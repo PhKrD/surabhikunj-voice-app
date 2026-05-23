@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  --color-saffron-50: #fff8f0;
+  --color-saffron-100: #ffecd9;
+  --color-saffron-200: #ffd4a8;
+  --color-saffron-300: #ffb870;
+  --color-saffron-400: #ff9638;
+  --color-saffron-500: #f97316;
+  --color-saffron-600: #ea6c0a;
+  --color-saffron-700: #c25608;
+  --color-saffron-800: #9a4410;
+  --color-saffron-900: #7c3a10;
+
+  --color-tulasi-50: #f0fdf4;
+  --color-tulasi-100: #dcfce7;
+  --color-tulasi-200: #bbf7d0;
+  --color-tulasi-300: #86efac;
+  --color-tulasi-400: #4ade80;
+  --color-tulasi-500: #22c55e;
+  --color-tulasi-600: #16a34a;
+  --color-tulasi-700: #15803d;
+  --color-tulasi-800: #166534;
+  --color-tulasi-900: #14532d;
+
+  --color-lotus-50: #fdf4ff;
+  --color-lotus-100: #fae8ff;
+  --color-lotus-200: #f5d0fe;
+  --color-lotus-300: #f0abfc;
+  --color-lotus-400: #e879f9;
+  --color-lotus-500: #d946ef;
+  --color-lotus-600: #c026d3;
+  --color-lotus-700: #a21caf;
+  --color-lotus-800: #86198f;
+  --color-lotus-900: #701a75;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-devanagari: 'Noto Serif Devanagari', Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

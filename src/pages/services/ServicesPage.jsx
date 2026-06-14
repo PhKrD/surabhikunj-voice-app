@@ -10,6 +10,7 @@ import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { cn, formatTime, isAdmin } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
+import DailyRoster from './DailyRoster'
 
 const statusConfig = {
   pending: { label: 'Pending', color: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
@@ -38,6 +39,7 @@ export default function ServicesPage() {
   const today = new Date().toISOString().split('T')[0]
   const [schedulerDate, setSchedulerDate] = useState(today)
   const [scheduling, setScheduling] = useState(false)
+  const [rosterReload, setRosterReload] = useState(0)
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -395,6 +397,7 @@ export default function ServicesPage() {
       }
 
       await loadData()
+      setRosterReload((n) => n + 1)
       toast.success(`Auto-scheduler completed (${inserts.length} allocations)`)
     } catch (error) {
       toast.error('Could not run auto-scheduler', error.message)
@@ -443,6 +446,14 @@ export default function ServicesPage() {
               <p className="text-xs text-slate-400">Allocates one devotee per service for selected date based on weekly preferences.</p>
             </CardBody>
           </Card>
+
+          <DailyRoster
+            voiceId={profile.voice_id}
+            services={masterServices}
+            date={schedulerDate}
+            allocatedBy={profile.id}
+            reloadSignal={rosterReload}
+          />
 
           {showForm && (
             <Card>

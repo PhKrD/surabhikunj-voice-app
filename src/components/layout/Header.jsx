@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Menu, Bell } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -26,25 +26,39 @@ export default function Header({ onMenuClick }) {
   const navigate = useNavigate()
   const { profile } = useAuthStore()
   const [unread, setUnread] = useState(0)
+  const profileId = profile?.id
   const label =
     routeLabels[location.pathname] ??
     (location.pathname.startsWith('/residents/') ? 'Resident Profile' : 'SurabhiKunj VOICE')
 
-  useEffect(() => {
-    if (!profile?.id) return undefined
-    let active = true
+  const fetchUnread = useCallback(() => {
+    if (!profileId) return
     supabase
       .from('notifications')
       .select('id', { count: 'exact', head: true })
-      .eq('profile_id', profile.id)
+      .eq('profile_id', profileId)
       .eq('is_read', false)
-      .then(({ count }) => {
-        if (active) setUnread(count ?? 0)
-      })
+      .then(({ count }) => setUnread(count ?? 0))
+  }, [profileId])
+
+  useEffect(() => {
+    fetchUnread()
+  }, [fetchUnread, location.pathname])
+
+  useEffect(() => {
+    if (!profileId) return undefined
+    const channel = supabase
+      .channel(`notif-bell-${profileId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `profile_id=eq.${profileId}` },
+        () => fetchUnread()
+      )
+      .subscribe()
     return () => {
-      active = false
+      supabase.removeChannel(channel)
     }
-  }, [profile?.id, location.pathname])
+  }, [profileId, fetchUnread])
 
   return (
     <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-sm border-b border-slate-100 px-4 py-3 flex items-center gap-3">

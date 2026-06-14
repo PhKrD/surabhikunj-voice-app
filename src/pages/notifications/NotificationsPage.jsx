@@ -43,6 +43,21 @@ export default function NotificationsPage() {
     return () => clearTimeout(id)
   }, [load])
 
+  useEffect(() => {
+    if (!profile?.id) return undefined
+    const channel = supabase
+      .channel(`notif-page-${profile.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `profile_id=eq.${profile.id}` },
+        () => load()
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [profile?.id, load])
+
   const markAllRead = async () => {
     if (!profile) return
     await supabase

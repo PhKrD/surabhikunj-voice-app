@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Building2, Users, Plus, ChevronRight, X, Pencil, Trash2 } from 'lucide-react'
+import * as LucideIcons from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
 import Card, { CardBody } from '@/components/ui/Card'
@@ -281,7 +282,12 @@ export default function DepartmentsPage() {
                     className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
                     style={{ backgroundColor: dept.color ? dept.color + '20' : '#f97316' + '20' }}
                   >
-                    {dept.icon ?? '🏛️'}
+                    {(() => {
+                      const LI = dept.icon && LucideIcons[dept.icon]
+                      return LI
+                        ? <LI className="w-5 h-5" style={{ color: dept.color ?? '#f97316' }} />
+                        : <span>{dept.icon ?? '🏛️'}</span>
+                    })()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">

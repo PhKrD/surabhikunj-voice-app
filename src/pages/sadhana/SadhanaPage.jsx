@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { BookOpen, PlusCircle, TrendingUp, Calendar, Award, Flame } from 'lucide-react'
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import { format } from 'date-fns'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -10,6 +9,8 @@ import { scoreBg, formatDate, minutesToHHMM, formatTime } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
 import SadhanaReportForm from './SadhanaReportForm'
+
+const SadhanaTrendChart = lazy(() => import('./SadhanaTrendChart'))
 
 export default function SadhanaPage() {
   const { profile } = useAuthStore()
@@ -227,16 +228,9 @@ export default function SadhanaPage() {
                 <h3 className="font-semibold text-slate-700">Score Trend (Last 14 Days)</h3>
               </CardHeader>
               <CardBody>
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="score" stroke="#f97316" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="japa" stroke="#d946ef" strokeWidth={1.5} dot={false} strokeDasharray="4 4" />
-                  </LineChart>
-                </ResponsiveContainer>
+                <Suspense fallback={<div className="h-[200px] flex items-center justify-center text-sm text-slate-400">Loading chart…</div>}>
+                  <SadhanaTrendChart data={chartData} />
+                </Suspense>
               </CardBody>
             </Card>
           )}

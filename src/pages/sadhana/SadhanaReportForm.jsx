@@ -7,6 +7,7 @@ import { calculateSadhanaScore, generateWhatsAppMessage } from '@/lib/sadhanaSco
 import { cn } from '@/lib/utils'
 import useAuthStore from '@/store/authStore'
 import { supabase } from '@/lib/supabase'
+import { enqueueSadhanaReport } from '@/lib/offlineQueue'
 
 const defaultForm = {
   report_date: new Date().toISOString().split('T')[0],
@@ -91,6 +92,7 @@ export default function SadhanaReportForm({ onSaved }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [queuedOffline, setQueuedOffline] = useState(false)
 
   const scores = useMemo(() => calculateSadhanaScore(form), [form])
 
@@ -99,13 +101,25 @@ export default function SadhanaReportForm({ onSaved }) {
   const handleSave = async () => {
     setSaving(true)
     setError('')
+    setQueuedOffline(false)
+    const scoreData = calculateSadhanaScore(form)
+    const payload = {
+      ...form,
+      profile_id: profile.id,
+      voice_id: profile.voice_id,
+      ...scoreData,
+    }
+    const queueForLater = () => {
+      enqueueSadhanaReport(payload)
+      setQueuedOffline(true)
+      setSaved(true)
+      onSaved?.()
+      setTimeout(() => setSaved(false), 3000)
+    }
     try {
-      const scoreData = calculateSadhanaScore(form)
-      const payload = {
-        ...form,
-        profile_id: profile.id,
-        voice_id: profile.voice_id,
-        ...scoreData,
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        queueForLater()
+        return
       }
       const { error: err } = await supabase
         .from('sadhana_reports')
@@ -116,7 +130,11 @@ export default function SadhanaReportForm({ onSaved }) {
       onSaved?.()
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
-      setError(err.message)
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        queueForLater()
+      } else {
+        setError(err.message)
+      }
     } finally {
       setSaving(false)
     }
@@ -237,6 +255,13 @@ export default function SadhanaReportForm({ onSaved }) {
         <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
           <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
           <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
+      {queuedOffline && (
+        <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+          <Clock className="w-4 h-4 text-blue-500 flex-shrink-0" />
+          <p className="text-sm text-blue-600">Saved offline — it will sync automatically when you're back online.</p>
         </div>
       )}
 

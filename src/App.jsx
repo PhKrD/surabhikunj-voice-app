@@ -2,6 +2,7 @@ import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import useAuthStore from '@/store/authStore'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { flushSadhanaQueue } from '@/lib/offlineQueue'
 
 const AppLayout = lazy(() => import('@/components/layout/AppLayout'))
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
@@ -32,13 +33,21 @@ function PageFallback() {
 }
 
 function AppBootstrap() {
-  const { initialize, initialized } = useAuthStore()
+  const { initialize, initialized, user } = useAuthStore()
 
   useEffect(() => {
     if (!initialized) {
       initialize()
     }
   }, [initialize, initialized])
+
+  useEffect(() => {
+    if (!user) return
+    flushSadhanaQueue()
+    const onOnline = () => flushSadhanaQueue()
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [user])
 
   return null
 }

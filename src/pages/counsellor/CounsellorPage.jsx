@@ -6,40 +6,107 @@ import useAuthStore from '@/store/authStore'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
+import Button from '@/components/ui/Button'
 import { ROLES, ROLE_COLORS, formatDate, scoreBg } from '@/lib/utils'
+import useToastStore from '@/store/toastStore'
+
+const COUNSELLOR_ROLES = ['counsellor', 'sadhana_incharge']
+const ADMIN_ROLES = ['admin', 'vmc', 'oc']
 
 export default function CounsellorPage() {
-  const { profile } = useAuthStore()
-  const isCounsellor = ['counsellor', 'sadhana_incharge', 'admin', 'vmc', 'oc'].includes(profile?.role)
+  const { profile, loginType } = useAuthStore()
+  const toast = useToastStore()
+  const isCounsellor = loginType === 'counsellor'
+  const canManageAssignments = ADMIN_ROLES.includes(profile?.role)
 
   const [counsellees, setCounsellees] = useState([])
   const [counsellor, setCounsellor] = useState(null)
+  const [counsellors, setCounsellors] = useState([])
+  const [devotees, setDevotees] = useState([])
+  const [draftAssignments, setDraftAssignments] = useState({})
+  const [savingId, setSavingId] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!profile) return
+
     const load = async () => {
       setLoading(true)
-      if (isCounsellor) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*, sadhana_reports(score, report_date)')
-          .eq('counsellor_id', profile.id)
-          .eq('is_active', true)
-          .order('spiritual_name')
-        setCounsellees(data ?? [])
-      } else if (profile.counsellor_id) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', profile.counsellor_id)
-          .single()
-        setCounsellor(data)
+
+      try {
+        if (isCounsellor) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*, sadhana_reports(score, report_date)')
+            .eq('counsellor_id', profile.id)
+            .eq('is_active', true)
+            .order('spiritual_name')
+
+          if (error) throw error
+          setCounsellees(data ?? [])
+        } else if (canManageAssignments) {
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, spiritual_name, legal_name, avatar_url, role, counsellor_id')
+            .eq('voice_id', profile.voice_id)
+            .eq('is_active', true)
+            .order('spiritual_name')
+
+          if (profileError) throw profileError
+
+          const rows = profileData ?? []
+          const counsellorData = rows.filter((p) => COUNSELLOR_ROLES.includes(p.role))
+          const devoteeData = rows.filter(
+            (p) => p.id !== profile.id && !COUNSELLOR_ROLES.includes(p.role) && !ADMIN_ROLES.includes(p.role)
+          )
+
+          setCounsellors(counsellorData)
+          setDevotees(devoteeData)
+          setDraftAssignments(
+            Object.fromEntries(devoteeData.map((d) => [d.id, d.counsellor_id ?? '']))
+          )
+        } else if (profile.counsellor_id) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', profile.counsellor_id)
+            .single()
+
+          if (error) throw error
+          setCounsellor(data)
+        }
+      } catch (error) {
+        toast.error('Could not load counsellor data', error.message)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
+
     load()
-  }, [profile, isCounsellor])
+  }, [profile, loginType, isCounsellor, canManageAssignments, toast])
+
+  const saveAssignment = async (devotee) => {
+    if (!profile) return
+
+    setSavingId(devotee.id)
+    try {
+      const nextCounsellorId = draftAssignments[devotee.id] || null
+      const { error } = await supabase
+        .from('profiles')
+        .update({ counsellor_id: nextCounsellorId })
+        .eq('id', devotee.id)
+        .eq('voice_id', profile.voice_id)
+
+      if (error) throw error
+
+      setDevotees((prev) => prev.map((d) => (d.id === devotee.id ? { ...d, counsellor_id: nextCounsellorId } : d)))
+      toast.success(nextCounsellorId ? 'Counsellor assigned' : 'Counsellor removed')
+    } catch (error) {
+      toast.error('Could not update assignment', error.message)
+    } finally {
+      setSavingId(null)
+    }
+  }
 
   if (loading) {
     return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
@@ -99,6 +166,66 @@ export default function CounsellorPage() {
             </motion.div>
           )
         })}
+      </div>
+    )
+  }
+
+  if (canManageAssignments) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-slate-800">Counsellor Assignments</h2>
+          <Badge variant="saffron">Admin</Badge>
+        </div>
+
+        {devotees.length === 0 ? (
+          <Card>
+            <CardBody>
+              <div className="flex flex-col items-center py-10 text-slate-400">
+                <Users className="w-12 h-12 mb-3 opacity-30" />
+                <p className="text-sm">No assignable members found in this VOICE.</p>
+                <p className="text-xs text-slate-300 mt-1">Users with counsellor/admin roles are excluded from this list.</p>
+              </div>
+            </CardBody>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {devotees.map((devotee) => (
+              <Card key={devotee.id}>
+                <CardBody className="py-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-800 truncate">{devotee.spiritual_name}</p>
+                      {devotee.legal_name ? <p className="text-xs text-slate-400">{devotee.legal_name}</p> : null}
+                    </div>
+
+                    <select
+                      value={draftAssignments[devotee.id] ?? ''}
+                      onChange={(e) => setDraftAssignments((prev) => ({ ...prev, [devotee.id]: e.target.value }))}
+                      className="w-full sm:w-64 px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                      disabled={savingId === devotee.id || counsellors.length === 0}
+                    >
+                      <option value="">Unassigned</option>
+                      {counsellors.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.spiritual_name} ({ROLES[c.role] ?? c.role})
+                        </option>
+                      ))}
+                    </select>
+
+                    <Button
+                      size="sm"
+                      onClick={() => saveAssignment(devotee)}
+                      loading={savingId === devotee.id}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </CardBody>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     )
   }

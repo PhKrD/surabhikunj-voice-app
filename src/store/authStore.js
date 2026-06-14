@@ -8,6 +8,12 @@ const useAuthStore = create((set, get) => ({
   profile: null,
   loading: true,
   initialized: false,
+  loginType: localStorage.getItem('loginType') || 'counsellee',
+
+  setLoginType: (type) => {
+    localStorage.setItem('loginType', type)
+    set({ loginType: type })
+  },
 
   initialize: async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -21,7 +27,8 @@ const useAuthStore = create((set, get) => ({
         set({ user: session.user })
         await get().fetchProfile(session.user.id)
       } else if (event === 'SIGNED_OUT') {
-        set({ user: null, profile: null })
+        localStorage.removeItem('loginType')
+        set({ user: null, profile: null, loginType: 'counsellee' })
       }
     })
   },

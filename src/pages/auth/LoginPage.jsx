@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button'
 
 export default function LoginPage() {
   const [mode, setMode] = useState('login') // 'login' | 'signup'
+  const [loginType, setLoginType] = useState('counsellee') // 'counsellor' | 'counsellee'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [spiritualName, setSpiritualName] = useState('')
@@ -24,9 +25,11 @@ export default function LoginPage() {
     try {
       if (mode === 'login') {
         await signInWithEmail(email, password)
+        localStorage.setItem('loginType', loginType)
         navigate('/')
       } else {
         await signUpWithEmail(email, password, spiritualName)
+        localStorage.setItem('loginType', 'counsellee')
         navigate('/')
       }
     } catch (err) {
@@ -73,6 +76,39 @@ export default function LoginPage() {
               </button>
             ))}
           </div>
+
+          {/* Login Type Selection (only for login mode) */}
+          {mode === 'login' && (
+            <div className="mb-6">
+              <p className="text-sm font-medium text-slate-700 mb-3">I am a:</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setLoginType('counsellee')}
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                    loginType === 'counsellee'
+                      ? 'border-saffron-400 bg-saffron-50'
+                      : 'border-slate-200 hover:border-saffron-200'
+                  }`}
+                >
+                  <p className="font-semibold text-slate-800">Counsellee</p>
+                  <p className="text-xs text-slate-500 mt-1">View my counsellor & submit reports</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLoginType('counsellor')}
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                    loginType === 'counsellor'
+                      ? 'border-saffron-400 bg-saffron-50'
+                      : 'border-slate-200 hover:border-saffron-200'
+                  }`}
+                >
+                  <p className="font-semibold text-slate-800">Counsellor</p>
+                  <p className="text-xs text-slate-500 mt-1">Manage my counsellees</p>
+                </button>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (

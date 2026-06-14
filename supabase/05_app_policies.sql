@@ -34,6 +34,123 @@ create policy "service_allocations_write" on public.service_allocations
   );
 
 -- ============================================================
+-- SERVICE PREFERENCES SELECT/WRITE
+-- Devotees set their own preferences; IM/admin can read for scheduler
+-- ============================================================
+
+drop policy if exists "service_preferences_select" on public.service_preferences;
+create policy "service_preferences_select" on public.service_preferences
+  for select
+  using (
+    exists (
+      select 1
+      from public.services s
+      where s.id = service_preferences.service_id
+        and s.voice_id = get_my_voice_id()
+    )
+    and (
+      profile_id = auth.uid()
+      or get_my_role() in ('im', 'admin', 'vmc', 'oc')
+    )
+  );
+
+drop policy if exists "service_preferences_write" on public.service_preferences;
+create policy "service_preferences_write" on public.service_preferences
+  for all
+  using (
+    exists (
+      select 1
+      from public.services s
+      where s.id = service_preferences.service_id
+        and s.voice_id = get_my_voice_id()
+    )
+    and (
+      profile_id = auth.uid()
+      or get_my_role() in ('im', 'admin', 'vmc', 'oc')
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.services s
+      where s.id = service_preferences.service_id
+        and s.voice_id = get_my_voice_id()
+    )
+    and (
+      profile_id = auth.uid()
+      or get_my_role() in ('im', 'admin', 'vmc', 'oc')
+    )
+  );
+
+-- ============================================================
+-- CLEANING ASSIGNMENTS SELECT/WRITE
+-- Needed for admin area assignment workflow in CleanlinessPage
+-- ============================================================
+
+drop policy if exists "cleaning_assignments_select" on public.cleaning_assignments;
+create policy "cleaning_assignments_select" on public.cleaning_assignments
+  for select
+  using (
+    exists (
+      select 1
+      from public.cleaning_areas a
+      where a.id = cleaning_assignments.area_id
+        and a.voice_id = get_my_voice_id()
+    )
+  );
+
+drop policy if exists "cleaning_assignments_write" on public.cleaning_assignments;
+create policy "cleaning_assignments_write" on public.cleaning_assignments
+  for all
+  using (
+    exists (
+      select 1
+      from public.cleaning_areas a
+      where a.id = cleaning_assignments.area_id
+        and a.voice_id = get_my_voice_id()
+    )
+    and is_admin()
+  )
+  with check (
+    exists (
+      select 1
+      from public.cleaning_areas a
+      where a.id = cleaning_assignments.area_id
+        and a.voice_id = get_my_voice_id()
+    )
+    and exists (
+      select 1
+      from public.profiles p
+      where p.id = cleaning_assignments.profile_id
+        and p.voice_id = get_my_voice_id()
+    )
+    and is_admin()
+  );
+
+-- ============================================================
+-- PROFILES UPDATE HARDENING
+-- Replace broad update policy with voice-scoped checks
+-- ============================================================
+
+drop policy if exists "profiles_update_self" on public.profiles;
+create policy "profiles_update_self" on public.profiles
+  for update
+  using (
+    voice_id = get_my_voice_id()
+    and (
+      id = auth.uid()
+      or is_admin()
+    )
+  )
+  with check (
+    voice_id = get_my_voice_id()
+    and (
+      id = auth.uid()
+      or is_admin()
+    )
+  );
+
+-- ============================================================
 -- NOTIFICATIONS INSERT/UPDATE
 -- Required for in-app notification creation from client
 -- ============================================================

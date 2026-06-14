@@ -128,12 +128,6 @@ export default function SadhanaReportForm({ onSaved }) {
     window.open(`https://wa.me/?text=${encoded}`, '_blank')
   }
 
-  const handleWhatsAppCounsellor = () => {
-    const msg = generateWhatsAppMessage(form, profile?.spiritual_name)
-    const encoded = encodeURIComponent(msg)
-    window.open(`https://wa.me/?text=${encoded}`, '_blank')
-  }
-
   return (
     <div className="space-y-4 max-w-2xl">
       {/* Date picker */}
@@ -253,9 +247,6 @@ export default function SadhanaReportForm({ onSaved }) {
         </Button>
         <Button onClick={handleWhatsApp} variant="tulasi" icon={MessageCircle}>
           Share via WhatsApp
-        </Button>
-        <Button onClick={handleWhatsAppCounsellor} variant="secondary" icon={Send}>
-          Send to Counsellor
         </Button>
       </div>
 

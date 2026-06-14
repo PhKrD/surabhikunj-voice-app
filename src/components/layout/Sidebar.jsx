@@ -52,10 +52,21 @@ function NavItem({ item, collapsed, onClick }) {
   )
 }
 
+const COUNSELLOR_ROLES = ['counsellor', 'sadhana_incharge', 'admin', 'vmc', 'oc']
+
 export default function Sidebar({ mobileOpen, onClose }) {
-  const { profile, signOut } = useAuthStore()
+  const { profile, signOut, loginType, setLoginType } = useAuthStore()
   const navigate = useNavigate()
   const [signingOut, setSigningOut] = useState(false)
+
+  const canBeCounsellor = COUNSELLOR_ROLES.includes(profile?.role)
+
+  const toggleLoginType = () => {
+    const newType = loginType === 'counsellor' ? 'counsellee' : 'counsellor'
+    setLoginType(newType)
+    navigate('/counsellor')
+    onClose?.()
+  }
 
   const handleSignOut = async () => {
     if (signingOut) return
@@ -130,12 +141,25 @@ export default function Sidebar({ mobileOpen, onClose }) {
 
       {/* Profile */}
       {profile && (
-        <div className="mx-3 mb-4 p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
-          <Avatar name={profile.spiritual_name} url={profile.avatar_url} size="sm" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-slate-800 truncate">{profile.spiritual_name}</p>
-            <Badge variant="saffron" className="text-xs">{profile.role}</Badge>
+        <div className="mx-3 mb-4 p-3 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <Avatar name={profile.spiritual_name} url={profile.avatar_url} size="sm" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-800 truncate">{profile.spiritual_name}</p>
+              <Badge variant="saffron" className="text-xs">{profile.role}</Badge>
+            </div>
           </div>
+          {canBeCounsellor && (
+            <button
+              onClick={toggleLoginType}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-600 hover:bg-saffron-50 hover:text-saffron-700 hover:border-saffron-200 transition-all"
+            >
+              <Users className="w-4 h-4" />
+              <span>
+                View as: <span className="font-semibold">{loginType === 'counsellor' ? 'Counsellor' : 'Counsellee'}</span>
+              </span>
+            </button>
+          )}
         </div>
       )}
     </div>

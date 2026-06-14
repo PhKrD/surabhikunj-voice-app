@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { ListChecks, Clock, CheckCircle2, Plus, X, Pencil, Trash2 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, startOfWeek } from 'date-fns'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
@@ -30,9 +30,14 @@ export default function ServicesPage() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [archivingId, setArchivingId] = useState(null)
+  const [preferenceSaving, setPreferenceSaving] = useState({})
   const [editingId, setEditingId] = useState(null)
   const [formError, setFormError] = useState('')
   const [focusedServiceId, setFocusedServiceId] = useState(null)
+  const [preferences, setPreferences] = useState({})
+  const today = new Date().toISOString().split('T')[0]
+  const [schedulerDate, setSchedulerDate] = useState(today)
+  const [scheduling, setScheduling] = useState(false)
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -41,7 +46,6 @@ export default function ServicesPage() {
     instructions: '',
     is_recurring: false,
   })
-  const today = new Date().toISOString().split('T')[0]
   const canManage = profile?.role === 'im' || isAdmin(profile?.role)
   const linkedServiceId = location.state?.referenceId
   const serviceRefs = useRef({})
@@ -92,26 +96,39 @@ export default function ServicesPage() {
 
       if (error) throw error
 
-      const servicesQuery = canManage
-        ? supabase
-          .from('services')
-          .select('*')
-          .eq('voice_id', profile.voice_id)
-          .eq('is_active', true)
-          .order('name')
-        : Promise.resolve({ data: [], error: null })
+      const servicesQuery = supabase
+        .from('services')
+        .select('*')
+        .eq('voice_id', profile.voice_id)
+        .eq('is_active', true)
+        .order('name')
 
       const { data: servicesData, error: servicesError } = await servicesQuery
       if (servicesError) throw servicesError
 
+      const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+      const { data: prefData, error: prefError } = await supabase
+        .from('service_preferences')
+        .select('service_id, preference')
+        .eq('profile_id', profile.id)
+        .eq('week_start', weekStart)
+
+      if (prefError) throw prefError
+
+      const prefMap = {}
+      ;(prefData ?? []).forEach((p) => {
+        prefMap[p.service_id] = p.preference
+      })
+
       setAllocations(data ?? [])
       setMasterServices(servicesData ?? [])
+      setPreferences(prefMap)
     } catch (error) {
       toast.error('Could not load services', error.message)
     } finally {
       setLoading(false)
     }
-  }, [profile, today, canManage, toast])
+  }, [profile, today, toast])
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -286,6 +303,106 @@ export default function ServicesPage() {
     }
   }
 
+  const savePreference = async (serviceId, preferenceValue) => {
+    if (!profile) return
+
+    const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+    setPreferenceSaving((prev) => ({ ...prev, [serviceId]: true }))
+    try {
+      const payload = {
+        profile_id: profile.id,
+        service_id: serviceId,
+        week_start: weekStart,
+        preference: preferenceValue,
+      }
+
+      const { error } = await supabase
+        .from('service_preferences')
+        .upsert(payload, { onConflict: 'profile_id,service_id,week_start' })
+
+      if (error) throw error
+
+      setPreferences((prev) => ({ ...prev, [serviceId]: preferenceValue }))
+      toast.success('Preference updated')
+    } catch (error) {
+      toast.error('Could not save preference', error.message)
+    } finally {
+      setPreferenceSaving((prev) => ({ ...prev, [serviceId]: false }))
+    }
+  }
+
+  const runAutoScheduler = async () => {
+    if (!profile || !canManage || !schedulerDate) return
+
+    setScheduling(true)
+    try {
+      const weekStart = format(startOfWeek(new Date(schedulerDate), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+
+      const { data: prefRows, error: prefError } = await supabase
+        .from('service_preferences')
+        .select('profile_id, service_id, preference')
+        .eq('week_start', weekStart)
+
+      if (prefError) throw prefError
+
+      const { data: existingAllocations, error: existingError } = await supabase
+        .from('service_allocations')
+        .select('service_id, profile_id')
+        .eq('voice_id', profile.voice_id)
+        .eq('service_date', schedulerDate)
+
+      if (existingError) throw existingError
+
+      const existingServiceIds = new Set((existingAllocations ?? []).map((a) => a.service_id))
+      const usedProfileIds = new Set((existingAllocations ?? []).map((a) => a.profile_id))
+
+      const grouped = {}
+      ;(prefRows ?? []).forEach((row) => {
+        if (!grouped[row.service_id]) grouped[row.service_id] = []
+        grouped[row.service_id].push(row)
+      })
+
+      Object.values(grouped).forEach((rows) => {
+        rows.sort((a, b) => b.preference - a.preference)
+      })
+
+      const inserts = []
+      masterServices.forEach((service) => {
+        if (existingServiceIds.has(service.id)) return
+
+        const candidates = grouped[service.id] ?? []
+        const pick = candidates.find((c) => !usedProfileIds.has(c.profile_id))
+        if (!pick) return
+
+        usedProfileIds.add(pick.profile_id)
+        inserts.push({
+          voice_id: profile.voice_id,
+          service_id: service.id,
+          profile_id: pick.profile_id,
+          service_date: schedulerDate,
+          service_time: service.default_time || null,
+          status: 'pending',
+          allocated_by: profile.id,
+        })
+      })
+
+      if (inserts.length > 0) {
+        const { error: insertError } = await supabase
+          .from('service_allocations')
+          .insert(inserts)
+
+        if (insertError) throw insertError
+      }
+
+      await loadData()
+      toast.success(`Auto-scheduler completed (${inserts.length} allocations)`)
+    } catch (error) {
+      toast.error('Could not run auto-scheduler', error.message)
+    } finally {
+      setScheduling(false)
+    }
+  }
+
   if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
 
   const today_alloc = allocations.filter((a) => a.service_date === today)
@@ -308,6 +425,24 @@ export default function ServicesPage() {
               {showForm ? 'Close' : 'Add Service'}
             </Button>
           </div>
+
+          <Card>
+            <CardBody className="py-4 space-y-2">
+              <p className="text-sm font-semibold text-slate-700">Weekly Auto Allocation</p>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <input
+                  type="date"
+                  value={schedulerDate}
+                  onChange={(e) => setSchedulerDate(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                />
+                <Button size="sm" onClick={runAutoScheduler} loading={scheduling}>
+                  Auto-allocate from preferences
+                </Button>
+              </div>
+              <p className="text-xs text-slate-400">Allocates one devotee per service for selected date based on weekly preferences.</p>
+            </CardBody>
+          </Card>
 
           {showForm && (
             <Card>
@@ -451,6 +586,50 @@ export default function ServicesPage() {
               </CardBody>
             </Card>
           )}
+        </div>
+      )}
+
+      {!canManage && masterServices.length > 0 && (
+        <div>
+          <h3 className="text-base font-semibold text-slate-700 mb-3">My Weekly Service Preferences</h3>
+          <Card>
+            <CardBody>
+              <div className="space-y-2">
+                {masterServices.map((service) => {
+                  const current = preferences[service.id]
+                  return (
+                    <div key={service.id} className="flex flex-col sm:flex-row sm:items-center gap-2 py-2 border-b border-slate-50 last:border-0">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-700">{service.name}</p>
+                        {service.description ? <p className="text-xs text-slate-400 line-clamp-1">{service.description}</p> : null}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {[
+                          { label: 'Prefer', value: 1, active: 'bg-tulasi-50 text-tulasi-700 border-tulasi-200' },
+                          { label: 'Okay', value: 0, active: 'bg-saffron-50 text-saffron-700 border-saffron-200' },
+                          { label: 'Avoid', value: -1, active: 'bg-red-50 text-red-700 border-red-200' },
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => savePreference(service.id, option.value)}
+                            disabled={preferenceSaving[service.id]}
+                            className={cn(
+                              'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors',
+                              current === option.value
+                                ? option.active
+                                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                            )}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardBody>
+          </Card>
         </div>
       )}
 

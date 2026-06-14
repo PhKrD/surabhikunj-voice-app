@@ -4,8 +4,9 @@ import { Sparkles, CheckCircle2, XCircle, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
 import Card, { CardBody } from '@/components/ui/Card'
-import Badge from '@/components/ui/Badge'
+import Button from '@/components/ui/Button'
 import { cn, isAdmin } from '@/lib/utils'
+import useToastStore from '@/store/toastStore'
 
 const statusConfig = {
   done: { label: 'Done', icon: CheckCircle2, color: 'text-tulasi-600', bg: 'bg-tulasi-50 border-tulasi-200' },
@@ -15,72 +16,186 @@ const statusConfig = {
 
 export default function CleanlinessPage() {
   const { profile } = useAuthStore()
+  const toast = useToastStore()
   const [areas, setAreas] = useState([])
   const [myAreas, setMyAreas] = useState([])
+  const [devotees, setDevotees] = useState([])
+  const [areaAssignments, setAreaAssignments] = useState({})
   const [logs, setLogs] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState({})
+  const [creatingArea, setCreatingArea] = useState(false)
+  const [assigningAreaId, setAssigningAreaId] = useState(null)
+  const [areaDraft, setAreaDraft] = useState({ name: '', floor: '', description: '' })
   const today = new Date().toISOString().split('T')[0]
   const admin = isAdmin(profile?.role)
 
   useEffect(() => {
     if (!profile) return
+
     const load = async () => {
       setLoading(true)
-
-      // My assigned areas
-      const { data: assignments } = await supabase
-        .from('cleaning_assignments')
-        .select('*, cleaning_areas(*)')
-        .eq('profile_id', profile.id)
-      setMyAreas(assignments?.map((a) => a.cleaning_areas).filter(Boolean) ?? [])
-
-      // Today's logs for my areas
-      const areaIds = assignments?.map((a) => a.area_id) ?? []
-      if (areaIds.length > 0) {
-        const { data: todayLogs } = await supabase
-          .from('cleaning_logs')
-          .select('*')
-          .in('area_id', areaIds)
+      try {
+        const { data: assignments, error: assignmentsError } = await supabase
+          .from('cleaning_assignments')
+          .select('area_id, profile_id, cleaning_areas(*)')
           .eq('profile_id', profile.id)
-          .eq('log_date', today)
-        const logMap = {}
-        todayLogs?.forEach((l) => { logMap[l.area_id] = l })
-        setLogs(logMap)
-      }
 
-      // All areas if admin
-      if (admin) {
-        const { data: allAreas } = await supabase
-          .from('cleaning_areas')
-          .select('*')
-          .eq('voice_id', profile.voice_id)
-          .eq('is_active', true)
-          .order('name')
-        setAreas(allAreas ?? [])
-      }
+        if (assignmentsError) throw assignmentsError
+        setMyAreas(assignments?.map((a) => a.cleaning_areas).filter(Boolean) ?? [])
 
-      setLoading(false)
+        const areaIds = assignments?.map((a) => a.area_id) ?? []
+        if (areaIds.length > 0) {
+          const { data: todayLogs, error: logsError } = await supabase
+            .from('cleaning_logs')
+            .select('*')
+            .in('area_id', areaIds)
+            .eq('profile_id', profile.id)
+            .eq('log_date', today)
+
+          if (logsError) throw logsError
+
+          const logMap = {}
+          todayLogs?.forEach((l) => { logMap[l.area_id] = l })
+          setLogs(logMap)
+        } else {
+          setLogs({})
+        }
+
+        if (admin) {
+          const [{ data: allAreas, error: allAreasError }, { data: allDevotees, error: allDevoteesError }, { data: allAssignments, error: allAssignmentsError }] = await Promise.all([
+            supabase
+              .from('cleaning_areas')
+              .select('*')
+              .eq('voice_id', profile.voice_id)
+              .eq('is_active', true)
+              .order('name'),
+            supabase
+              .from('profiles')
+              .select('id, spiritual_name')
+              .eq('voice_id', profile.voice_id)
+              .eq('is_active', true)
+              .eq('role', 'devotee')
+              .order('spiritual_name'),
+            supabase
+              .from('cleaning_assignments')
+              .select('area_id, profile_id')
+              .eq('voice_id', profile.voice_id),
+          ])
+
+          if (allAreasError) throw allAreasError
+          if (allDevoteesError) throw allDevoteesError
+          if (allAssignmentsError) throw allAssignmentsError
+
+          setAreas(allAreas ?? [])
+          setDevotees(allDevotees ?? [])
+
+          const assignmentMap = {}
+          allAssignments?.forEach((a) => {
+            if (!assignmentMap[a.area_id]) {
+              assignmentMap[a.area_id] = a.profile_id
+            }
+          })
+          setAreaAssignments(assignmentMap)
+        }
+      } catch (error) {
+        toast.error('Could not load cleanliness data', error.message)
+      } finally {
+        setLoading(false)
+      }
     }
+
     load()
-  }, [profile, admin, today])
+  }, [profile, admin, today, toast])
 
   const markStatus = async (area, status) => {
     setSaving((s) => ({ ...s, [area.id]: true }))
-    const payload = {
-      voice_id: profile.voice_id,
-      area_id: area.id,
-      profile_id: profile.id,
-      log_date: today,
-      status,
+    try {
+      const payload = {
+        voice_id: profile.voice_id,
+        area_id: area.id,
+        profile_id: profile.id,
+        log_date: today,
+        status,
+      }
+      const { data, error } = await supabase
+        .from('cleaning_logs')
+        .upsert(payload, { onConflict: 'area_id,profile_id,log_date' })
+        .select()
+        .single()
+
+      if (error) throw error
+      if (data) setLogs((l) => ({ ...l, [area.id]: data }))
+    } catch (error) {
+      toast.error('Could not update cleaning status', error.message)
+    } finally {
+      setSaving((s) => ({ ...s, [area.id]: false }))
     }
-    const { data } = await supabase
-      .from('cleaning_logs')
-      .upsert(payload, { onConflict: 'area_id,profile_id,log_date' })
-      .select()
-      .single()
-    if (data) setLogs((l) => ({ ...l, [area.id]: data }))
-    setSaving((s) => ({ ...s, [area.id]: false }))
+  }
+
+  const createArea = async () => {
+    if (!profile || !areaDraft.name.trim()) return
+
+    setCreatingArea(true)
+    try {
+      const payload = {
+        voice_id: profile.voice_id,
+        name: areaDraft.name.trim(),
+        floor: areaDraft.floor.trim() || null,
+        description: areaDraft.description.trim() || null,
+        is_active: true,
+      }
+
+      const { data, error } = await supabase
+        .from('cleaning_areas')
+        .insert(payload)
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setAreas((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+      setAreaDraft({ name: '', floor: '', description: '' })
+      toast.success('Cleaning area created')
+    } catch (error) {
+      toast.error('Could not create cleaning area', error.message)
+    } finally {
+      setCreatingArea(false)
+    }
+  }
+
+  const saveAreaAssignment = async (areaId) => {
+    if (!profile) return
+
+    const assigneeId = areaAssignments[areaId] || ''
+    setAssigningAreaId(areaId)
+    try {
+      const { error: clearError } = await supabase
+        .from('cleaning_assignments')
+        .delete()
+        .eq('voice_id', profile.voice_id)
+        .eq('area_id', areaId)
+
+      if (clearError) throw clearError
+
+      if (assigneeId) {
+        const { error: insertError } = await supabase
+          .from('cleaning_assignments')
+          .insert({
+            voice_id: profile.voice_id,
+            area_id: areaId,
+            profile_id: assigneeId,
+          })
+
+        if (insertError) throw insertError
+      }
+
+      toast.success(assigneeId ? 'Assignment saved' : 'Assignment removed')
+    } catch (error) {
+      toast.error('Could not save assignment', error.message)
+    } finally {
+      setAssigningAreaId(null)
+    }
   }
 
   if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
@@ -157,18 +272,66 @@ export default function CleanlinessPage() {
 
       {/* Admin: all areas overview */}
       {admin && (
-        <div>
-          <h3 className="text-base font-semibold text-slate-700 mb-3">All Areas Overview</h3>
+        <div className="space-y-3">
+          <h3 className="text-base font-semibold text-slate-700">Area Management</h3>
+
+          <Card>
+            <CardBody className="space-y-3">
+              <p className="text-sm font-semibold text-slate-700">Create Cleaning Area</p>
+              <div className="grid sm:grid-cols-3 gap-2">
+                <input
+                  value={areaDraft.name}
+                  onChange={(e) => setAreaDraft((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Area name"
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                />
+                <input
+                  value={areaDraft.floor}
+                  onChange={(e) => setAreaDraft((prev) => ({ ...prev, floor: e.target.value }))}
+                  placeholder="Floor"
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                />
+                <input
+                  value={areaDraft.description}
+                  onChange={(e) => setAreaDraft((prev) => ({ ...prev, description: e.target.value }))}
+                  placeholder="Description"
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                />
+              </div>
+              <Button size="sm" onClick={createArea} loading={creatingArea}>Add Area</Button>
+            </CardBody>
+          </Card>
+
           <Card>
             <CardBody>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {areas.map((area) => (
-                  <div key={area.id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                    <div>
+                  <div key={area.id} className="flex flex-col sm:flex-row sm:items-center gap-2 py-2 border-b border-slate-50 last:border-0">
+                    <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-700">{area.name}</p>
                       {area.floor && <p className="text-xs text-slate-400">{area.floor}</p>}
                     </div>
-                    <Badge variant="default">Monitoring</Badge>
+
+                    <select
+                      value={areaAssignments[area.id] ?? ''}
+                      onChange={(e) => setAreaAssignments((prev) => ({ ...prev, [area.id]: e.target.value }))}
+                      className="w-full sm:w-56 px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                      disabled={assigningAreaId === area.id}
+                    >
+                      <option value="">Unassigned</option>
+                      {devotees.map((d) => (
+                        <option key={d.id} value={d.id}>{d.spiritual_name}</option>
+                      ))}
+                    </select>
+
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => saveAreaAssignment(area.id)}
+                      loading={assigningAreaId === area.id}
+                    >
+                      Save
+                    </Button>
                   </div>
                 ))}
               </div>

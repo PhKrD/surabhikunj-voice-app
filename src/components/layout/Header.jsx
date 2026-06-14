@@ -1,5 +1,5 @@
-import { Menu, Bell, Search } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { Menu, Bell } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '@/store/authStore'
 import Avatar from '@/components/ui/Avatar'
 
@@ -19,6 +19,7 @@ const routeLabels = {
 
 export default function Header({ onMenuClick }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const { profile } = useAuthStore()
   const label = routeLabels[location.pathname] ?? 'SurabhiKunj VOICE'
 
@@ -34,10 +35,11 @@ export default function Header({ onMenuClick }) {
       <h1 className="flex-1 text-lg font-semibold text-slate-800 truncate">{label}</h1>
 
       <div className="flex items-center gap-2">
-        <button className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors">
-          <Search className="w-5 h-5" />
-        </button>
-        <button className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors">
+        <button 
+          onClick={() => navigate('/notifications')}
+          className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors"
+          title="Notifications"
+        >
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-saffron-500 rounded-full" />
         </button>
@@ -47,6 +49,7 @@ export default function Header({ onMenuClick }) {
             url={profile.avatar_url}
             size="sm"
             className="cursor-pointer ring-2 ring-saffron-200 ring-offset-1"
+            onClick={() => navigate('/settings')}
           />
         )}
       </div>

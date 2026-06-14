@@ -51,3 +51,40 @@ values
     true
   )
 on conflict do nothing;
+
+-- Today's prasadam menu (lights up the dashboard "Today's Prasadam" card)
+insert into public.meal_plans (voice_id, plan_date, meal_type, menu_items, notes, is_special)
+values
+  ('a1b2c3d4-e5f6-7890-abcd-ef1234567890', current_date, 'breakfast', array['Upma', 'Seasonal Fruit', 'Milk'], null, false),
+  ('a1b2c3d4-e5f6-7890-abcd-ef1234567890', current_date, 'lunch', array['Rice', 'Dal', 'Sabji', 'Salad', 'Sweet'], 'Full prasadam', false),
+  ('a1b2c3d4-e5f6-7890-abcd-ef1234567890', current_date, 'dinner', array['Khichdi', 'Roti', 'Subji'], null, false)
+on conflict (voice_id, plan_date, meal_type) do nothing;
+
+-- An event happening today (shows in "Upcoming Events")
+insert into public.events (voice_id, title, description, event_type, start_datetime, end_datetime, venue, is_mandatory, notify_all)
+select
+  'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+  'Evening Bhagavatam Class',
+  'Daily Srimad-Bhagavatam class and kirtan.',
+  'program',
+  date_trunc('day', now()) + interval '19 hour',
+  date_trunc('day', now()) + interval '20 hour',
+  'Temple Hall',
+  false,
+  true
+where not exists (
+  select 1 from public.events
+  where voice_id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' and title = 'Evening Bhagavatam Class'
+);
+
+-- Announcements (created_by left null for seed; client inserts are RLS-restricted to leadership)
+insert into public.announcements (voice_id, title, body, is_pinned)
+select 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', v.title, v.body, v.pinned
+from (values
+  ('Mangala Arati timing update', 'Mangala arati begins at 4:45 AM starting this week. Please plan your sadhana accordingly.', true),
+  ('Sunday Feast seva sign-up', 'Sign-up for Sunday Feast seva is now open. Please speak to your department incharge.', false)
+) as v(title, body, pinned)
+where not exists (
+  select 1 from public.announcements a
+  where a.voice_id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' and a.title = v.title
+);

@@ -32,14 +32,22 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_DEFAULT_VOICE_ID=a1b2c3d4-e5f6-7890-abcd-ef1234567890
 ```
 
-4. Run SQL setup in Supabase SQL editor:
+4. Run SQL setup in the Supabase SQL editor, in this order:
 
+Required (schema + policies):
 - `supabase/01_schema.sql`
 - `supabase/02_bootstrap.sql`
-- optional: `supabase/03_seed_demo.sql`
 - `supabase/04_events_soft_delete.sql`
-- `supabase/05_app_policies.sql` (required)
-- `supabase/06_make_first_admin.sql` (required once)
+- `supabase/05_app_policies.sql`
+- `supabase/07_department_members_policies.sql`
+- `supabase/08_announcements.sql`
+
+After your first sign-up (promote yourself to admin):
+- `supabase/06_make_first_admin.sql` (edit the email first, run once)
+
+Optional demo data:
+- `supabase/03_seed_demo.sql` — departments, services, cleaning areas, events, today's prasadam menu, announcements
+- `supabase/09_seed_demo_personal.sql` — run after residents sign up; adds today's service/cleaning + 7 days of sadhana per resident
 
 5. Promote first admin user:
 
@@ -64,6 +72,18 @@ npm run dev
 - `npm run lint` — eslint
 - `npm run build` — production build
 - `npm run preview` — preview build output
+
+## Smoke-test the daily loop
+
+1. Apply the required SQL (`01`, `02`, `04`, `05`, `07`, `08`) and optionally `03_seed_demo.sql`.
+2. Sign up your admin account in the app, then run `06_make_first_admin.sql` (with your email) once.
+3. Sign up 2–3 more accounts to act as residents (they appear under **Residents**).
+4. Run `09_seed_demo_personal.sql` to populate today's services/cleaning + sadhana history for everyone.
+5. Verify in the app:
+   - **Dashboard** — today's sadhana, services, cleanliness, prasadam, upcoming events, announcements, your counsellor.
+   - **Residents** — directory with search + role/status/department filters; open a profile to edit (admin).
+   - **Sadhana → Analytics** — streak banner + weekly/monthly rollups.
+   - **Announcements** — leadership can post/pin/delete.
 
 ## Notes
 

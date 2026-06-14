@@ -92,4 +92,4 @@ npm run dev
 
 - This repo is frontend + SQL setup pack.
 - Never commit real Supabase keys.
-- For WhatsApp notifications in production, add an Edge Function + provider (Twilio/WATI).
+- WhatsApp push: deployable Edge Function at `supabase/functions/notify-whatsapp` (Twilio implemented) — see `supabase/functions/README.md` for deploy + secrets. Invoke via `sendWhatsApp()` in `src/lib/whatsapp.js`.

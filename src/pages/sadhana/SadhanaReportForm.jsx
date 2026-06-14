@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Send, MessageCircle, Save, Clock, Moon, Sun, BookOpen, Headphones, Heart, Star, AlertCircle } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -93,8 +93,25 @@ export default function SadhanaReportForm({ onSaved }) {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [queuedOffline, setQueuedOffline] = useState(false)
+  const [scoreConfig, setScoreConfig] = useState(null)
 
-  const scores = useMemo(() => calculateSadhanaScore(form), [form])
+  useEffect(() => {
+    if (!profile?.voice_id) return undefined
+    let active = true
+    supabase
+      .from('sadhana_score_config')
+      .select('config')
+      .eq('voice_id', profile.voice_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setScoreConfig(data?.config ?? null)
+      })
+    return () => {
+      active = false
+    }
+  }, [profile?.voice_id])
+
+  const scores = useMemo(() => calculateSadhanaScore(form, scoreConfig), [form, scoreConfig])
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
 
@@ -102,7 +119,7 @@ export default function SadhanaReportForm({ onSaved }) {
     setSaving(true)
     setError('')
     setQueuedOffline(false)
-    const scoreData = calculateSadhanaScore(form)
+    const scoreData = calculateSadhanaScore(form, scoreConfig)
     const payload = {
       ...form,
       profile_id: profile.id,

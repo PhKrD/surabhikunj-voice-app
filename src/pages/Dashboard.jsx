@@ -26,6 +26,8 @@ const todayQuote = {
 
 const SERVICE_STATUS_VARIANT = { done: 'tulasi', pending: 'yellow', missed: 'red', excused: 'blue' }
 const SERVICE_STATUS_LABEL = { done: 'Done', pending: 'Pending', missed: 'Missed', excused: 'Excused' }
+const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'prasad_special']
+const MEAL_LABEL = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', prasad_special: 'Special Prasad' }
 
 export default function Dashboard() {
   const { profile } = useAuthStore()
@@ -38,18 +40,20 @@ export default function Dashboard() {
   const [cleaning, setCleaning] = useState({ assigned: 0, done: 0 })
   const [events, setEvents] = useState([])
   const [recent, setRecent] = useState([])
+  const [meals, setMeals] = useState([])
 
   const load = useCallback(async () => {
     if (!profile) return
     setLoading(true)
     const nowISO = new Date().toISOString()
-    const [sadhanaRes, servicesRes, logsRes, assignRes, eventsRes, recentRes] = await Promise.all([
+    const [sadhanaRes, servicesRes, logsRes, assignRes, eventsRes, recentRes, mealsRes] = await Promise.all([
       supabase.from('sadhana_reports').select('score, report_date').eq('profile_id', profile.id).eq('report_date', todayISO).maybeSingle(),
       supabase.from('service_allocations').select('id, status, service_time, service:service_id(name)').eq('profile_id', profile.id).eq('service_date', todayISO).order('service_time', { ascending: true }),
       supabase.from('cleaning_logs').select('id, status').eq('profile_id', profile.id).eq('log_date', todayISO),
       supabase.from('cleaning_assignments').select('id').eq('profile_id', profile.id),
       supabase.from('events').select('id, title, start_datetime, venue, event_type, is_mandatory').eq('voice_id', profile.voice_id).eq('is_active', true).gte('start_datetime', nowISO).order('start_datetime', { ascending: true }).limit(4),
       supabase.from('sadhana_reports').select('id, report_date, score, japa_rounds, mangal_arti, morning_class').eq('profile_id', profile.id).order('report_date', { ascending: false }).limit(5),
+      supabase.from('meal_plans').select('id, meal_type, menu_items, notes, is_special').eq('voice_id', profile.voice_id).eq('plan_date', todayISO),
     ])
     setTodaySadhana(sadhanaRes.data ?? null)
     setServices(servicesRes.data ?? [])
@@ -57,6 +61,7 @@ export default function Dashboard() {
     setCleaning({ assigned: (assignRes.data ?? []).length, done: logs.filter((l) => l.status === 'done').length })
     setEvents(eventsRes.data ?? [])
     setRecent(recentRes.data ?? [])
+    setMeals(mealsRes.data ?? [])
     setLoading(false)
   }, [profile, todayISO])
 
@@ -172,6 +177,47 @@ export default function Dashboard() {
                       <Badge variant={SERVICE_STATUS_VARIANT[s.status] ?? 'default'}>
                         {SERVICE_STATUS_LABEL[s.status] ?? s.status}
                       </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardBody>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Today's Prasadam */}
+      {meals.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.28 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-slate-700">Today's Prasadam</h3>
+                <Link to="/kitchen" className="text-sm text-saffron-600 hover:text-saffron-700 font-medium">
+                  View all →
+                </Link>
+              </div>
+            </CardHeader>
+            <CardBody className="pt-0">
+              <div className="divide-y divide-slate-50">
+                {[...meals].sort((a, b) => MEAL_ORDER.indexOf(a.meal_type) - MEAL_ORDER.indexOf(b.meal_type)).map((m) => (
+                  <div key={m.id} className="flex items-start gap-3 py-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
+                      <UtensilsCrossed className="w-4 h-4 text-orange-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-700">{MEAL_LABEL[m.meal_type] ?? m.meal_type}</p>
+                        {m.is_special && <Badge variant="saffron">Special</Badge>}
+                      </div>
+                      {Array.isArray(m.menu_items) && m.menu_items.length > 0 && (
+                        <p className="text-sm text-slate-500 mt-0.5">{m.menu_items.join(', ')}</p>
+                      )}
+                      {m.notes && <p className="text-xs text-slate-400 mt-0.5">{m.notes}</p>}
                     </div>
                   </div>
                 ))}

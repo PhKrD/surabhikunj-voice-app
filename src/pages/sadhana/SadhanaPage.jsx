@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, PlusCircle, TrendingUp, Calendar, Award } from 'lucide-react'
+import { BookOpen, PlusCircle, TrendingUp, Calendar, Award, Flame } from 'lucide-react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import { format } from 'date-fns'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
@@ -25,7 +25,7 @@ export default function SadhanaPage() {
       .select('*')
       .eq('profile_id', profile.id)
       .order('report_date', { ascending: false })
-      .limit(30)
+      .limit(90)
     setReports(data ?? [])
     setLoading(false)
   }, [profile])
@@ -43,6 +43,49 @@ export default function SadhanaPage() {
   const avgScore = reports.length
     ? Math.round(reports.reduce((s, r) => s + (r.score ?? 0), 0) / reports.length)
     : 0
+
+  const stats = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0]
+    const addDays = (str, delta) => {
+      const d = new Date(str + 'T00:00:00Z')
+      d.setUTCDate(d.getUTCDate() + delta)
+      return d.toISOString().split('T')[0]
+    }
+    const set = new Set(reports.map((r) => r.report_date))
+
+    let cursor = todayStr
+    if (!set.has(cursor)) cursor = addDays(cursor, -1)
+    let currentStreak = 0
+    while (set.has(cursor)) {
+      currentStreak++
+      cursor = addDays(cursor, -1)
+    }
+
+    let longestStreak = 0
+    let run = 0
+    let prev = null
+    for (const ds of [...set].sort()) {
+      run = prev && addDays(prev, 1) === ds ? run + 1 : 1
+      if (run > longestStreak) longestStreak = run
+      prev = ds
+    }
+
+    const dow = new Date(todayStr + 'T00:00:00Z').getUTCDay()
+    const weekStart = addDays(todayStr, -((dow + 6) % 7))
+    const monthStart = `${todayStr.slice(0, 8)}01`
+    const avg = (arr) => (arr.length ? Math.round(arr.reduce((s, r) => s + (r.score ?? 0), 0) / arr.length) : 0)
+    const weekReports = reports.filter((r) => r.report_date >= weekStart)
+    const monthReports = reports.filter((r) => r.report_date >= monthStart)
+
+    return {
+      currentStreak,
+      longestStreak,
+      weekAvg: avg(weekReports),
+      weekCount: weekReports.length,
+      monthAvg: avg(monthReports),
+      monthCount: monthReports.length,
+    }
+  }, [reports])
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
@@ -94,7 +137,7 @@ export default function SadhanaPage() {
               </CardBody>
             </Card>
           )}
-          {reports.map((r) => (
+          {reports.slice(0, 30).map((r) => (
             <Card key={r.id}>
               <CardBody className="py-4">
                 <div className="flex items-start justify-between gap-3">
@@ -126,27 +169,53 @@ export default function SadhanaPage() {
       {/* Analytics */}
       {view === 'analytics' && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          {/* Streak banner */}
+          <div className="bg-gradient-to-r from-saffron-500 to-saffron-600 rounded-2xl p-4 text-white flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                <Flame className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-3xl font-bold leading-none">
+                  {stats.currentStreak}
+                  <span className="text-base font-medium opacity-80"> day{stats.currentStreak === 1 ? '' : 's'}</span>
+                </p>
+                <p className="text-sm opacity-80 mt-0.5">Current streak</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xl font-bold leading-none">{stats.longestStreak}</p>
+              <p className="text-xs opacity-80 mt-0.5">Longest streak</p>
+            </div>
+          </div>
+
+          {/* Rollups */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Card>
               <CardBody className="text-center py-5">
-                <Award className="w-7 h-7 text-saffron-500 mx-auto mb-1" />
-                <p className="text-2xl font-bold text-slate-800">{avgScore}</p>
-                <p className="text-xs text-slate-500">Avg. Score</p>
+                <Calendar className="w-7 h-7 text-saffron-500 mx-auto mb-1" />
+                <p className="text-2xl font-bold text-slate-800">{stats.weekAvg}</p>
+                <p className="text-xs text-slate-500">This Week ({stats.weekCount})</p>
               </CardBody>
             </Card>
             <Card>
               <CardBody className="text-center py-5">
                 <Calendar className="w-7 h-7 text-tulasi-500 mx-auto mb-1" />
-                <p className="text-2xl font-bold text-slate-800">{reports.length}</p>
-                <p className="text-xs text-slate-500">Reports</p>
+                <p className="text-2xl font-bold text-slate-800">{stats.monthAvg}</p>
+                <p className="text-xs text-slate-500">This Month ({stats.monthCount})</p>
               </CardBody>
             </Card>
             <Card>
               <CardBody className="text-center py-5">
-                <TrendingUp className="w-7 h-7 text-lotus-500 mx-auto mb-1" />
-                <p className="text-2xl font-bold text-slate-800">
-                  {reports.filter((r) => r.mangal_arti).length}
-                </p>
+                <Award className="w-7 h-7 text-lotus-500 mx-auto mb-1" />
+                <p className="text-2xl font-bold text-slate-800">{avgScore}</p>
+                <p className="text-xs text-slate-500">All-time Avg</p>
+              </CardBody>
+            </Card>
+            <Card>
+              <CardBody className="text-center py-5">
+                <TrendingUp className="w-7 h-7 text-blue-500 mx-auto mb-1" />
+                <p className="text-2xl font-bold text-slate-800">{reports.filter((r) => r.mangal_arti).length}</p>
                 <p className="text-xs text-slate-500">MA Days</p>
               </CardBody>
             </Card>

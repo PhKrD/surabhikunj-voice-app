@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SurabhiKunj VOICE</string>
+    <string name="title_activity_main">SurabhiKunj VOICE</string>
+    <string name="package_name">com.surabhikunj.voice</string>
+    <string name="custom_url_scheme">com.surabhikunj.voice</string>
+</resources>

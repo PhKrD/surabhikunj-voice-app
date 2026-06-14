@@ -4,7 +4,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard, BookOpen, Users, Sparkles, Building2,
   UtensilsCrossed, CalendarDays, ListChecks, GitBranch,
-  Bell, Settings, LogOut, X, Flame
+  Bell, Settings, LogOut, X, Flame, Megaphone
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import useAuthStore from '@/store/authStore'
@@ -22,6 +22,7 @@ const navItems = [
   { label: 'Kitchen', to: '/kitchen', icon: UtensilsCrossed },
   { label: 'Events', to: '/events', icon: CalendarDays },
   { label: 'Org Structure', to: '/hierarchy', icon: GitBranch },
+  { label: 'Announcements', to: '/announcements', icon: Megaphone },
 ]
 
 const bottomItems = [

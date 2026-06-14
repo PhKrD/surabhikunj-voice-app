@@ -14,6 +14,7 @@ const routeLabels = {
   '/kitchen': 'Kitchen',
   '/events': 'Events & Festivals',
   '/hierarchy': 'Org Structure',
+  '/announcements': 'Announcements',
   '/notifications': 'Notifications',
   '/settings': 'Settings',
 }

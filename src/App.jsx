@@ -16,6 +16,7 @@ const CleanlinessPage = lazy(() => import('@/pages/cleanliness/CleanlinessPage')
 const KitchenPage = lazy(() => import('@/pages/kitchen/KitchenPage'))
 const EventsPage = lazy(() => import('@/pages/events/EventsPage'))
 const HierarchyPage = lazy(() => import('@/pages/hierarchy/HierarchyPage'))
+const AnnouncementsPage = lazy(() => import('@/pages/announcements/AnnouncementsPage'))
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'))
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 
@@ -67,6 +68,7 @@ function AppRoutes() {
           <Route path="kitchen" element={<KitchenPage />} />
           <Route path="events" element={<EventsPage />} />
           <Route path="hierarchy" element={<HierarchyPage />} />
+          <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>

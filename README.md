@@ -42,6 +42,7 @@ Required (schema + policies):
 - `supabase/07_department_members_policies.sql`
 - `supabase/08_announcements.sql`
 - `supabase/10_sadhana_config.sql`
+- `supabase/11_notifications_triggers.sql`
 
 After your first sign-up (promote yourself to admin):
 - `supabase/06_make_first_admin.sql` (edit the email first, run once)

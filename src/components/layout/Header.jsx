@@ -5,6 +5,7 @@ import Avatar from '@/components/ui/Avatar'
 
 const routeLabels = {
   '/': 'Dashboard',
+  '/residents': 'Residents',
   '/sadhana': 'Sadhana Tracker',
   '/counsellor': 'Counsellor',
   '/departments': 'Departments',

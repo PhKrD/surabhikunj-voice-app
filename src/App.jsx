@@ -6,6 +6,8 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 const AppLayout = lazy(() => import('@/components/layout/AppLayout'))
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
+const ResidentsPage = lazy(() => import('@/pages/residents/ResidentsPage'))
+const ResidentProfilePage = lazy(() => import('@/pages/residents/ResidentProfilePage'))
 const SadhanaPage = lazy(() => import('@/pages/sadhana/SadhanaPage'))
 const CounsellorPage = lazy(() => import('@/pages/counsellor/CounsellorPage'))
 const DepartmentsPage = lazy(() => import('@/pages/departments/DepartmentsPage'))
@@ -55,6 +57,8 @@ function AppRoutes() {
           }
         >
           <Route index element={<Dashboard />} />
+          <Route path="residents" element={<ResidentsPage />} />
+          <Route path="residents/:id" element={<ResidentProfilePage />} />
           <Route path="sadhana" element={<SadhanaPage />} />
           <Route path="counsellor" element={<CounsellorPage />} />
           <Route path="departments" element={<DepartmentsPage />} />

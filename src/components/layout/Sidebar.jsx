@@ -13,6 +13,7 @@ import Badge from '@/components/ui/Badge'
 
 const navItems = [
   { label: 'Dashboard', to: '/', icon: LayoutDashboard },
+  { label: 'Residents', to: '/residents', icon: Users },
   { label: 'Sadhana', to: '/sadhana', icon: BookOpen },
   { label: 'Counsellor', to: '/counsellor', icon: Users },
   { label: 'Departments', to: '/departments', icon: Building2 },

@@ -18,99 +18,77 @@ function timeToMinutes(timeStr) {
   return h * 60 + m
 }
 
-export function calculateSadhanaScore(report) {
-  let scoreJapa
-  let scoreSleep
-  let scoreReading
-  let scoreHearing
-  let scoreSeva
-  let scoreAttendance = 0
+// Default scoring configuration. A per-VOICE config may override any subset of
+// these via calculateSadhanaScore(report, config). Defaults reproduce the
+// original hard-coded scoring exactly.
+export const DEFAULT_SADHANA_CONFIG = {
+  japaMaxRounds: 16,
+  japaRoundsPoints: 15,
+  // [minute-of-day cutoff, points], evaluated with "<=" (earlier is better)
+  japaTimeTiers: [[7 * 60, 15], [8 * 60, 12], [9 * 60, 8], [10 * 60, 4]],
+  wakeUpTiers: [[4 * 60 + 30, 10], [5 * 60, 8], [5 * 60 + 30, 5], [6 * 60, 2]],
+  // to-bed tiers use "adjusted" minutes (AM times treated as +24h)
+  toBedTiers: [[22 * 60, 10], [22 * 60 + 30, 8], [23 * 60, 5], [23 * 60 + 30, 2]],
+  // [minutes threshold, points], evaluated with ">=" (more is better)
+  readingTiers: [[60, 15], [45, 12], [30, 9], [15, 5], [Number.MIN_VALUE, 2]],
+  hearingTiers: [[60, 15], [45, 12], [30, 9], [15, 5], [Number.MIN_VALUE, 2]],
+  // [hours threshold, points], evaluated with ">="
+  sevaTiers: [[4, 10], [3, 8], [2, 6], [1, 3], [Number.MIN_VALUE, 1]],
+  mangalArtiPoints: 5,
+  morningClassPoints: 5,
+  dayRestPenaltyPer15Min: 0.5,
+  maxDayRestPenalty: 5,
+}
+
+// Earlier-is-better tiers (e.g. japa/wake/bed times in minutes).
+function tierLte(value, tiers) {
+  if (value === null || value === undefined) return 0
+  for (const [cutoff, points] of tiers) if (value <= cutoff) return points
+  return 0
+}
+
+// More-is-better tiers (e.g. reading/hearing minutes, seva hours).
+function tierGte(value, tiers) {
+  if (!value || value <= 0) return 0
+  for (const [cutoff, points] of tiers) if (value >= cutoff) return points
+  return 0
+}
+
+export function calculateSadhanaScore(report, config) {
+  const cfg = { ...DEFAULT_SADHANA_CONFIG, ...(config || {}) }
 
   // --- JAPA (30 pts) ---
-  // Rounds: 0-16 rounds → 0-15 pts (16 rounds = full 15 pts)
-  const rounds = Math.min(report.japa_rounds ?? 0, 16)
-  const roundScore = (rounds / 16) * 15
-
-  // Time: earlier completion = more pts (0-15 pts)
-  let timeScore = 0
-  const japaMin = timeToMinutes(report.japa_time)
-  if (japaMin !== null) {
-    const t7 = 7 * 60        // 07:00
-    const t8 = 8 * 60        // 08:00
-    const t9 = 9 * 60        // 09:00
-    const t10 = 10 * 60      // 10:00
-    if (japaMin <= t7) timeScore = 15
-    else if (japaMin <= t8) timeScore = 12
-    else if (japaMin <= t9) timeScore = 8
-    else if (japaMin <= t10) timeScore = 4
-    else timeScore = 0
-  }
-  scoreJapa = roundScore + timeScore
+  const rounds = Math.min(report.japa_rounds ?? 0, cfg.japaMaxRounds)
+  const roundScore = (rounds / cfg.japaMaxRounds) * cfg.japaRoundsPoints
+  const timeScore = tierLte(timeToMinutes(report.japa_time), cfg.japaTimeTiers)
+  const scoreJapa = roundScore + timeScore
 
   // --- SLEEP DISCIPLINE (20 pts) ---
-  // Wake-up (10 pts): 04:30 or earlier = 10, by 05:00 = 8, by 05:30 = 5, by 06:00 = 2, later = 0
-  let wuScore = 0
-  const wuMin = timeToMinutes(report.wake_up_time)
-  if (wuMin !== null) {
-    if (wuMin <= 4 * 60 + 30) wuScore = 10
-    else if (wuMin <= 5 * 60) wuScore = 8
-    else if (wuMin <= 5 * 60 + 30) wuScore = 5
-    else if (wuMin <= 6 * 60) wuScore = 2
-    else wuScore = 0
-  }
-
-  // To-bed (10 pts): by 22:00 = 10, by 22:30 = 8, by 23:00 = 5, by 23:30 = 2, later = 0
-  let tbScore = 0
+  const wuScore = tierLte(timeToMinutes(report.wake_up_time), cfg.wakeUpTiers)
   const tbMin = timeToMinutes(report.to_bed_time)
-  if (tbMin !== null) {
-    // Convert PM time: if < 12*60, it's AM (morning), add 24 hrs conceptually
-    const adjusted = tbMin < 12 * 60 ? tbMin + 24 * 60 : tbMin
-    const t22 = 22 * 60
-    const t2230 = 22 * 60 + 30
-    const t23 = 23 * 60
-    const t2330 = 23 * 60 + 30
-    if (adjusted <= t22) tbScore = 10
-    else if (adjusted <= t2230) tbScore = 8
-    else if (adjusted <= t23) tbScore = 5
-    else if (adjusted <= t2330) tbScore = 2
-    else tbScore = 0
-  }
-  scoreSleep = wuScore + tbScore
+  // Convert PM time: if < 12:00, it's AM (post-midnight), add 24 hrs conceptually
+  const tbAdjusted = tbMin === null ? null : tbMin < 12 * 60 ? tbMin + 24 * 60 : tbMin
+  const tbScore = tierLte(tbAdjusted, cfg.toBedTiers)
+  const scoreSleep = wuScore + tbScore
 
-  // --- READING (15 pts) ---
-  const rdMin = report.reading_min ?? 0
-  if (rdMin >= 60) scoreReading = 15
-  else if (rdMin >= 45) scoreReading = 12
-  else if (rdMin >= 30) scoreReading = 9
-  else if (rdMin >= 15) scoreReading = 5
-  else if (rdMin > 0) scoreReading = 2
-  else scoreReading = 0
-
-  // --- HEARING (15 pts) ---
-  const hrMin = report.hearing_min ?? 0
-  if (hrMin >= 60) scoreHearing = 15
-  else if (hrMin >= 45) scoreHearing = 12
-  else if (hrMin >= 30) scoreHearing = 9
-  else if (hrMin >= 15) scoreHearing = 5
-  else if (hrMin > 0) scoreHearing = 2
-  else scoreHearing = 0
+  // --- READING / HEARING (15 pts each) ---
+  const scoreReading = tierGte(report.reading_min ?? 0, cfg.readingTiers)
+  const scoreHearing = tierGte(report.hearing_min ?? 0, cfg.hearingTiers)
 
   // --- SEVA (10 pts) ---
-  const sevaHrs = parseFloat(report.seva_hours ?? 0)
-  if (sevaHrs >= 4) scoreSeva = 10
-  else if (sevaHrs >= 3) scoreSeva = 8
-  else if (sevaHrs >= 2) scoreSeva = 6
-  else if (sevaHrs >= 1) scoreSeva = 3
-  else if (sevaHrs > 0) scoreSeva = 1
-  else scoreSeva = 0
+  const scoreSeva = tierGte(parseFloat(report.seva_hours ?? 0), cfg.sevaTiers)
 
   // --- ATTENDANCE (10 pts) ---
-  if (report.mangal_arti) scoreAttendance += 5
-  if (report.morning_class) scoreAttendance += 5
+  const scoreAttendance =
+    (report.mangal_arti ? cfg.mangalArtiPoints : 0) +
+    (report.morning_class ? cfg.morningClassPoints : 0)
 
-  // --- DAY REST PENALTY (max -5 pts) ---
+  // --- DAY REST PENALTY ---
   const drMin = report.day_rest_min ?? 0
-  const penalty = Math.min(Math.floor(drMin / 15) * 0.5, 5)
+  const penalty = Math.min(
+    Math.floor(drMin / 15) * cfg.dayRestPenaltyPer15Min,
+    cfg.maxDayRestPenalty
+  )
 
   const total = Math.max(
     0,

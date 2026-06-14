@@ -5,7 +5,7 @@
 //   - Cross-origin requests (e.g. Supabase API/auth): never intercepted.
 
 const CACHE = 'skv-cache-v1'
-const APP_SHELL = ['/', '/index.html', '/favicon.svg', '/manifest.webmanifest']
+const APP_SHELL = ['/', '/index.html', '/icon.svg', '/favicon.svg', '/manifest.webmanifest']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

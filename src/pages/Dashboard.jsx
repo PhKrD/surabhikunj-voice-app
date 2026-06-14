@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, Users, Sparkles, UtensilsCrossed, CalendarDays, ListChecks, TrendingUp, Clock, MapPin } from 'lucide-react'
+import { BookOpen, Users, Sparkles, UtensilsCrossed, CalendarDays, ListChecks, TrendingUp, Clock, MapPin, Megaphone, MessageCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '@/lib/supabase'
@@ -8,6 +8,7 @@ import useAuthStore from '@/store/authStore'
 import StatCard from '@/components/ui/StatCard'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
+import Avatar from '@/components/ui/Avatar'
 import { ROLES, ROLE_COLORS, scoreBg, formatDate, formatTime } from '@/lib/utils'
 
 const modules = [
@@ -41,12 +42,14 @@ export default function Dashboard() {
   const [events, setEvents] = useState([])
   const [recent, setRecent] = useState([])
   const [meals, setMeals] = useState([])
+  const [announcements, setAnnouncements] = useState([])
+  const [counsellor, setCounsellor] = useState(null)
 
   const load = useCallback(async () => {
     if (!profile) return
     setLoading(true)
     const nowISO = new Date().toISOString()
-    const [sadhanaRes, servicesRes, logsRes, assignRes, eventsRes, recentRes, mealsRes] = await Promise.all([
+    const [sadhanaRes, servicesRes, logsRes, assignRes, eventsRes, recentRes, mealsRes, announcementsRes, counsellorRes] = await Promise.all([
       supabase.from('sadhana_reports').select('score, report_date').eq('profile_id', profile.id).eq('report_date', todayISO).maybeSingle(),
       supabase.from('service_allocations').select('id, status, service_time, service:service_id(name)').eq('profile_id', profile.id).eq('service_date', todayISO).order('service_time', { ascending: true }),
       supabase.from('cleaning_logs').select('id, status').eq('profile_id', profile.id).eq('log_date', todayISO),
@@ -54,6 +57,10 @@ export default function Dashboard() {
       supabase.from('events').select('id, title, start_datetime, venue, event_type, is_mandatory').eq('voice_id', profile.voice_id).eq('is_active', true).gte('start_datetime', nowISO).order('start_datetime', { ascending: true }).limit(4),
       supabase.from('sadhana_reports').select('id, report_date, score, japa_rounds, mangal_arti, morning_class').eq('profile_id', profile.id).order('report_date', { ascending: false }).limit(5),
       supabase.from('meal_plans').select('id, meal_type, menu_items, notes, is_special').eq('voice_id', profile.voice_id).eq('plan_date', todayISO),
+      supabase.from('announcements').select('id, title, body, is_pinned, created_at').eq('voice_id', profile.voice_id).order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(2),
+      profile.counsellor_id
+        ? supabase.from('profiles').select('id, spiritual_name, avatar_url, role, phone').eq('id', profile.counsellor_id).maybeSingle()
+        : Promise.resolve({ data: null }),
     ])
     setTodaySadhana(sadhanaRes.data ?? null)
     setServices(servicesRes.data ?? [])
@@ -62,6 +69,8 @@ export default function Dashboard() {
     setEvents(eventsRes.data ?? [])
     setRecent(recentRes.data ?? [])
     setMeals(mealsRes.data ?? [])
+    setAnnouncements(announcementsRes.data ?? [])
+    setCounsellor(counsellorRes.data ?? null)
     setLoading(false)
   }, [profile, todayISO])
 
@@ -106,6 +115,43 @@ export default function Dashboard() {
         <p className="text-xs opacity-70 mt-2">— {todayQuote.source}</p>
       </motion.div>
 
+      {/* Announcements */}
+      {announcements.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+        >
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Megaphone className="w-4 h-4 text-saffron-500" />
+                  <h3 className="font-semibold text-slate-700">Announcements</h3>
+                </div>
+                <Link to="/announcements" className="text-sm text-saffron-600 hover:text-saffron-700 font-medium">
+                  View all →
+                </Link>
+              </div>
+            </CardHeader>
+            <CardBody className="pt-0">
+              <div className="divide-y divide-slate-50">
+                {announcements.map((a) => (
+                  <div key={a.id} className="py-2.5">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-slate-700">{a.title}</p>
+                      {a.is_pinned && <Badge variant="saffron">Pinned</Badge>}
+                    </div>
+                    {a.body && <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">{a.body}</p>}
+                    <p className="text-xs text-slate-400 mt-1">{formatDate(a.created_at)}</p>
+                  </div>
+                ))}
+              </div>
+            </CardBody>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Stats */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -142,6 +188,41 @@ export default function Dashboard() {
           ))}
         </div>
       </motion.div>
+
+      {/* Your Counsellor */}
+      {counsellor && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.22 }}
+        >
+          <Card>
+            <CardHeader>
+              <h3 className="font-semibold text-slate-700">Your Counsellor</h3>
+            </CardHeader>
+            <CardBody className="pt-0">
+              <div className="flex items-center gap-3">
+                <Avatar name={counsellor.spiritual_name} url={counsellor.avatar_url} size="md" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-slate-800 truncate">{counsellor.spiritual_name}</p>
+                  <Badge className={ROLE_COLORS[counsellor.role]}>{ROLES[counsellor.role] ?? counsellor.role}</Badge>
+                </div>
+                {counsellor.phone && (
+                  <a
+                    href={`https://wa.me/${counsellor.phone.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-tulasi-600 hover:bg-tulasi-700 text-white text-sm font-medium transition-colors"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Message
+                  </a>
+                )}
+              </div>
+            </CardBody>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Today's Services */}
       {services.length > 0 && (

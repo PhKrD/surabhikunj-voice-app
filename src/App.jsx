@@ -1,5 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { MotionConfig } from 'framer-motion'
 import useAuthStore from '@/store/authStore'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { flushSadhanaQueue } from '@/lib/offlineQueue'
@@ -90,9 +91,11 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AppBootstrap />
-      <AppRoutes />
-    </BrowserRouter>
+    <MotionConfig reducedMotion="user" transition={{ duration: 0.18, ease: 'easeOut' }}>
+      <BrowserRouter>
+        <AppBootstrap />
+        <AppRoutes />
+      </BrowserRouter>
+    </MotionConfig>
   )
 }

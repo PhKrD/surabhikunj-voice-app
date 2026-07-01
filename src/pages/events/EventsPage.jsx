@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { CalendarDays, Clock, MapPin, Plus, X, Pencil, Trash2 } from 'lucide-react'
 import { format, isToday, isTomorrow } from 'date-fns'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
+import { useCachedQuery } from '@/lib/useCachedQuery'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
@@ -31,8 +32,6 @@ export default function EventsPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const toast = useToastStore()
-  const [events, setEvents] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [archivingId, setArchivingId] = useState(null)
@@ -66,7 +65,7 @@ export default function EventsPage() {
     }, 120)
 
     return () => clearTimeout(id)
-  }, [linkedEventId, events, navigate])
+  }, [linkedEventId, navigate])
 
   useEffect(() => {
     if (!focusedEventId) return
@@ -78,15 +77,10 @@ export default function EventsPage() {
     return () => clearTimeout(id)
   }, [focusedEventId])
 
-  const loadEvents = useCallback(async () => {
-    if (!profile) {
-      setEvents([])
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-    try {
+  const todayStr = new Date().toISOString().split('T')[0]
+  const { data: events = [], loading, refetch } = useCachedQuery(
+    profile ? `events:${profile.voice_id}:${todayStr}` : null,
+    async () => {
       const { data, error } = await supabase
         .from('events')
         .select('*')
@@ -97,20 +91,9 @@ export default function EventsPage() {
         .limit(30)
 
       if (error) throw error
-      setEvents(data ?? [])
-    } catch (error) {
-      toast.error('Could not load events', error.message)
-    } finally {
-      setLoading(false)
+      return data ?? []
     }
-  }, [profile, toast])
-
-  useEffect(() => {
-    const id = setTimeout(() => {
-      loadEvents()
-    }, 0)
-    return () => clearTimeout(id)
-  }, [loadEvents])
+  )
 
   const resetForm = () => {
     setForm({
@@ -197,7 +180,7 @@ export default function EventsPage() {
       toast.success(editingId ? 'Event updated' : 'Event created')
       resetForm()
       setShowForm(false)
-      await loadEvents()
+      await refetch()
     } catch (error) {
       setFormError(error.message)
       toast.error('Could not save event', error.message)
@@ -238,7 +221,7 @@ export default function EventsPage() {
         return
       }
 
-      await loadEvents()
+      await refetch()
       toast.success('Event archived', '', {
         actionLabel: 'Undo',
         action: async () => {
@@ -252,7 +235,7 @@ export default function EventsPage() {
             return
           }
 
-          await loadEvents()
+          await refetch()
           toast.info('Event restored')
         },
       })

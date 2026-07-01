@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { ListChecks, Clock, CheckCircle2, Plus, X, Pencil, Trash2 } from 'lucide-react'
 import { format, startOfWeek } from 'date-fns'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
+import { useCachedQuery } from '@/lib/useCachedQuery'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
@@ -24,9 +25,6 @@ export default function ServicesPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const toast = useToastStore()
-  const [allocations, setAllocations] = useState([])
-  const [masterServices, setMasterServices] = useState([])
-  const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState({})
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -35,8 +33,8 @@ export default function ServicesPage() {
   const [editingId, setEditingId] = useState(null)
   const [formError, setFormError] = useState('')
   const [focusedServiceId, setFocusedServiceId] = useState(null)
-  const [preferences, setPreferences] = useState({})
   const today = new Date().toISOString().split('T')[0]
+  const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
   const [schedulerDate, setSchedulerDate] = useState(today)
   const [scheduling, setScheduling] = useState(false)
   const [rosterReload, setRosterReload] = useState(0)
@@ -65,7 +63,7 @@ export default function ServicesPage() {
     }, 120)
 
     return () => clearTimeout(id)
-  }, [linkedServiceId, masterServices, navigate])
+  }, [linkedServiceId, navigate])
 
   useEffect(() => {
     if (!focusedServiceId) return
@@ -77,67 +75,51 @@ export default function ServicesPage() {
     return () => clearTimeout(id)
   }, [focusedServiceId])
 
-  const loadData = useCallback(async () => {
-    if (!profile) {
-      setAllocations([])
-      setMasterServices([])
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from('service_allocations')
-        .select('*, services(name, description, instructions)')
-        .eq('profile_id', profile.id)
-        .gte('service_date', today)
-        .order('service_date', { ascending: true })
-        .order('service_time', { ascending: true })
-        .limit(20)
-
-      if (error) throw error
-
-      const servicesQuery = supabase
-        .from('services')
-        .select('*')
-        .eq('voice_id', profile.voice_id)
-        .eq('is_active', true)
-        .order('name')
-
-      const { data: servicesData, error: servicesError } = await servicesQuery
-      if (servicesError) throw servicesError
-
-      const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
-      const { data: prefData, error: prefError } = await supabase
-        .from('service_preferences')
-        .select('service_id, preference')
-        .eq('profile_id', profile.id)
-        .eq('week_start', weekStart)
-
-      if (prefError) throw prefError
-
+  const { data, loading, refetch } = useCachedQuery(
+    profile ? `services:${profile.id}:${today}:${weekStart}` : null,
+    async () => {
+      const [allocRes, servicesRes, prefRes] = await Promise.all([
+        supabase
+          .from('service_allocations')
+          .select('*, services(name, description, instructions)')
+          .eq('profile_id', profile.id)
+          .gte('service_date', today)
+          .order('service_date', { ascending: true })
+          .order('service_time', { ascending: true })
+          .limit(20),
+        supabase
+          .from('services')
+          .select('*')
+          .eq('voice_id', profile.voice_id)
+          .eq('is_active', true)
+          .order('name'),
+        supabase
+          .from('service_preferences')
+          .select('service_id, preference')
+          .eq('profile_id', profile.id)
+          .eq('week_start', weekStart)
+      ])
+      
+      if (allocRes.error) throw allocRes.error
+      if (servicesRes.error) throw servicesRes.error
+      if (prefRes.error) throw prefRes.error
+      
       const prefMap = {}
-      ;(prefData ?? []).forEach((p) => {
+      ;(prefRes.data ?? []).forEach((p) => {
         prefMap[p.service_id] = p.preference
       })
-
-      setAllocations(data ?? [])
-      setMasterServices(servicesData ?? [])
-      setPreferences(prefMap)
-    } catch (error) {
-      toast.error('Could not load services', error.message)
-    } finally {
-      setLoading(false)
+      
+      return {
+        allocations: allocRes.data ?? [],
+        masterServices: servicesRes.data ?? [],
+        preferences: prefMap
+      }
     }
-  }, [profile, today, toast])
+  )
 
-  useEffect(() => {
-    const id = setTimeout(() => {
-      loadData()
-    }, 0)
-    return () => clearTimeout(id)
-  }, [loadData])
+  const allocations = data?.allocations ?? []
+  const masterServices = data?.masterServices ?? []
+  const preferences = data?.preferences ?? {}
 
   const resetForm = () => {
     setForm({
@@ -216,7 +198,7 @@ export default function ServicesPage() {
       toast.success(editingId ? 'Service updated' : 'Service created')
       resetForm()
       setShowForm(false)
-      await loadData()
+      await refetch()
     } catch (error) {
       setFormError(error.message)
       toast.error('Could not save service', error.message)
@@ -268,11 +250,11 @@ export default function ServicesPage() {
             return
           }
 
-          await loadData()
+          await refetch()
           toast.info('Service restored')
         },
       })
-      await loadData()
+      await refetch()
     } catch (error) {
       toast.error('Could not archive service', error.message)
     } finally {
@@ -296,7 +278,7 @@ export default function ServicesPage() {
       }
 
       if (data) {
-        setAllocations((prev) => prev.map((a) => (a.id === id ? data : a)))
+        await refetch()
       }
     } catch (error) {
       toast.error('Could not mark service done', error.message)
@@ -308,7 +290,6 @@ export default function ServicesPage() {
   const savePreference = async (serviceId, preferenceValue) => {
     if (!profile) return
 
-    const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
     setPreferenceSaving((prev) => ({ ...prev, [serviceId]: true }))
     try {
       const payload = {
@@ -324,7 +305,7 @@ export default function ServicesPage() {
 
       if (error) throw error
 
-      setPreferences((prev) => ({ ...prev, [serviceId]: preferenceValue }))
+      await refetch()
       toast.success('Preference updated')
     } catch (error) {
       toast.error('Could not save preference', error.message)
@@ -338,12 +319,12 @@ export default function ServicesPage() {
 
     setScheduling(true)
     try {
-      const weekStart = format(startOfWeek(new Date(schedulerDate), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+      const scheduleWeekStart = format(startOfWeek(new Date(schedulerDate), { weekStartsOn: 1 }), 'yyyy-MM-dd')
 
       const { data: prefRows, error: prefError } = await supabase
         .from('service_preferences')
         .select('profile_id, service_id, preference')
-        .eq('week_start', weekStart)
+        .eq('week_start', scheduleWeekStart)
 
       if (prefError) throw prefError
 
@@ -396,7 +377,7 @@ export default function ServicesPage() {
         if (insertError) throw insertError
       }
 
-      await loadData()
+      await refetch()
       setRosterReload((n) => n + 1)
       toast.success(`Auto-scheduler completed (${inserts.length} allocations)`)
     } catch (error) {

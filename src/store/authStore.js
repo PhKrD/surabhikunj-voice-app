@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import { clearCache } from '@/lib/useCachedQuery'
 
 const DEFAULT_VOICE_ID = import.meta.env.VITE_DEFAULT_VOICE_ID
 
@@ -17,17 +18,22 @@ const useAuthStore = create((set, get) => ({
 
   initialize: async () => {
     const { data: { session } } = await supabase.auth.getSession()
+    // Unblock the UI as soon as the auth state is known (getSession reads
+    // from local storage and is fast). The profile is hydrated in the
+    // background so the app shell paints immediately instead of waiting on
+    // a network round-trip.
+    set({ user: session?.user ?? null, loading: false, initialized: true })
     if (session?.user) {
-      await get().fetchProfile(session.user.id)
+      get().fetchProfile(session.user.id)
     }
-    set({ loading: false, initialized: true })
 
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         set({ user: session.user })
-        await get().fetchProfile(session.user.id)
+        get().fetchProfile(session.user.id)
       } else if (event === 'SIGNED_OUT') {
         localStorage.removeItem('loginType')
+        clearCache()
         set({ user: null, profile: null, loginType: 'counsellee' })
       }
     })

@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { BookOpen, Users, Sparkles, UtensilsCrossed, CalendarDays, ListChecks, TrendingUp, Clock, MapPin, Megaphone, MessageCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '@/lib/supabase'
+import { useCachedQuery } from '@/lib/useCachedQuery'
 import useAuthStore from '@/store/authStore'
 import StatCard from '@/components/ui/StatCard'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
@@ -35,50 +35,49 @@ export default function Dashboard() {
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
   const todayISO = new Date().toISOString().split('T')[0]
 
-  const [loading, setLoading] = useState(true)
-  const [todaySadhana, setTodaySadhana] = useState(null)
-  const [services, setServices] = useState([])
-  const [cleaning, setCleaning] = useState({ assigned: 0, done: 0 })
-  const [events, setEvents] = useState([])
-  const [recent, setRecent] = useState([])
-  const [meals, setMeals] = useState([])
-  const [announcements, setAnnouncements] = useState([])
-  const [counsellor, setCounsellor] = useState(null)
+  const { data, loading: queryLoading } = useCachedQuery(
+    profile ? `dashboard:${profile.id}:${todayISO}` : null,
+    async () => {
+      const nowISO = new Date().toISOString()
+      const [sadhanaRes, servicesRes, logsRes, assignRes, eventsRes, recentRes, mealsRes, announcementsRes, counsellorRes] = await Promise.all([
+        supabase.from('sadhana_reports').select('score, report_date').eq('profile_id', profile.id).eq('report_date', todayISO).maybeSingle(),
+        supabase.from('service_allocations').select('id, status, service_time, service:service_id(name)').eq('profile_id', profile.id).eq('service_date', todayISO).order('service_time', { ascending: true }),
+        supabase.from('cleaning_logs').select('id, status').eq('profile_id', profile.id).eq('log_date', todayISO),
+        supabase.from('cleaning_assignments').select('id').eq('profile_id', profile.id),
+        supabase.from('events').select('id, title, start_datetime, venue, event_type, is_mandatory').eq('voice_id', profile.voice_id).eq('is_active', true).gte('start_datetime', nowISO).order('start_datetime', { ascending: true }).limit(4),
+        supabase.from('sadhana_reports').select('id, report_date, score, japa_rounds, mangal_arti, morning_class').eq('profile_id', profile.id).order('report_date', { ascending: false }).limit(5),
+        supabase.from('meal_plans').select('id, meal_type, menu_items, notes, is_special').eq('voice_id', profile.voice_id).eq('plan_date', todayISO),
+        supabase.from('announcements').select('id, title, body, is_pinned, created_at').eq('voice_id', profile.voice_id).order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(2),
+        profile.counsellor_id
+          ? supabase.from('profiles').select('id, spiritual_name, avatar_url, role, phone').eq('id', profile.counsellor_id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ])
+      const logs = logsRes.data ?? []
+      return {
+        todaySadhana: sadhanaRes.data ?? null,
+        services: servicesRes.data ?? [],
+        cleaning: { assigned: (assignRes.data ?? []).length, done: logs.filter((l) => l.status === 'done').length },
+        events: eventsRes.data ?? [],
+        recent: recentRes.data ?? [],
+        meals: mealsRes.data ?? [],
+        announcements: announcementsRes.data ?? [],
+        counsellor: counsellorRes.data ?? null,
+      }
+    }
+  )
 
-  const load = useCallback(async () => {
-    if (!profile) return
-    setLoading(true)
-    const nowISO = new Date().toISOString()
-    const [sadhanaRes, servicesRes, logsRes, assignRes, eventsRes, recentRes, mealsRes, announcementsRes, counsellorRes] = await Promise.all([
-      supabase.from('sadhana_reports').select('score, report_date').eq('profile_id', profile.id).eq('report_date', todayISO).maybeSingle(),
-      supabase.from('service_allocations').select('id, status, service_time, service:service_id(name)').eq('profile_id', profile.id).eq('service_date', todayISO).order('service_time', { ascending: true }),
-      supabase.from('cleaning_logs').select('id, status').eq('profile_id', profile.id).eq('log_date', todayISO),
-      supabase.from('cleaning_assignments').select('id').eq('profile_id', profile.id),
-      supabase.from('events').select('id, title, start_datetime, venue, event_type, is_mandatory').eq('voice_id', profile.voice_id).eq('is_active', true).gte('start_datetime', nowISO).order('start_datetime', { ascending: true }).limit(4),
-      supabase.from('sadhana_reports').select('id, report_date, score, japa_rounds, mangal_arti, morning_class').eq('profile_id', profile.id).order('report_date', { ascending: false }).limit(5),
-      supabase.from('meal_plans').select('id, meal_type, menu_items, notes, is_special').eq('voice_id', profile.voice_id).eq('plan_date', todayISO),
-      supabase.from('announcements').select('id, title, body, is_pinned, created_at').eq('voice_id', profile.voice_id).order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(2),
-      profile.counsellor_id
-        ? supabase.from('profiles').select('id, spiritual_name, avatar_url, role, phone').eq('id', profile.counsellor_id).maybeSingle()
-        : Promise.resolve({ data: null }),
-    ])
-    setTodaySadhana(sadhanaRes.data ?? null)
-    setServices(servicesRes.data ?? [])
-    const logs = logsRes.data ?? []
-    setCleaning({ assigned: (assignRes.data ?? []).length, done: logs.filter((l) => l.status === 'done').length })
-    setEvents(eventsRes.data ?? [])
-    setRecent(recentRes.data ?? [])
-    setMeals(mealsRes.data ?? [])
-    setAnnouncements(announcementsRes.data ?? [])
-    setCounsellor(counsellorRes.data ?? null)
-    setLoading(false)
-  }, [profile, todayISO])
+  const {
+    todaySadhana = null,
+    services = [],
+    cleaning = { assigned: 0, done: 0 },
+    events = [],
+    recent = [],
+    meals = [],
+    announcements = [],
+    counsellor = null,
+  } = data ?? {}
 
-  useEffect(() => {
-    const id = setTimeout(() => { load() }, 0)
-    return () => clearTimeout(id)
-  }, [load])
-
+  const loading = !profile || queryLoading
   const servicesDone = services.filter((s) => s.status === 'done').length
   const sadhanaValue = todaySadhana?.score != null ? Math.round(todaySadhana.score) : null
 
@@ -107,7 +106,6 @@ export default function Dashboard() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
         className="bg-gradient-to-r from-saffron-500 to-saffron-600 rounded-2xl p-5 text-white shadow-lg shadow-saffron-200"
       >
         <p className="text-sm font-medium opacity-80 mb-1">Verse of the Day</p>
@@ -120,7 +118,6 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12 }}
         >
           <Card>
             <CardHeader>
@@ -156,7 +153,6 @@ export default function Dashboard() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
         className="grid grid-cols-2 lg:grid-cols-4 gap-4"
       >
         <StatCard label="Sadhana Today" value={sadhanaValue != null ? sadhanaValue : '—'} icon={BookOpen} color="lotus" />
@@ -169,7 +165,6 @@ export default function Dashboard() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
       >
         <h3 className="text-base font-semibold text-slate-700 mb-3">Quick Access</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -194,7 +189,6 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.22 }}
         >
           <Card>
             <CardHeader>
@@ -229,7 +223,6 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
         >
           <Card>
             <CardHeader>
@@ -272,7 +265,6 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.28 }}
         >
           <Card>
             <CardHeader>
@@ -313,7 +305,6 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
         >
           <Card>
             <CardHeader>
@@ -356,7 +347,6 @@ export default function Dashboard() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35 }}
       >
         <Card>
           <CardHeader>

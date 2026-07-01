@@ -79,8 +79,7 @@ export default function CleanlinessPage() {
               .order('spiritual_name'),
             supabase
               .from('cleaning_assignments')
-              .select('area_id, profile_id')
-              .eq('voice_id', profile.voice_id),
+              .select('area_id, profile_id'),
           ])
 
           if (allAreasError) throw allAreasError
@@ -90,9 +89,11 @@ export default function CleanlinessPage() {
           setAreas(allAreas ?? [])
           setDevotees(allDevotees ?? [])
 
+          // Filter assignments to only include areas from this voice
+          const voiceAreaIds = new Set((allAreas ?? []).map(area => area.id))
           const assignmentMap = {}
           allAssignments?.forEach((a) => {
-            if (!assignmentMap[a.area_id]) {
+            if (voiceAreaIds.has(a.area_id) && !assignmentMap[a.area_id]) {
               assignmentMap[a.area_id] = a.profile_id
             }
           })
@@ -106,7 +107,8 @@ export default function CleanlinessPage() {
     }
 
     load()
-  }, [profile, admin, today, toast])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, admin, today])
 
   const markStatus = async (area, status) => {
     setSaving((s) => ({ ...s, [area.id]: true }))

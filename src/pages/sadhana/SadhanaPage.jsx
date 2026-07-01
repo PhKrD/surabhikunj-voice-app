@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useCallback, useMemo } from 'react'
+import { lazy, Suspense, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { BookOpen, PlusCircle, TrendingUp, Calendar, Award, Flame } from 'lucide-react'
 import { format } from 'date-fns'
@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import { scoreBg, formatDate, minutesToHHMM, formatTime } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { useCachedQuery, invalidateCache } from '@/lib/useCachedQuery'
 import useAuthStore from '@/store/authStore'
 import { computeSadhanaStats } from '@/lib/sadhanaStats'
 import SadhanaReportForm from './SadhanaReportForm'
@@ -16,24 +17,27 @@ const SadhanaTrendChart = lazy(() => import('./SadhanaTrendChart'))
 export default function SadhanaPage() {
   const { profile } = useAuthStore()
   const [view, setView] = useState('history') // 'history' | 'form' | 'analytics'
-  const [reports, setReports] = useState([])
-  const [loading, setLoading] = useState(true)
 
-  const fetchReports = useCallback(async () => {
-    if (!profile) return
-    setLoading(true)
-    const { data } = await supabase
-      .from('sadhana_reports')
-      .select('*')
-      .eq('profile_id', profile.id)
-      .order('report_date', { ascending: false })
-      .limit(90)
-    setReports(data ?? [])
-    setLoading(false)
-  }, [profile])
+  const { data: reports = [], loading: queryLoading, refetch } = useCachedQuery(
+    profile ? `sadhana:reports:${profile.id}` : null,
+    async () => {
+      const { data } = await supabase
+        .from('sadhana_reports')
+        .select('*')
+        .eq('profile_id', profile.id)
+        .order('report_date', { ascending: false })
+        .limit(90)
+      return data ?? []
+    }
+  )
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { fetchReports() }, [fetchReports])
+  const loading = !profile || queryLoading
+
+  const handleSaved = () => {
+    refetch()
+    invalidateCache('dashboard:', { prefix: true })
+    setView('history')
+  }
 
   const chartData = [...reports].reverse().slice(-14).map((r) => ({
     date: format(new Date(r.report_date), 'dd MMM'),
@@ -75,7 +79,7 @@ export default function SadhanaPage() {
       {/* New Report Form */}
       {view === 'form' && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-          <SadhanaReportForm onSaved={() => { fetchReports(); setView('history') }} />
+          <SadhanaReportForm onSaved={handleSaved} />
         </motion.div>
       )}
 

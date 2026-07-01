@@ -1,7 +1,7 @@
 {
   "name": "surabhikunj-voice-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,6 +12,7 @@
     "cap:sync": "vite build && cap sync",
     "ios": "vite build && cap sync ios && cap open ios",
     "android": "vite build && cap sync android && cap open android",
+    "apk": "bash scripts/build-apk.sh",
     "deploy:ota": "vite build && node scripts/deploy-ota.mjs"
   },
   "dependencies": {

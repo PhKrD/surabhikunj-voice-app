@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect } from 'react'
 import { Bell, CheckCheck, Calendar, ListChecks, Sparkles, BookOpen } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
+import { useCachedQuery, invalidateCache } from '@/lib/useCachedQuery'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
@@ -19,29 +20,19 @@ const iconByType = {
 export default function NotificationsPage() {
   const { profile } = useAuthStore()
   const navigate = useNavigate()
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
-    if (!profile) return
-    setLoading(true)
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('profile_id', profile.id)
-      .order('created_at', { ascending: false })
-      .limit(50)
-    setItems(data ?? [])
-    setLoading(false)
-  }, [profile])
-
-  useEffect(() => {
-    const id = setTimeout(() => {
-      load()
-    }, 0)
-
-    return () => clearTimeout(id)
-  }, [load])
+  const { data: items = [], loading, refetch } = useCachedQuery(
+    profile ? `notifications:${profile.id}` : null,
+    async () => {
+      const { data } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('profile_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(50)
+      return data ?? []
+    }
+  )
 
   useEffect(() => {
     if (!profile?.id) return undefined
@@ -50,13 +41,17 @@ export default function NotificationsPage() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications', filter: `profile_id=eq.${profile.id}` },
-        () => load()
+        () => {
+          refetch()
+          // Also refresh the header unread count
+          invalidateCache(`notif:unread:${profile.id}`)
+        }
       )
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [profile?.id, load])
+  }, [profile?.id, refetch])
 
   const markAllRead = async () => {
     if (!profile) return
@@ -65,12 +60,19 @@ export default function NotificationsPage() {
       .update({ is_read: true })
       .eq('profile_id', profile.id)
       .eq('is_read', false)
-    setItems((prev) => prev.map((it) => ({ ...it, is_read: true })))
+    refetch()
+    // Also refresh the header unread count
+    invalidateCache(`notif:unread:${profile?.id}`)
   }
 
   const markRead = async (id) => {
     await supabase.from('notifications').update({ is_read: true }).eq('id', id)
-    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, is_read: true } : it)))
+    refetch()
+    // Also refresh the header unread count if it was unread
+    const item = items.find(n => n.id === id)
+    if (item && !item.is_read) {
+      invalidateCache(`notif:unread:${profile?.id}`)
+    }
   }
 
   const handleOpen = async (item) => {

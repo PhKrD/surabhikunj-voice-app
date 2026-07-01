@@ -19,7 +19,13 @@ export default defineConfig({
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined
           if (id.includes('@supabase')) return 'supabase'
-          if (id.includes('framer-motion')) return 'motion'
+          if (
+            id.includes('framer-motion') ||
+            id.includes('motion-dom') ||
+            id.includes('motion-utils')
+          ) {
+            return 'motion'
+          }
           if (
             id.includes('react-router') ||
             id.includes('react-dom') ||
@@ -28,6 +34,7 @@ export default defineConfig({
           ) {
             return 'react-vendor'
           }
+          if (id.includes('lucide-react')) return 'icons'
           return undefined
         },
       },

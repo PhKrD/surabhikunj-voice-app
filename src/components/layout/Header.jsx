@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect } from 'react'
 import { Menu, Bell } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { useCachedQuery } from '@/lib/useCachedQuery'
 import useAuthStore from '@/store/authStore'
 import Avatar from '@/components/ui/Avatar'
 
@@ -25,25 +26,22 @@ export default function Header({ onMenuClick }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { profile } = useAuthStore()
-  const [unread, setUnread] = useState(0)
   const profileId = profile?.id
   const label =
     routeLabels[location.pathname] ??
     (location.pathname.startsWith('/residents/') ? 'Resident Profile' : 'SurabhiKunj VOICE')
 
-  const fetchUnread = useCallback(() => {
-    if (!profileId) return
-    supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('profile_id', profileId)
-      .eq('is_read', false)
-      .then(({ count }) => setUnread(count ?? 0))
-  }, [profileId])
-
-  useEffect(() => {
-    fetchUnread()
-  }, [fetchUnread, location.pathname])
+  const { data: unread = 0, refetch } = useCachedQuery(
+    profileId ? `notif:unread:${profileId}` : null,
+    async () => {
+      const { count } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('profile_id', profileId)
+        .eq('is_read', false)
+      return count ?? 0
+    }
+  )
 
   useEffect(() => {
     if (!profileId) return undefined
@@ -52,13 +50,13 @@ export default function Header({ onMenuClick }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications', filter: `profile_id=eq.${profileId}` },
-        () => fetchUnread()
+        () => refetch()
       )
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [profileId, fetchUnread])
+  }, [profileId, refetch])
 
   return (
     <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-sm border-b border-slate-100 px-4 py-3 flex items-center gap-3">

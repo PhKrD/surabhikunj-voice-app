@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Building2, Users, Plus, ChevronRight, X, Pencil, Trash2 } from 'lucide-react'
-import * as LucideIcons from 'lucide-react'
+import {
+  Building2, Users, Plus, ChevronRight, X, Pencil, Trash2,
+  UtensilsCrossed, BookOpen, Sparkles, Heart, Home, Flower2, Sun,
+  Music, Leaf, Wrench, Shield, Calendar, Bell, Star, Flame,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
 import Card, { CardBody } from '@/components/ui/Card'
@@ -10,6 +13,14 @@ import Avatar from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
 import { isAdmin } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
+
+// Curated map so departments can render a lucide icon by stored name WITHOUT
+// pulling the entire icon set into the bundle. Unknown names (e.g. emojis)
+// fall back to plain text.
+const DEPT_ICON_MAP = {
+  Building2, Users, UtensilsCrossed, BookOpen, Sparkles, Heart, Home,
+  Flower2, Sun, Music, Leaf, Wrench, Shield, Calendar, Bell, Star, Flame,
+}
 
 const defaultForm = {
   name: '',
@@ -283,7 +294,7 @@ export default function DepartmentsPage() {
                     style={{ backgroundColor: dept.color ? dept.color + '20' : '#f97316' + '20' }}
                   >
                     {(() => {
-                      const LI = dept.icon && LucideIcons[dept.icon]
+                      const LI = dept.icon && DEPT_ICON_MAP[dept.icon]
                       return LI
                         ? <LI className="w-5 h-5" style={{ color: dept.color ?? '#f97316' }} />
                         : <span>{dept.icon ?? '🏛️'}</span>

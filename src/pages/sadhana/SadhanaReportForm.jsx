@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Send, MessageCircle, Save, Clock, Moon, Sun, BookOpen, Headphones, Heart, Star, AlertCircle } from 'lucide-react'
+import { Send, MessageCircle, Save, Clock, Moon, Sun, BookOpen, Headphones, Heart, Star, AlertCircle, GraduationCap, Sparkles } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import { calculateSadhanaScore, generateWhatsAppMessage } from '@/lib/sadhanaScoring'
@@ -21,6 +21,8 @@ const defaultForm = {
   mangal_arti: false,
   morning_class: false,
   seva_hours: 0,
+  studies_min: 0,
+  cleanliness_done: false,
   notes: '',
 }
 
@@ -189,7 +191,7 @@ export default function SadhanaReportForm({ onSaved }) {
             <p className="text-sm font-medium opacity-80">Live Score Preview</p>
             <div className="text-3xl font-bold">{scores.score.toFixed(1)}<span className="text-lg opacity-70">/100</span></div>
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
             {[
               { label: 'Japa', val: scores.score_japa, max: 30 },
               { label: 'Sleep', val: scores.score_sleep, max: 20 },
@@ -197,6 +199,8 @@ export default function SadhanaReportForm({ onSaved }) {
               { label: 'Hearing', val: scores.score_hearing, max: 15 },
               { label: 'Seva', val: scores.score_seva, max: 10 },
               { label: 'Attend.', val: scores.score_attendance, max: 10 },
+              { label: 'Studies', val: scores.score_studies ?? 0, max: 10 },
+              { label: 'Clean.', val: scores.score_cleanliness ?? 0, max: 5 },
             ].map((s) => (
               <div key={s.label} className="text-center">
                 <div className="text-lg font-bold">{s.val}</div>
@@ -252,6 +256,14 @@ export default function SadhanaReportForm({ onSaved }) {
 
           <FieldRow icon={Send} label="Seva (hours)">
             <NumberInput value={form.seva_hours} onChange={(v) => set('seva_hours', v)} suffix="hrs" max={24} />
+          </FieldRow>
+
+          <FieldRow icon={GraduationCap} label="Studies (minutes)">
+            <NumberInput value={form.studies_min} onChange={(v) => set('studies_min', v)} suffix="min" max={480} />
+          </FieldRow>
+
+          <FieldRow icon={Sparkles} label="Cleanliness">
+            <Toggle value={form.cleanliness_done} onChange={(v) => set('cleanliness_done', v)} label="Cleaning done today" />
           </FieldRow>
 
           <div className="mt-3">

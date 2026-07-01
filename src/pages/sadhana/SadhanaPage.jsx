@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, PlusCircle, TrendingUp, Calendar, Award, Flame } from 'lucide-react'
+import { BookOpen, PlusCircle, TrendingUp, Calendar, Award, Flame, CalendarRange } from 'lucide-react'
 import { format } from 'date-fns'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -13,6 +13,7 @@ import { computeSadhanaStats } from '@/lib/sadhanaStats'
 import SadhanaReportForm from './SadhanaReportForm'
 
 const SadhanaTrendChart = lazy(() => import('./SadhanaTrendChart'))
+const WeeklySadhanaReport = lazy(() => import('./WeeklySadhanaReport'))
 
 export default function SadhanaPage() {
   const { profile } = useAuthStore()
@@ -55,10 +56,11 @@ export default function SadhanaPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       {/* Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {[
           { key: 'history', label: 'History', icon: Calendar },
           { key: 'form', label: 'New Report', icon: PlusCircle },
+          { key: 'weekly', label: 'Weekly Report', icon: CalendarRange },
           { key: 'analytics', label: 'Analytics', icon: TrendingUp },
         ].map((tab) => (
           <button
@@ -80,6 +82,15 @@ export default function SadhanaPage() {
       {view === 'form' && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           <SadhanaReportForm onSaved={handleSaved} />
+        </motion.div>
+      )}
+
+      {/* Weekly Report */}
+      {view === 'weekly' && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          <Suspense fallback={<div className="text-center py-12 text-slate-400 text-sm">Loading weekly report…</div>}>
+            <WeeklySadhanaReport />
+          </Suspense>
         </motion.div>
       )}
 

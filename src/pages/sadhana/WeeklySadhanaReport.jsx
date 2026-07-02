@@ -17,12 +17,12 @@ const COLUMNS = [
   { key: 'to_bed_time',     label: 'TB',          type: 'time',   scoreKey: 'tb',          max: WEEKLY_MAX.tb },
   { key: 'wake_up_time',    label: 'WU',          type: 'time',   scoreKey: 'wu',          max: WEEKLY_MAX.wu },
   { key: 'day_rest_min',    label: 'DR (min)',    type: 'number', scoreKey: 'dr',          max: WEEKLY_MAX.dr },
-  { key: 'japa_rounds',     label: 'JP (rnds)',   type: 'number', scoreKey: 'japa',        max: WEEKLY_MAX.japa },
+  { key: 'japa_time',       label: 'JP (time)',   type: 'time',   scoreKey: 'japa',        max: WEEKLY_MAX.japa },
   { key: 'reading_min',     label: 'RD (min)',    type: 'number', scoreKey: 'reading',     max: WEEKLY_MAX.reading },
   { key: 'hearing_min',     label: 'HR (min)',    type: 'number', scoreKey: 'hearing',     max: WEEKLY_MAX.hearing },
   { key: 'morning_class',   label: 'MC',          type: 'bool',   scoreKey: 'mc',          max: WEEKLY_MAX.mc },
   { key: 'mangal_arti',     label: 'MA',          type: 'bool',   scoreKey: 'ma',          max: WEEKLY_MAX.ma },
-  { key: 'studies_min',     label: 'Studies',     type: 'number', scoreKey: 'studies',     max: WEEKLY_MAX.studies },
+  { key: 'studies_min',     label: 'Studies (min)',type: 'number', scoreKey: 'studies',     max: WEEKLY_MAX.studies },
   { key: 'cleanliness_done',label: 'Clean.',      type: 'bool',   scoreKey: 'cleanliness', max: WEEKLY_MAX.cleanliness },
 ]
 

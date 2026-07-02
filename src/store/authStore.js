@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import { clearCache } from '@/lib/useCachedQuery'
+import { getWithFallback, saveProfileOffline } from '@/lib/offlineDatabase'
 
 const DEFAULT_VOICE_ID = import.meta.env.VITE_DEFAULT_VOICE_ID
 
@@ -52,20 +53,21 @@ const useAuthStore = create((set, get) => ({
   fetchProfile: async (userId) => {
     set({ profileLoading: true, profileError: null })
     try {
-      // Add a hard timeout so a hung network request cannot leave the UI stuck
-      const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Profile fetch timed out')), 10000)
+      // Use offline-first database with fallback
+      const data = await getWithFallback(
+        `profile:${userId}`,
+        async () => {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*, voices(name, location)')
+            .eq('id', userId)
+            .single()
+          
+          if (error) throw error
+          return data
+        },
+        24 * 60 * 60 * 1000 // Cache for 24 hours
       )
-
-      const query = supabase
-        .from('profiles')
-        .select('*, voices(name, location)')
-        .eq('id', userId)
-        .single()
-
-      let { data, error } = await Promise.race([query, timeout])
-
-      if (error) throw error
 
       if (data && !data.voice_id && DEFAULT_VOICE_ID) {
         try {
@@ -86,6 +88,8 @@ const useAuthStore = create((set, get) => ({
 
       if (data) {
         set({ user: { id: userId }, profile: data, profileError: null })
+        // Save to offline cache for future use
+        await saveProfileOffline(data)
       } else {
         throw new Error('Profile not found')
       }

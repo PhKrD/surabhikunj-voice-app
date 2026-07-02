@@ -4,6 +4,7 @@ import { MotionConfig } from 'framer-motion'
 import useAuthStore from '@/store/authStore'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { flushSadhanaQueue } from '@/lib/offlineQueue'
+import { healthMonitor } from '@/lib/healthCheck'
 
 const AppLayout = lazy(() => import('@/components/layout/AppLayout'))
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))

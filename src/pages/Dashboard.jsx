@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { BookOpen, Users, Sparkles, UtensilsCrossed, CalendarDays, ListChecks, TrendingUp, Clock, MapPin, Megaphone, MessageCircle } from 'lucide-react'
+import { BookOpen, Users, Sparkles, UtensilsCrossed, CalendarDays, ListChecks, TrendingUp, Clock, MapPin, Megaphone, MessageCircle, AlertCircle, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '@/lib/supabase'
@@ -9,6 +9,7 @@ import StatCard from '@/components/ui/StatCard'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
+import Button from '@/components/ui/Button'
 import { ROLES, ROLE_COLORS, scoreBg, formatDate, formatTime } from '@/lib/utils'
 
 const modules = [
@@ -31,7 +32,7 @@ const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'prasad_special']
 const MEAL_LABEL = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', prasad_special: 'Special Prasad' }
 
 export default function Dashboard() {
-  const { profile } = useAuthStore()
+  const { profile, profileLoading, profileError, user, fetchProfile } = useAuthStore()
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
   const todayISO = new Date().toISOString().split('T')[0]
 
@@ -77,9 +78,42 @@ export default function Dashboard() {
     counsellor = null,
   } = data ?? {}
 
-  const loading = !profile || queryLoading
+  const loading = queryLoading
   const servicesDone = services.filter((s) => s.status === 'done').length
   const sadhanaValue = todaySadhana?.score != null ? Math.round(todaySadhana.score) : null
+
+  // Profile failed to load → show recoverable error instead of hanging forever
+  if (profileError && !profile) {
+    return (
+      <div className="max-w-md mx-auto mt-16">
+        <Card>
+          <CardBody className="text-center py-10">
+            <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+            <h3 className="font-semibold text-slate-700 mb-1">Could not load your profile</h3>
+            <p className="text-sm text-slate-500 mb-4">{profileError}</p>
+            <Button icon={RefreshCw} onClick={() => user?.id && fetchProfile(user.id)} loading={profileLoading}>
+              Retry
+            </Button>
+          </CardBody>
+        </Card>
+      </div>
+    )
+  }
+
+  // First-time profile fetch → show skeleton (not a stuck spinner)
+  if (!profile) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-4 animate-pulse">
+        <div className="h-20 bg-slate-100 rounded-2xl" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="h-24 bg-slate-100 rounded-2xl" />
+          <div className="h-24 bg-slate-100 rounded-2xl" />
+          <div className="h-24 bg-slate-100 rounded-2xl" />
+          <div className="h-24 bg-slate-100 rounded-2xl" />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">

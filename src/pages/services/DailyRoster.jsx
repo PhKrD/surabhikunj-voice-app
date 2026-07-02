@@ -32,12 +32,16 @@ export default function DailyRoster({ voiceId, services, date, allocatedBy, relo
         .eq('voice_id', voiceId)
         .eq('is_active', true)
         .order('spiritual_name', { ascending: true }),
-    ]).then(([allocRes, memRes]) => {
-      setAllocations(allocRes.data ?? [])
-      setMembers(memRes.data ?? [])
-      setLoading(false)
-    })
-  }, [voiceId, date])
+    ])
+      .then(([allocRes, memRes]) => {
+        setAllocations(allocRes.data ?? [])
+        setMembers(memRes.data ?? [])
+      })
+      .catch((e) => {
+        toast.error('Could not load roster', e.message)
+      })
+      .finally(() => setLoading(false))
+  }, [voiceId, date, toast])
 
   useEffect(() => {
     const id = setTimeout(() => load(), 0)

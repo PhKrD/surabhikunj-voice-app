@@ -36,8 +36,11 @@ export default function SadhanaConfigEditor() {
   const [editingRule, setEditingRule] = useState(null)
   const [expandedRule, setExpandedRule] = useState(null)
 
+  const [migrationMissing, setMigrationMissing] = useState(false)
+
   const loadConfiguration = useCallback(async () => {
     setLoading(true)
+    setMigrationMissing(false)
     try {
       const [rulesRes, hearingRes, readingRes] = await Promise.all([
         supabase
@@ -57,6 +60,18 @@ export default function SadhanaConfigEditor() {
           .order('display_order')
       ])
 
+      // If ANY of the tables is missing, the migration hasn't been applied yet
+      const anyMissing = [rulesRes, hearingRes, readingRes].some(
+        (r) => r.error && /relation .* does not exist|schema cache/i.test(r.error.message || '')
+      )
+      if (anyMissing) {
+        setMigrationMissing(true)
+        setScoringRules([])
+        setHearingSources([])
+        setReadingTypes([])
+        return
+      }
+
       if (rulesRes.error) throw rulesRes.error
       if (hearingRes.error) throw hearingRes.error
       if (readingRes.error) throw readingRes.error
@@ -65,6 +80,7 @@ export default function SadhanaConfigEditor() {
       setHearingSources(hearingRes.data || [])
       setReadingTypes(readingRes.data || [])
     } catch (error) {
+      console.error('[config] load failed:', error)
       toast.error('Failed to load configuration', error.message)
     } finally {
       setLoading(false)
@@ -144,6 +160,29 @@ export default function SadhanaConfigEditor() {
 
   if (loading) {
     return <div className="text-center py-12 text-slate-400">Loading configuration...</div>
+  }
+
+  if (migrationMissing) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <Card>
+          <CardBody className="text-center py-10 space-y-3">
+            <div className="mx-auto w-12 h-12 rounded-2xl bg-yellow-50 flex items-center justify-center">
+              <Save className="w-6 h-6 text-yellow-600" />
+            </div>
+            <h3 className="font-semibold text-slate-700">Database setup required</h3>
+            <p className="text-sm text-slate-500">
+              The configurable scoring tables have not been created yet. Run the SQL migration
+              <code className="mx-1 px-1.5 py-0.5 bg-slate-100 rounded text-xs">supabase/14_sadhana_config.sql</code>
+              in your Supabase project (SQL editor) and then reload this page.
+            </p>
+            <Button onClick={loadConfiguration} icon={Save} variant="ghost">
+              Retry
+            </Button>
+          </CardBody>
+        </Card>
+      </div>
+    )
   }
 
   return (

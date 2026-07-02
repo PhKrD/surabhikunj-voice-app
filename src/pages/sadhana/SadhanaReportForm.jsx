@@ -132,15 +132,19 @@ export default function SadhanaReportForm({ onSaved }) {
         .eq('voice_id', profile.voice_id)
         .eq('is_active', true)
         .order('display_order')
-    ]).then(([configRes, rulesRes, hearingRes, readingRes]) => {
-      if (active) {
+    ])
+      .then(([configRes, rulesRes, hearingRes, readingRes]) => {
+        if (!active) return
         setScoreConfig(configRes.data?.config ?? null)
-        setScoringRules(rulesRes.data ?? [])
-        setHearingSources(hearingRes.data ?? [])
-        setReadingTypes(readingRes.data ?? [])
-      }
-    })
-    
+        // Missing tables (before migration) return an error object — treat as empty
+        setScoringRules(rulesRes.error ? [] : (rulesRes.data ?? []))
+        setHearingSources(hearingRes.error ? [] : (hearingRes.data ?? []))
+        setReadingTypes(readingRes.error ? [] : (readingRes.data ?? []))
+      })
+      .catch((err) => {
+        console.error('[sadhana] config fetch failed:', err)
+      })
+
     return () => {
       active = false
     }

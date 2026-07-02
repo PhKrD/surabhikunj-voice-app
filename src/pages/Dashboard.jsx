@@ -13,12 +13,12 @@ import Button from '@/components/ui/Button'
 import { ROLES, ROLE_COLORS, scoreBg, formatDate, formatTime } from '@/lib/utils'
 
 const modules = [
-  { label: 'Sadhana', icon: BookOpen, to: '/sadhana', color: 'bg-lotus-50 border-lotus-100 text-lotus-600', desc: 'Track daily spiritual practices' },
-  { label: 'Counsellor', icon: Users, to: '/counsellor', color: 'bg-blue-50 border-blue-100 text-blue-600', desc: 'Manage counsellee relationships' },
-  { label: 'Services', icon: ListChecks, to: '/services', color: 'bg-saffron-50 border-saffron-100 text-saffron-600', desc: 'View & manage service assignments' },
-  { label: 'Cleanliness', icon: Sparkles, to: '/cleanliness', color: 'bg-tulasi-50 border-tulasi-100 text-tulasi-600', desc: 'Daily cleaning assignments' },
-  { label: 'Kitchen', icon: UtensilsCrossed, to: '/kitchen', color: 'bg-orange-50 border-orange-100 text-orange-600', desc: 'Meal plans & menus' },
-  { label: 'Events', icon: CalendarDays, to: '/events', color: 'bg-indigo-50 border-indigo-100 text-indigo-600', desc: 'Programs & festivals' },
+  { label: 'Sadhana', icon: BookOpen, to: '/sadhana', grad: 'grad-lotus', desc: 'Track daily spiritual practices' },
+  { label: 'Counsellor', icon: Users, to: '/counsellor', grad: 'grad-blue', desc: 'Manage counsellee relationships' },
+  { label: 'Services', icon: ListChecks, to: '/services', grad: 'grad-saffron', desc: 'View & manage service assignments' },
+  { label: 'Cleanliness', icon: Sparkles, to: '/cleanliness', grad: 'grad-tulasi', desc: 'Daily cleaning assignments' },
+  { label: 'Kitchen', icon: UtensilsCrossed, to: '/kitchen', grad: 'grad-amber', desc: 'Meal plans & menus' },
+  { label: 'Events', icon: CalendarDays, to: '/events', grad: 'grad-indigo', desc: 'Programs & festivals' },
 ]
 
 const todayQuote = {
@@ -140,11 +140,15 @@ export default function Dashboard() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-saffron-500 to-saffron-600 rounded-2xl p-5 text-white shadow-lg shadow-saffron-200"
+        className="relative overflow-hidden grad-saffron rounded-3xl p-6 text-white glow-saffron"
       >
-        <p className="text-sm font-medium opacity-80 mb-1">Verse of the Day</p>
-        <p className="text-base font-medium leading-relaxed italic">"{todayQuote.text}"</p>
-        <p className="text-xs opacity-70 mt-2">— {todayQuote.source}</p>
+        <div className="pointer-events-none absolute -top-10 -right-8 w-40 h-40 rounded-full bg-white/10 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-12 -left-10 w-40 h-40 rounded-full bg-black/10 blur-2xl" />
+        <div className="relative">
+          <p className="text-xs font-bold uppercase tracking-widest text-white/80 mb-2">Verse of the Day</p>
+          <p className="text-lg font-medium leading-relaxed italic">"{todayQuote.text}"</p>
+          <p className="text-xs text-white/80 mt-3 font-semibold">— {todayQuote.source}</p>
+        </div>
       </motion.div>
 
       {/* Announcements */}
@@ -208,10 +212,15 @@ export default function Dashboard() {
               to={mod.to}
               className="group block"
             >
-              <div className={`border rounded-2xl p-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${mod.color}`}>
-                <mod.icon className="w-7 h-7 mb-2" />
-                <p className="font-semibold text-sm text-slate-800">{mod.label}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{mod.desc}</p>
+              <div className={`relative overflow-hidden rounded-3xl p-4 text-white hover-lift ${mod.grad}`}>
+                <div className="pointer-events-none absolute -top-6 -right-6 w-20 h-20 rounded-full bg-white/15 blur-lg" />
+                <div className="relative">
+                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-white/20 backdrop-blur-sm ring-1 ring-white/30 mb-3">
+                    <mod.icon className="w-6 h-6" />
+                  </div>
+                  <p className="font-bold text-sm">{mod.label}</p>
+                  <p className="text-xs text-white/80 mt-0.5 leading-snug">{mod.desc}</p>
+                </div>
               </div>
             </Link>
           ))}

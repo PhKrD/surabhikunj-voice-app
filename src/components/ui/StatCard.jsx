@@ -1,29 +1,40 @@
 import { cn } from '@/lib/utils'
 
-export default function StatCard({ label, value, icon: Icon, color = 'saffron', trend, className }) {
-  const colorMap = {
-    saffron: 'bg-saffron-50 text-saffron-600 border-saffron-100',
-    tulasi: 'bg-tulasi-50 text-tulasi-600 border-tulasi-100',
-    lotus: 'bg-lotus-50 text-lotus-600 border-lotus-100',
-    blue: 'bg-blue-50 text-blue-600 border-blue-100',
-    slate: 'bg-slate-50 text-slate-600 border-slate-100',
-  }
+const gradientMap = {
+  saffron: 'grad-saffron glow-saffron',
+  tulasi: 'grad-tulasi glow-tulasi',
+  lotus: 'grad-lotus glow-lotus',
+  blue: 'grad-blue glow-blue',
+  indigo: 'grad-indigo glow-indigo',
+  slate: 'bg-gradient-to-br from-slate-600 to-slate-800',
+}
 
+export default function StatCard({ label, value, icon: Icon, color = 'saffron', trend, className }) {
   return (
-    <div className={cn('bg-white rounded-2xl border border-slate-100 p-5 shadow-sm', className)}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-slate-500 font-medium">{label}</p>
-          <p className="text-3xl font-bold text-slate-800 mt-1">{value}</p>
-          {trend && (
-            <p className={cn('text-xs mt-1', trend > 0 ? 'text-tulasi-600' : 'text-red-500')}>
+    <div
+      className={cn(
+        'relative overflow-hidden rounded-3xl p-5 text-white hover-lift',
+        gradientMap[color] ?? gradientMap.saffron,
+        className
+      )}
+    >
+      {/* Decorative blobs */}
+      <div className="pointer-events-none absolute -top-8 -right-8 w-28 h-28 rounded-full bg-white/15 blur-xl" />
+      <div className="pointer-events-none absolute -bottom-10 -left-6 w-24 h-24 rounded-full bg-black/10 blur-xl" />
+
+      <div className="relative flex items-start justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-white/80">{label}</p>
+          <p className="text-3xl font-extrabold mt-1 drop-shadow-sm">{value}</p>
+          {trend != null && trend !== 0 && (
+            <p className="text-xs mt-1.5 font-medium text-white/90">
               {trend > 0 ? '↑' : '↓'} {Math.abs(trend)}% vs last week
             </p>
           )}
         </div>
         {Icon && (
-          <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center border', colorMap[color])}>
-            <Icon className="w-5 h-5" />
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white/20 backdrop-blur-sm ring-1 ring-white/30 flex-shrink-0">
+            <Icon className="w-6 h-6" />
           </div>
         )}
       </div>

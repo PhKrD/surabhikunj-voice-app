@@ -54,7 +54,7 @@ const useAuthStore = create((set, get) => ({
     set({ profileLoading: true, profileError: null })
     try {
       // Use offline-first database with fallback
-      const data = await getWithFallback(
+      let data = await getWithFallback(
         `profile:${userId}`,
         async () => {
           const { data, error } = await supabase

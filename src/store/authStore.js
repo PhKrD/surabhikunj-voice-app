@@ -5,6 +5,26 @@ import { getWithFallback, saveProfileOffline } from '@/lib/offlineDatabase'
 
 const DEFAULT_VOICE_ID = import.meta.env.VITE_DEFAULT_VOICE_ID
 
+// --- localStorage profile cache (synchronous, survives Supabase outages) ---
+const LS_KEY = (uid) => `profile_cache:${uid}`
+
+function readProfileCache(uid) {
+  try {
+    const raw = localStorage.getItem(LS_KEY(uid))
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
+function writeProfileCache(profile) {
+  try {
+    localStorage.setItem(LS_KEY(profile.id), JSON.stringify(profile))
+  } catch { /* quota exceeded – ignore */ }
+}
+
+function clearProfileCache(uid) {
+  try { localStorage.removeItem(LS_KEY(uid)) } catch { }
+}
+
 const useAuthStore = create((set, get) => ({
   user: null,
   profile: null,
@@ -29,11 +49,17 @@ const useAuthStore = create((set, get) => ({
     } catch (e) {
       console.error('[auth] getSession failed:', e)
     }
-    // Unblock the UI as soon as the auth state is known (getSession reads
-    // from local storage and is fast). The profile is hydrated in the
-    // background so the app shell paints immediately instead of waiting on
-    // a network round-trip.
-    set({ user: session?.user ?? null, loading: false, initialized: true })
+
+    // Immediately seed profile from localStorage so Dashboard renders right away
+    const cachedProfile = session?.user ? readProfileCache(session.user.id) : null
+
+    set({
+      user: session?.user ?? null,
+      profile: cachedProfile ?? null,
+      loading: false,
+      initialized: true,
+    })
+
     if (session?.user) {
       get().fetchProfile(session.user.id)
     }
@@ -51,9 +77,11 @@ const useAuthStore = create((set, get) => ({
   },
 
   fetchProfile: async (userId) => {
-    set({ profileLoading: true, profileError: null })
+    // If we already have a cached profile, don't show loading — refresh silently
+    const hasCached = !!readProfileCache(userId)
+    if (!hasCached) set({ profileLoading: true, profileError: null })
+
     try {
-      // Use offline-first database with fallback
       let data = await getWithFallback(
         `profile:${userId}`,
         async () => {
@@ -62,11 +90,10 @@ const useAuthStore = create((set, get) => ({
             .select('*, voices(name, location)')
             .eq('id', userId)
             .single()
-          
           if (error) throw error
           return data
         },
-        24 * 60 * 60 * 1000 // Cache for 24 hours
+        24 * 60 * 60 * 1000
       )
 
       if (data && !data.voice_id && DEFAULT_VOICE_ID) {
@@ -87,15 +114,23 @@ const useAuthStore = create((set, get) => ({
       }
 
       if (data) {
-        set({ user: { id: userId }, profile: data, profileError: null })
-        // Save to offline cache for future use
+        // Save to localStorage so next visit is instant
+        writeProfileCache(data)
         await saveProfileOffline(data)
+        set({ user: { id: userId }, profile: data, profileError: null })
       } else {
         throw new Error('Profile not found')
       }
     } catch (error) {
       console.error('[auth] fetchProfile failed:', error)
-      set({ profileError: error.message || 'Failed to load profile' })
+      // If we have a cached profile, stay silent — user can still use the app
+      const cached = readProfileCache(userId)
+      if (cached) {
+        console.log('[auth] Using localStorage cache due to fetch failure')
+        set({ profile: cached, profileError: null })
+      } else {
+        set({ profileError: error.message || 'Failed to load profile' })
+      }
     } finally {
       set({ profileLoading: false })
     }
@@ -118,6 +153,8 @@ const useAuthStore = create((set, get) => ({
   },
 
   signOut: async () => {
+    const { profile } = get()
+    if (profile?.id) clearProfileCache(profile.id)
     const { error } = await supabase.auth.signOut({ scope: 'local' })
     if (error) {
       console.error('Sign out failed:', error.message)

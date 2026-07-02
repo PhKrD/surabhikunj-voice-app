@@ -197,6 +197,13 @@ INSERT INTO sadhana_default_configs (parameter, rule_type, default_config, max_p
    0, 'Day Rest penalty')
 ON CONFLICT (parameter) DO NOTHING;
 
+-- RLS for the default-configs reference table (read-only for all auth'd users)
+ALTER TABLE sadhana_default_configs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS default_configs_select ON sadhana_default_configs;
+CREATE POLICY default_configs_select ON sadhana_default_configs
+  FOR SELECT USING (auth.role() = 'authenticated');
+
 -- =====================================================================
 -- DEFAULT DATA FOR HEARING SOURCES AND READING TYPES
 -- =====================================================================

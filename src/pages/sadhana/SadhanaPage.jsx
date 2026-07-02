@@ -1,11 +1,11 @@
 import { lazy, Suspense, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, PlusCircle, TrendingUp, Calendar, Award, Flame, CalendarRange } from 'lucide-react'
+import { BookOpen, PlusCircle, TrendingUp, Calendar, Award, Flame, CalendarRange, Settings } from 'lucide-react'
 import { format } from 'date-fns'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
-import { scoreBg, formatDate, minutesToHHMM, formatTime } from '@/lib/utils'
+import { scoreBg, formatDate, minutesToHHMM, formatTime, isAdmin } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useCachedQuery, invalidateCache } from '@/lib/useCachedQuery'
 import useAuthStore from '@/store/authStore'
@@ -14,6 +14,7 @@ import SadhanaReportForm from './SadhanaReportForm'
 
 const SadhanaTrendChart = lazy(() => import('./SadhanaTrendChart'))
 const WeeklySadhanaReport = lazy(() => import('./WeeklySadhanaReport'))
+const SadhanaConfigEditor = lazy(() => import('./SadhanaConfigEditor'))
 
 export default function SadhanaPage() {
   const { profile } = useAuthStore()
@@ -62,6 +63,8 @@ export default function SadhanaPage() {
           { key: 'form', label: 'New Report', icon: PlusCircle },
           { key: 'weekly', label: 'Weekly Report', icon: CalendarRange },
           { key: 'analytics', label: 'Analytics', icon: TrendingUp },
+          ...(isAdmin(profile?.role) || profile?.role === 'coordinator' ? 
+            [{ key: 'config', label: 'Configuration', icon: Settings }] : []),
         ].map((tab) => (
           <button
             key={tab.key}
@@ -139,6 +142,15 @@ export default function SadhanaPage() {
               </CardBody>
             </Card>
           ))}
+        </motion.div>
+      )}
+
+      {/* Configuration */}
+      {view === 'config' && (isAdmin(profile?.role) || profile?.role === 'coordinator') && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          <Suspense fallback={<div className="text-center py-12 text-slate-400 text-sm">Loading configuration…</div>}>
+            <SadhanaConfigEditor />
+          </Suspense>
         </motion.div>
       )}
 

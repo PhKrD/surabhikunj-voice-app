@@ -4,6 +4,7 @@ import { Send, MessageCircle, Save, Clock, Moon, Sun, BookOpen, Headphones, Hear
 import Button from '@/components/ui/Button'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import { calculateSadhanaScore, generateWhatsAppMessage } from '@/lib/sadhanaScoring'
+import { calculateDynamicSadhanaScore } from '@/lib/sadhanaConfigScoring'
 import { cn } from '@/lib/utils'
 import useAuthStore from '@/store/authStore'
 import { supabase } from '@/lib/supabase'
@@ -96,24 +97,62 @@ export default function SadhanaReportForm({ onSaved }) {
   const [error, setError] = useState('')
   const [queuedOffline, setQueuedOffline] = useState(false)
   const [scoreConfig, setScoreConfig] = useState(null)
+  const [scoringRules, setScoringRules] = useState([])
+  const [hearingSources, setHearingSources] = useState([])
+  const [readingTypes, setReadingTypes] = useState([])
+  const [hearingSourceId, setHearingSourceId] = useState('')
+  const [readingTypeId, setReadingTypeId] = useState('')
 
   useEffect(() => {
     if (!profile?.voice_id) return undefined
     let active = true
-    supabase
-      .from('sadhana_score_config')
-      .select('config')
-      .eq('voice_id', profile.voice_id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (active) setScoreConfig(data?.config ?? null)
-      })
+    
+    // Fetch scoring configuration, rules, and sources
+    Promise.all([
+      supabase
+        .from('sadhana_score_config')
+        .select('config')
+        .eq('voice_id', profile.voice_id)
+        .maybeSingle(),
+      supabase
+        .from('sadhana_scoring_rules')
+        .select('*')
+        .eq('voice_id', profile.voice_id)
+        .eq('is_active', true)
+        .order('display_order'),
+      supabase
+        .from('hearing_sources')
+        .select('*')
+        .eq('voice_id', profile.voice_id)
+        .eq('is_active', true)
+        .order('display_order'),
+      supabase
+        .from('reading_types')
+        .select('*')
+        .eq('voice_id', profile.voice_id)
+        .eq('is_active', true)
+        .order('display_order')
+    ]).then(([configRes, rulesRes, hearingRes, readingRes]) => {
+      if (active) {
+        setScoreConfig(configRes.data?.config ?? null)
+        setScoringRules(rulesRes.data ?? [])
+        setHearingSources(hearingRes.data ?? [])
+        setReadingTypes(readingRes.data ?? [])
+      }
+    })
+    
     return () => {
       active = false
     }
   }, [profile?.voice_id])
 
-  const scores = useMemo(() => calculateSadhanaScore(form, scoreConfig), [form, scoreConfig])
+  const scores = useMemo(() => {
+    // Use dynamic scoring if rules are configured, otherwise fall back to old system
+    if (scoringRules.length > 0) {
+      return calculateDynamicSadhanaScore(form, scoringRules)
+    }
+    return calculateSadhanaScore(form, scoreConfig)
+  }, [form, scoreConfig, scoringRules])
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
 
@@ -121,11 +160,15 @@ export default function SadhanaReportForm({ onSaved }) {
     setSaving(true)
     setError('')
     setQueuedOffline(false)
-    const scoreData = calculateSadhanaScore(form, scoreConfig)
+    const scoreData = scoringRules.length > 0 
+      ? calculateDynamicSadhanaScore(form, scoringRules)
+      : calculateSadhanaScore(form, scoreConfig)
     const payload = {
       ...form,
       profile_id: profile.id,
       voice_id: profile.voice_id,
+      hearing_source_id: hearingSourceId || null,
+      reading_type_id: readingTypeId || null,
       ...scoreData,
     }
     const queueForLater = () => {
@@ -240,11 +283,41 @@ export default function SadhanaReportForm({ onSaved }) {
           </FieldRow>
 
           <FieldRow icon={BookOpen} label="RD — Reading (minutes)">
-            <NumberInput value={form.reading_min} onChange={(v) => set('reading_min', v)} suffix="min" max={480} />
+            <div className="space-y-2">
+              <NumberInput value={form.reading_min} onChange={(v) => set('reading_min', v)} suffix="min" max={480} />
+              {readingTypes.length > 0 && (
+                <select
+                  value={readingTypeId}
+                  onChange={(e) => setReadingTypeId(e.target.value)}
+                  className="w-full sm:w-64 px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-saffron-300 transition"
+                >
+                  <option value="">Select reading type...</option>
+                  {readingTypes.map((type) => (
+                    <option key={type.id} value={type.id}>{type.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
           </FieldRow>
 
           <FieldRow icon={Headphones} label="HR — Hearing (minutes)">
-            <NumberInput value={form.hearing_min} onChange={(v) => set('hearing_min', v)} suffix="min" max={480} />
+            <div className="space-y-2">
+              <NumberInput value={form.hearing_min} onChange={(v) => set('hearing_min', v)} suffix="min" max={480} />
+              {hearingSources.length > 0 && (
+                <select
+                  value={hearingSourceId}
+                  onChange={(e) => setHearingSourceId(e.target.value)}
+                  className="w-full sm:w-64 px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-saffron-300 transition"
+                >
+                  <option value="">Select hearing source...</option>
+                  {hearingSources.map((source) => (
+                    <option key={source.id} value={source.id}>
+                      {source.abbreviation || source.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           </FieldRow>
 
           <FieldRow icon={Heart} label="MA & MC — Attendance">

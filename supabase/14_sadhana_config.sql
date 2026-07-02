@@ -46,15 +46,18 @@ ALTER TABLE sadhana_reports
 -- =====================================================================
 
 -- Scoring rule types
-CREATE TYPE IF NOT EXISTS scoring_rule_type AS ENUM (
-  'time_before',     -- Points for completing before a certain time (WU, Japa)
-  'time_after',      -- Points for going to bed after a certain time (TB)
-  'duration_min',    -- Points based on duration in minutes (Reading, Hearing, Studies, DR)
-  'rounds',          -- Points based on number of rounds (Japa)
-  'seva_hours',      -- Points based on seva hours
-  'boolean',         -- Points for yes/no (MA, MC, Cleanliness)
-  'custom'           -- Custom scoring logic
-);
+DO $$ BEGIN
+  CREATE TYPE scoring_rule_type AS ENUM (
+    'time_before',     -- Points for completing before a certain time (WU, Japa)
+    'time_after',      -- Points for going to bed after a certain time (TB)
+    'duration_min',    -- Points based on duration in minutes (Reading, Hearing, Studies, DR)
+    'rounds',          -- Points based on number of rounds (Japa)
+    'seva_hours',      -- Points based on seva hours
+    'boolean',         -- Points for yes/no (MA, MC, Cleanliness)
+    'custom'           -- Custom scoring logic
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Configurable scoring rules per voice
 CREATE TABLE IF NOT EXISTS sadhana_scoring_rules (
@@ -261,7 +264,7 @@ CREATE POLICY hearing_sources_modify ON hearing_sources
       SELECT 1 FROM profiles 
       WHERE id = auth.uid() 
       AND voice_id = hearing_sources.voice_id
-      AND role IN ('admin', 'coordinator')
+      AND role IN ('admin', 'vmc', 'oc', 'sadhana_incharge')
     )
   );
 
@@ -281,7 +284,7 @@ CREATE POLICY reading_types_modify ON reading_types
       SELECT 1 FROM profiles 
       WHERE id = auth.uid() 
       AND voice_id = reading_types.voice_id
-      AND role IN ('admin', 'coordinator')
+      AND role IN ('admin', 'vmc', 'oc', 'sadhana_incharge')
     )
   );
 
@@ -301,7 +304,7 @@ CREATE POLICY scoring_rules_modify ON sadhana_scoring_rules
       SELECT 1 FROM profiles 
       WHERE id = auth.uid() 
       AND voice_id = sadhana_scoring_rules.voice_id
-      AND role IN ('admin', 'coordinator')
+      AND role IN ('admin', 'vmc', 'oc', 'sadhana_incharge')
     )
   );
 

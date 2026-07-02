@@ -17,7 +17,15 @@ const useAuthStore = create((set, get) => ({
   },
 
   initialize: async () => {
-    const { data: { session } } = await supabase.auth.getSession()
+    // Race getSession against a timeout so a hung token-refresh never blocks the UI
+    let session = null
+    try {
+      const timeout = new Promise((resolve) => setTimeout(resolve, 4000))
+      const sessionResult = supabase.auth.getSession().then((r) => r.data.session)
+      session = await Promise.race([sessionResult, timeout])
+    } catch {
+      // treat any error as signed-out
+    }
     // Unblock the UI as soon as the auth state is known (getSession reads
     // from local storage and is fast). The profile is hydrated in the
     // background so the app shell paints immediately instead of waiting on

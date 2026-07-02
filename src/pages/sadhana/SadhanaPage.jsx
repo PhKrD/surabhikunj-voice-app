@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
-import { scoreBg, formatDate, minutesToHHMM, formatTime, isAdmin } from '@/lib/utils'
+import { scoreBg, formatDate, minutesToHHMM, formatTime } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useCachedQuery, invalidateCache } from '@/lib/useCachedQuery'
 import useAuthStore from '@/store/authStore'
@@ -63,7 +63,7 @@ export default function SadhanaPage() {
           { key: 'form', label: 'New Report', icon: PlusCircle },
           { key: 'weekly', label: 'Weekly Report', icon: CalendarRange },
           { key: 'analytics', label: 'Analytics', icon: TrendingUp },
-          ...(isAdmin(profile?.role) || profile?.role === 'coordinator' ? 
+          ...(['admin', 'vmc', 'oc', 'sadhana_incharge'].includes(profile?.role) ? 
             [{ key: 'config', label: 'Configuration', icon: Settings }] : []),
         ].map((tab) => (
           <button
@@ -146,7 +146,7 @@ export default function SadhanaPage() {
       )}
 
       {/* Configuration */}
-      {view === 'config' && (isAdmin(profile?.role) || profile?.role === 'coordinator') && (
+      {view === 'config' && ['admin', 'vmc', 'oc', 'sadhana_incharge'].includes(profile?.role) && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           <Suspense fallback={<div className="text-center py-12 text-slate-400 text-sm">Loading configuration…</div>}>
             <SadhanaConfigEditor />

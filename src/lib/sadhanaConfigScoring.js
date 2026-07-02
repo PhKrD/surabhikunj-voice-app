@@ -139,7 +139,8 @@ export function calculateDynamicSadhanaScore(report, scoringRules) {
       case 'time_before':
         if (rule.parameter === 'wu') {
           score = scoreTimeBefore(report.wake_up_time, config.cutoffs || [], config.penalty_after || 0)
-        } else if (rule.parameter === 'japa_time') {
+        } else if (rule.parameter === 'japa_time' || rule.parameter === 'japa_rounds') {
+          // japa_rounds now uses time-based scoring for completion time
           score = scoreTimeBefore(report.japa_time, config.cutoffs || [], config.penalty_after || 0)
         }
         break
@@ -163,8 +164,15 @@ export function calculateDynamicSadhanaScore(report, scoringRules) {
         break
         
       case 'rounds':
+        // Legacy support - japa_rounds is now time-based
         if (rule.parameter === 'japa_rounds') {
-          score = scoreRounds(report.japa_rounds, config.tiers || [])
+          // Use time-based scoring for japa completion instead of rounds count
+          score = scoreTimeBefore(report.japa_time, config.cutoffs || [
+            {time: '06:00', points: 15},
+            {time: '07:00', points: 11},
+            {time: '08:00', points: 7},
+            {time: '09:00', points: 4}
+          ], 0)
         }
         break
         

@@ -240,7 +240,7 @@ export default function SadhanaReportForm({ onSaved }) {
           </div>
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
             {[
-              { label: 'Japa', val: scores.score_japa, max: 30 },
+              { label: 'Japa Time', val: scores.score_japa, max: 15 },
               { label: 'Sleep', val: scores.score_sleep, max: 20 },
               { label: 'Reading', val: scores.score_reading, max: 15 },
               { label: 'Hearing', val: scores.score_hearing, max: 15 },
@@ -276,12 +276,15 @@ export default function SadhanaReportForm({ onSaved }) {
             <NumberInput value={form.day_rest_min} onChange={(v) => set('day_rest_min', v)} suffix="min" max={480} />
           </FieldRow>
 
-          <FieldRow icon={Star} label="JP — Japa: Rounds & Completion Time">
+          <FieldRow icon={Star} label="JP — Japa: Completion Time (when all committed rounds finished)">
             <div className="flex flex-wrap gap-3 items-center">
-              <NumberInput value={form.japa_rounds} onChange={(v) => set('japa_rounds', v)} suffix="rounds" max={32} />
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">Completed by:</span>
+                <span className="text-sm font-medium text-slate-600">Completed at:</span>
                 <TimeInput value={form.japa_time} onChange={(v) => set('japa_time', v)} />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">Rounds done:</span>
+                <NumberInput value={form.japa_rounds} onChange={(v) => set('japa_rounds', v)} suffix="rounds" max={32} />
               </div>
             </div>
           </FieldRow>

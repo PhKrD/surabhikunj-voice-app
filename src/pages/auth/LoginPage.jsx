@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Flame, Mail, Lock, User, Eye, EyeOff, CheckCircle2 } from 'lucide-react'
+import { Flame, Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import Button from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
 export default function LoginPage() {
   const [mode, setMode] = useState('login') // 'login' | 'signup'
-  const [loginType, setLoginType] = useState('counsellee') // 'counsellor' | 'counsellee'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [spiritualName, setSpiritualName] = useState('')
@@ -26,24 +25,16 @@ export default function LoginPage() {
     try {
       if (mode === 'login') {
         await signInWithEmail(email, password)
-        localStorage.setItem('loginType', loginType)
-        navigate('/')
       } else {
         await signUpWithEmail(email, password, spiritualName)
-        localStorage.setItem('loginType', 'counsellee')
-        navigate('/')
       }
+      navigate('/')
     } catch (err) {
       setError(err.message || 'Something went wrong')
     } finally {
       setLoading(false)
     }
   }
-
-  const selectTypes = [
-    { key: 'counsellee', title: 'Counsellee', desc: 'View my counsellor & submit reports' },
-    { key: 'counsellor', title: 'Counsellor', desc: 'Manage my counsellees' },
-  ]
 
   return (
     <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden app-bg">
@@ -101,55 +92,6 @@ export default function LoginPage() {
               </button>
             ))}
           </div>
-
-          {/* Login Type Selection (only for login mode) */}
-          <AnimatePresence initial={false}>
-            {mode === 'login' && (
-              <motion.div
-                key="type-select"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.25 }}
-                className="overflow-hidden"
-              >
-                <p className="text-sm font-semibold text-slate-700 mb-3">I am a:</p>
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  {selectTypes.map((t) => {
-                    const active = loginType === t.key
-                    return (
-                      <button
-                        key={t.key}
-                        type="button"
-                        onClick={() => setLoginType(t.key)}
-                        className={cn(
-                          'relative p-4 rounded-2xl text-left transition-all duration-200 border',
-                          active
-                            ? 'border-transparent bg-gradient-to-br from-saffron-50 to-white ring-2 ring-saffron-400 shadow-[0_8px_20px_-10px_rgba(249,115,22,0.5)]'
-                            : 'border-slate-200 bg-white/60 hover:border-saffron-200 hover:bg-white'
-                        )}
-                      >
-                        <AnimatePresence>
-                          {active && (
-                            <motion.span
-                              initial={{ scale: 0, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              exit={{ scale: 0, opacity: 0 }}
-                              className="absolute top-2.5 right-2.5 text-saffron-500"
-                            >
-                              <CheckCircle2 className="w-4 h-4" />
-                            </motion.span>
-                          )}
-                        </AnimatePresence>
-                        <p className="font-bold text-slate-800">{t.title}</p>
-                        <p className="text-xs text-slate-500 mt-1 leading-snug">{t.desc}</p>
-                      </button>
-                    )
-                  })}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {mode === 'signup' && (

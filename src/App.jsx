@@ -5,6 +5,7 @@ import useAuthStore from '@/store/authStore'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { flushSadhanaQueue } from '@/lib/offlineQueue'
 import { healthMonitor } from '@/lib/healthCheck'
+import { ADMIN_ROLES } from '@/lib/utils'
 
 const AppLayout = lazy(() => import('@/components/layout/AppLayout'))
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
@@ -22,6 +23,7 @@ const HierarchyPage = lazy(() => import('@/pages/hierarchy/HierarchyPage'))
 const AnnouncementsPage = lazy(() => import('@/pages/announcements/AnnouncementsPage'))
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'))
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
+const MembersPage = lazy(() => import('@/pages/members/MembersPage'))
 
 function PageFallback() {
   return (
@@ -82,6 +84,14 @@ function AppRoutes() {
           <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route
+            path="members"
+            element={
+              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+                <MembersPage />
+              </ProtectedRoute>
+            }
+          />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -5,6 +5,9 @@ import { getWithFallback, saveProfileOffline } from '@/lib/offlineDatabase'
 
 const DEFAULT_VOICE_ID = import.meta.env.VITE_DEFAULT_VOICE_ID
 
+// Roles that default to the "counsellor" view (they can still toggle in the sidebar)
+const COUNSELLOR_VIEW_ROLES = ['counsellor', 'sadhana_incharge', 'admin', 'vmc', 'oc']
+
 // --- localStorage profile cache (synchronous, survives Supabase outages) ---
 const LS_KEY = (uid) => `profile_cache:${uid}`
 
@@ -117,6 +120,13 @@ const useAuthStore = create((set, get) => ({
         // Save to localStorage so next visit is instant
         writeProfileCache(data)
         await saveProfileOffline(data)
+        // Default the counsellor/counsellee view from the role on first login
+        // (no stored preference yet). The sidebar toggle overrides this later.
+        if (!localStorage.getItem('loginType')) {
+          const lt = COUNSELLOR_VIEW_ROLES.includes(data.role) ? 'counsellor' : 'counsellee'
+          localStorage.setItem('loginType', lt)
+          set({ loginType: lt })
+        }
         set({ user: { id: userId }, profile: data, profileError: null })
       } else {
         throw new Error('Profile not found')

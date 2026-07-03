@@ -1,6 +1,14 @@
 import { Navigate } from 'react-router-dom'
 import useAuthStore from '@/store/authStore'
 import { Loader2 } from 'lucide-react'
+import { ADMIN_ROLES } from '@/lib/utils'
+import PendingApproval from '@/pages/auth/PendingApproval'
+
+// A user has app access once an admin approves them. Admins/leaders always pass.
+function hasAppAccess(profile) {
+  if (!profile) return false
+  return profile.is_approved === true || ADMIN_ROLES.includes(profile.role)
+}
 
 export default function ProtectedRoute({ children, allowedRoles }) {
   const { user, profile, loading } = useAuthStore()
@@ -18,6 +26,11 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  // Gate: once the profile is known, block unapproved (pending) devotees.
+  if (profile && !hasAppAccess(profile)) {
+    return <PendingApproval />
   }
 
   if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {

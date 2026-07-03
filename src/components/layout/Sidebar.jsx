@@ -4,9 +4,9 @@ import { useState } from 'react'
 import {
   LayoutDashboard, BookOpen, Users, Sparkles, Building2,
   UtensilsCrossed, CalendarDays, ListChecks, GitBranch,
-  Bell, Settings, LogOut, X, Flame, Megaphone
+  Bell, Settings, LogOut, X, Flame, Megaphone, UserCog
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, ADMIN_ROLES } from '@/lib/utils'
 import useAuthStore from '@/store/authStore'
 import Avatar from '@/components/ui/Avatar'
 import Badge from '@/components/ui/Badge'
@@ -70,6 +70,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
   const [signingOut, setSigningOut] = useState(false)
 
   const canBeCounsellor = COUNSELLOR_ROLES.includes(profile?.role)
+  const isAdmin = ADMIN_ROLES.includes(profile?.role)
 
   const toggleLoginType = () => {
     const newType = loginType === 'counsellor' ? 'counsellee' : 'counsellor'
@@ -129,6 +130,12 @@ export default function Sidebar({ mobileOpen, onClose }) {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto scrollbar-hide">
+        {isAdmin && (
+          <NavItem
+            item={{ label: 'Assign Members', to: '/members', icon: UserCog, tint: 'text-rose-500' }}
+            onClick={onClose}
+          />
+        )}
         {navItems.map((item) => (
           <NavItem key={item.to} item={item} onClick={onClose} />
         ))}

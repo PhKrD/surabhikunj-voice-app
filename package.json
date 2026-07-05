@@ -1,7 +1,7 @@
 {
   "name": "surabhikunj-voice-app",
   "private": true,
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,10 +13,13 @@
     "ios": "vite build && cap sync ios && cap open ios",
     "android": "vite build && cap sync android && cap open android",
     "apk": "bash scripts/build-apk.sh",
-    "deploy:ota": "vite build && node scripts/deploy-ota.mjs"
+    "deploy:ota": "vite build && node scripts/deploy-ota.mjs",
+    "gen:vapid": "node scripts/gen-vapid.mjs",
+    "import:devotees": "node scripts/import-devotees.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.0",
+    "@capacitor/push-notifications": "^8.1.1",
     "@capgo/capacitor-updater": "^8.49.1",
     "@supabase/supabase-js": "^2.106.1",
     "@tailwindcss/vite": "^4.3.0",

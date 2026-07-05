@@ -128,6 +128,8 @@ const useAuthStore = create((set, get) => ({
           set({ loginType: lt })
         }
         set({ user: { id: userId }, profile: data, profileError: null })
+        // Register for push notifications (FCM native / Web Push). Fire-and-forget.
+        import('@/lib/push.js').then((m) => m.registerPush(userId)).catch(() => {})
       } else {
         throw new Error('Profile not found')
       }

@@ -10,6 +10,10 @@ const config: CapacitorConfig = {
       // bundles hosted on Supabase Storage. No paid Capgo cloud needed.
       autoUpdate: false,
     },
+    PushNotifications: {
+      // Show heads-up notification with sound/badge when received in foreground.
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
   },
 }
 

@@ -167,8 +167,12 @@ export default function SadhanaReportForm({ onSaved }) {
     const scoreData = scoringRules.length > 0 
       ? calculateDynamicSadhanaScore(form, scoringRules)
       : calculateSadhanaScore(form, scoreConfig)
+    const nullIfEmpty = (v) => (v === '' || v === null || v === undefined ? null : v)
     const payload = {
       ...form,
+      to_bed_time: nullIfEmpty(form.to_bed_time),
+      wake_up_time: nullIfEmpty(form.wake_up_time),
+      japa_time: nullIfEmpty(form.japa_time),
       profile_id: profile.id,
       voice_id: profile.voice_id,
       hearing_source_id: hearingSourceId || null,

@@ -7,6 +7,16 @@ import { supabase } from '@/lib/supabase'
 
 const KEY = 'skv_sadhana_queue'
 
+const TIME_FIELDS = ['to_bed_time', 'wake_up_time', 'japa_time']
+
+function sanitizePayload(payload) {
+  const out = { ...payload }
+  for (const f of TIME_FIELDS) {
+    if (out[f] === '' || out[f] === undefined) out[f] = null
+  }
+  return out
+}
+
 export function getSadhanaQueue() {
   try {
     return JSON.parse(localStorage.getItem(KEY) || '[]')
@@ -49,7 +59,7 @@ export async function flushSadhanaQueue() {
   for (const payload of queue) {
     const { error } = await supabase
       .from('sadhana_reports')
-      .upsert(payload, { onConflict: 'profile_id,report_date' })
+      .upsert(sanitizePayload(payload), { onConflict: 'profile_id,report_date' })
     if (error) {
       remaining.push(payload) // keep for the next attempt
     } else {

@@ -76,19 +76,7 @@ function scorePenaltyDuration(minutes, penaltyTiers) {
   return 0
 }
 
-/**
- * Apply rounds-based scoring
- * @param {number} rounds - Number of rounds
- * @param {Array} tiers - Array of {rounds, points}
- */
-function scoreRounds(rounds, tiers) {
-  if (!rounds || rounds <= 0) return 0
-  
-  for (const tier of tiers) {
-    if (rounds >= tier.rounds) return tier.points
-  }
-  return 0
-}
+// Note: scoreRounds function removed as japa_rounds is now time-based, not rounds-based
 
 /**
  * Apply seva hours scoring
@@ -201,24 +189,38 @@ export function calculateDynamicSadhanaScore(report, scoringRules) {
   }
   
   // Combine japa rounds and time scores if both exist
+  // Keep the individual scores for database storage
   if (scores.score_japa_rounds !== undefined && scores.score_japa_time !== undefined) {
     scores.score_japa = scores.score_japa_rounds + scores.score_japa_time
-    delete scores.score_japa_rounds
-    delete scores.score_japa_time
+  } else if (scores.score_japa_rounds !== undefined) {
+    scores.score_japa = scores.score_japa_rounds
+  } else if (scores.score_japa_time !== undefined) {
+    scores.score_japa = scores.score_japa_time
   }
   
   // Combine TB and WU into sleep score
+  // Keep the individual scores for database storage
   if (scores.score_tb !== undefined && scores.score_wu !== undefined) {
     scores.score_sleep = scores.score_tb + scores.score_wu
-    delete scores.score_tb
-    delete scores.score_wu
+  } else if (scores.score_tb !== undefined) {
+    scores.score_sleep = scores.score_tb
+  } else if (scores.score_wu !== undefined) {
+    scores.score_sleep = scores.score_wu
   }
   
   // Combine MA and MC into attendance score
+  // Keep the individual scores for database storage
   if (scores.score_ma !== undefined && scores.score_mc !== undefined) {
     scores.score_attendance = scores.score_ma + scores.score_mc
-    delete scores.score_ma
-    delete scores.score_mc
+  } else if (scores.score_ma !== undefined) {
+    scores.score_attendance = scores.score_ma
+  } else if (scores.score_mc !== undefined) {
+    scores.score_attendance = scores.score_mc
+  }
+  
+  // Map seva_hours to score_seva for backward compatibility
+  if (scores.score_seva_hours !== undefined) {
+    scores.score_seva = scores.score_seva_hours
   }
   
   return {
@@ -234,42 +236,51 @@ function calculateFallbackScore(report) {
   // Use the existing scoring logic from sadhanaScoring.js as fallback
   const scores = {
     score_japa: 0,
+    score_japa_rounds: 0,
+    score_japa_time: 0,
     score_sleep: 0,
+    score_tb: 0,
+    score_wu: 0,
     score_reading: 0,
     score_hearing: 0,
     score_seva: 0,
     score_attendance: 0,
+    score_ma: 0,
+    score_mc: 0,
     score_studies: 0,
-    score_cleanliness: 0
+    score_cleanliness: 0,
+    score_dr: 0
   }
   
   // Japa scoring (25 points max)
   const rounds = Math.min(report.japa_rounds ?? 0, 16)
-  scores.score_japa += (rounds / 16) * 15
+  scores.score_japa_rounds = (rounds / 16) * 15
   const japaMin = timeToMinutes(report.japa_time)
   if (japaMin !== null) {
-    if (japaMin <= 7 * 60) scores.score_japa += 10
-    else if (japaMin <= 8 * 60) scores.score_japa += 7
-    else if (japaMin <= 9 * 60) scores.score_japa += 5
-    else if (japaMin <= 10 * 60) scores.score_japa += 3
+    if (japaMin <= 7 * 60) scores.score_japa_time = 10
+    else if (japaMin <= 8 * 60) scores.score_japa_time = 7
+    else if (japaMin <= 9 * 60) scores.score_japa_time = 5
+    else if (japaMin <= 10 * 60) scores.score_japa_time = 3
   }
+  scores.score_japa = scores.score_japa_rounds + scores.score_japa_time
   
   // Sleep scoring (20 points max)
   const wuMin = timeToMinutes(report.wake_up_time)
   if (wuMin !== null) {
-    if (wuMin <= 4 * 60 + 30) scores.score_sleep += 10
-    else if (wuMin <= 5 * 60) scores.score_sleep += 8
-    else if (wuMin <= 5 * 60 + 30) scores.score_sleep += 5
-    else if (wuMin <= 6 * 60) scores.score_sleep += 2
+    if (wuMin <= 4 * 60 + 30) scores.score_wu = 10
+    else if (wuMin <= 5 * 60) scores.score_wu = 8
+    else if (wuMin <= 5 * 60 + 30) scores.score_wu = 5
+    else if (wuMin <= 6 * 60) scores.score_wu = 2
   }
   const tbMin = timeToMinutes(report.to_bed_time)
   if (tbMin !== null) {
     const tbAdjusted = tbMin < 12 * 60 ? tbMin + 24 * 60 : tbMin
-    if (tbAdjusted <= 22 * 60) scores.score_sleep += 10
-    else if (tbAdjusted <= 22 * 60 + 30) scores.score_sleep += 8
-    else if (tbAdjusted <= 23 * 60) scores.score_sleep += 5
-    else if (tbAdjusted <= 23 * 60 + 30) scores.score_sleep += 2
+    if (tbAdjusted <= 22 * 60) scores.score_tb = 10
+    else if (tbAdjusted <= 22 * 60 + 30) scores.score_tb = 8
+    else if (tbAdjusted <= 23 * 60) scores.score_tb = 5
+    else if (tbAdjusted <= 23 * 60 + 30) scores.score_tb = 2
   }
+  scores.score_sleep = scores.score_wu + scores.score_tb
   
   // Reading scoring (15 points max)
   const readMin = report.reading_min ?? 0
@@ -296,7 +307,9 @@ function calculateFallbackScore(report) {
   else if (sevaHrs > 0) scores.score_seva = 1
   
   // Attendance scoring (10 points max)
-  scores.score_attendance = (report.mangal_arti ? 5 : 0) + (report.morning_class ? 5 : 0)
+  scores.score_ma = report.mangal_arti ? 5 : 0
+  scores.score_mc = report.morning_class ? 5 : 0
+  scores.score_attendance = scores.score_ma + scores.score_mc
   
   // Studies scoring (10 points max)
   const studyMin = report.studies_min ?? 0
@@ -311,9 +324,12 @@ function calculateFallbackScore(report) {
   
   // Day rest penalty
   const drMin = report.day_rest_min ?? 0
-  const penalty = Math.min(Math.floor(drMin / 15) * 0.5, 5)
+  scores.score_dr = -Math.min(Math.floor(drMin / 15) * 0.5, 5)
   
-  const total = Object.values(scores).reduce((sum, val) => sum + val, 0) - penalty
+  // Calculate total from combined scores only (not individual components)
+  const total = scores.score_japa + scores.score_sleep + scores.score_reading + 
+                scores.score_hearing + scores.score_seva + scores.score_attendance + 
+                scores.score_studies + scores.score_cleanliness + scores.score_dr
   
   return {
     ...scores,

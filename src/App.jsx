@@ -1,29 +1,108 @@
-import { useEffect, lazy, Suspense } from 'react'
+import { Component, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { MotionConfig } from 'framer-motion'
 import useAuthStore from '@/store/authStore'
-import ProtectedRoute from '@/components/ProtectedRoute'
-import { flushSadhanaQueue } from '@/lib/offlineQueue'
+import ProtectedRoute, { RequireAuth } from '@/components/ProtectedRoute'
 import { healthMonitor } from '@/lib/healthCheck'
-import { ADMIN_ROLES } from '@/lib/utils'
+import Toaster from '@/components/ui/Toaster'
+import Button from '@/components/ui/Button'
 
 const AppLayout = lazy(() => import('@/components/layout/AppLayout'))
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
+const OnboardingPage = lazy(() => import('@/pages/auth/OnboardingPage'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const ResidentsPage = lazy(() => import('@/pages/residents/ResidentsPage'))
 const ResidentProfilePage = lazy(() => import('@/pages/residents/ResidentProfilePage'))
-const SadhanaPage = lazy(() => import('@/pages/sadhana/SadhanaPage'))
-const CounsellorPage = lazy(() => import('@/pages/counsellor/CounsellorPage'))
 const DepartmentsPage = lazy(() => import('@/pages/departments/DepartmentsPage'))
-const ServicesPage = lazy(() => import('@/pages/services/ServicesPage'))
-const CleanlinessPage = lazy(() => import('@/pages/cleanliness/CleanlinessPage'))
-const KitchenPage = lazy(() => import('@/pages/kitchen/KitchenPage'))
 const EventsPage = lazy(() => import('@/pages/events/EventsPage'))
 const HierarchyPage = lazy(() => import('@/pages/hierarchy/HierarchyPage'))
 const AnnouncementsPage = lazy(() => import('@/pages/announcements/AnnouncementsPage'))
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'))
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 const MembersPage = lazy(() => import('@/pages/members/MembersPage'))
+const TrackersPage  = lazy(() => import('@/pages/trackers/TrackersPage'))
+const ServicesPage  = lazy(() => import('@/pages/services/ServicesPage'))
+const CleanlinessPage = lazy(() => import('@/pages/cleanliness/CleanlinessPage'))
+const ResourcesPage = lazy(() => import('@/pages/resources/ResourcesPage'))
+const MentorshipPage = lazy(() => import('@/pages/mentorship/MentorshipPage'))
+const ReportsPage   = lazy(() => import('@/pages/reports/ReportsPage'))
+const BroadcastPage = lazy(() => import('@/pages/admin/BroadcastPage'))
+const ParentalControlPage = lazy(() => import('@/pages/parental-control/ParentalControlPage'))
+const ChildDetailPage = lazy(() => import('@/pages/parental-control/ChildDetailPage'))
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { error: null, info: null, clearing: false }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error }
+  }
+
+  componentDidCatch(error, info) {
+    this.setState({ info })
+    // Surface the real error in console for anyone with dev tools open
+    console.error('[ErrorBoundary]', error, info)
+  }
+
+  handleReload = () => {
+    window.location.reload()
+  }
+
+  handleClearAndReload = async () => {
+    this.setState({ clearing: true })
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys()
+        await Promise.all(keys.map((k) => caches.delete(k)))
+      }
+    } catch (e) {
+      console.error('Cache clear failed', e)
+    }
+    try {
+      if (window.navigator?.serviceWorker?.controller) {
+        const reg = await navigator.serviceWorker.ready
+        if (reg.unregister) await reg.unregister()
+      }
+    } catch (e) {
+      console.error('SW unregister failed', e)
+    }
+    window.location.reload()
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6 app-bg">
+          <div className="w-full max-w-md bg-white/90 glass elev-3 rounded-3xl p-6 text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto">
+              <span className="text-2xl">💥</span>
+            </div>
+            <div>
+              <h2 className="text-lg font-extrabold text-slate-800">Something went wrong</h2>
+              <p className="text-sm text-slate-500 mt-1">
+                The app crashed. This can happen on iOS PWAs when cached files get out of sync.
+              </p>
+            </div>
+            <div className="text-left rounded-2xl bg-slate-50 p-3 text-xs font-mono text-slate-600 overflow-auto max-h-40">
+              {this.state.error?.message || String(this.state.error)}
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button onClick={this.handleClearAndReload} loading={this.state.clearing} className="w-full">
+                Clear cache & reload
+              </Button>
+              <Button onClick={this.handleReload} variant="secondary" className="w-full">
+                Just reload
+              </Button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function PageFallback() {
   return (
@@ -37,21 +116,13 @@ function PageFallback() {
 }
 
 function AppBootstrap() {
-  const { initialize, initialized, user } = useAuthStore()
+  const { initialize, initialized } = useAuthStore()
 
   useEffect(() => {
     if (!initialized) {
       initialize()
     }
   }, [initialize, initialized])
-
-  useEffect(() => {
-    if (!user) return
-    flushSadhanaQueue()
-    const onOnline = () => flushSadhanaQueue()
-    window.addEventListener('online', onOnline)
-    return () => window.removeEventListener('online', onOnline)
-  }, [user])
 
   return null
 }
@@ -61,6 +132,15 @@ function AppRoutes() {
     <Suspense fallback={<PageFallback />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+
+        <Route
+          path="/onboarding"
+          element={
+            <RequireAuth>
+              <OnboardingPage />
+            </RequireAuth>
+          }
+        />
 
         <Route
           path="/"
@@ -73,21 +153,41 @@ function AppRoutes() {
           <Route index element={<Dashboard />} />
           <Route path="residents" element={<ResidentsPage />} />
           <Route path="residents/:id" element={<ResidentProfilePage />} />
-          <Route path="sadhana" element={<SadhanaPage />} />
-          <Route path="counsellor" element={<CounsellorPage />} />
+          {/* Generic primitive routes */}
+          <Route path="trackers/*"  element={<TrackersPage />} />
+          <Route path="services/*"  element={<ServicesPage />} />
+          <Route path="cleanliness/*" element={<CleanlinessPage />} />
+          <Route path="resources/*" element={<ResourcesPage />} />
+          <Route path="mentorship/*" element={<MentorshipPage />} />
+          <Route path="parental-control" element={<ParentalControlPage />} />
+          <Route path="parental-control/:childId" element={<ChildDetailPage />} />
+          <Route path="reports"     element={<ReportsPage />} />
+          <Route
+            path="broadcast"
+            element={
+              <ProtectedRoute permission="announcements.manage">
+                <BroadcastPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Legacy domain aliases — redirect to generic equivalents */}
+          <Route path="sadhana"     element={<Navigate to="/trackers" replace />} />
+          <Route path="counsellor"  element={<Navigate to="/mentorship" replace />} />
+          <Route path="tasks/*"     element={<Navigate to="/services" replace />} />
+          <Route path="kitchen"     element={<Navigate to="/resources" replace />} />
+
+          {/* Existing pages still using old structure */}
           <Route path="departments" element={<DepartmentsPage />} />
-          <Route path="services" element={<ServicesPage />} />
-          <Route path="cleanliness" element={<CleanlinessPage />} />
-          <Route path="kitchen" element={<KitchenPage />} />
-          <Route path="events" element={<EventsPage />} />
-          <Route path="hierarchy" element={<HierarchyPage />} />
+          <Route path="events"      element={<EventsPage />} />
+          <Route path="hierarchy"   element={<HierarchyPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route path="settings"    element={<SettingsPage />} />
           <Route
             path="members"
             element={
-              <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+              <ProtectedRoute permission="members.manage">
                 <MembersPage />
               </ProtectedRoute>
             }
@@ -102,10 +202,16 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <MotionConfig reducedMotion="user" transition={{ duration: 0.18, ease: 'easeOut' }}>
+    <MotionConfig
+      reducedMotion="user"
+      transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+    >
       <BrowserRouter>
-        <AppBootstrap />
-        <AppRoutes />
+        <ErrorBoundary>
+          <AppBootstrap />
+          <AppRoutes />
+        </ErrorBoundary>
+        <Toaster />
       </BrowserRouter>
     </MotionConfig>
   )

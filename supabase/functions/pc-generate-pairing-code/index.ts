@@ -1,0 +1,133 @@
+// Supabase Edge Function: pc-generate-pairing-code
+// Parent-authenticated. Creates (or reuses) a pc_devices row for a child,
+// creates a device-only auth.users row with a random never-exposed
+// password, and issues a short-lived hashed pairing code the child app
+// exchanges for a real session via pc-redeem-pairing-code.
+//
+// Deploy:  supabase functions deploy pc-generate-pairing-code
+// Invoke:  supabase.functions.invoke('pc-generate-pairing-code', { body: { child_id, device_name } })
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+declare const Deno: {
+  env: { get(key: string): string | undefined }
+  serve: (handler: (req: Request) => Response | Promise<Response>) => void
+}
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  })
+}
+
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no O/0/I/1 ambiguity
+const CODE_LENGTH = 6
+const CODE_TTL_MIN = 10
+
+function generateCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(CODE_LENGTH))
+  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('')
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function randomPassword(): string {
+  return crypto.randomUUID() + crypto.randomUUID()
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+
+  const url = Deno.env.get('SUPABASE_URL')!
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+  // --- Authenticate the caller (must be the child's parent) ---
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const caller = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } })
+  const { data: userData, error: userErr } = await caller.auth.getUser()
+  if (userErr || !userData?.user) return json({ error: 'Not authenticated' }, 401)
+
+  let payload: { child_id?: string; device_name?: string }
+  try {
+    payload = await req.json()
+  } catch {
+    return json({ error: 'Invalid JSON body' }, 400)
+  }
+
+  const childId = payload.child_id
+  const deviceName = (payload.device_name ?? 'New device').trim()
+  if (!childId) return json({ error: 'child_id is required' }, 400)
+
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
+
+  // --- Verify caller is the parent of this child ---
+  const { data: child, error: childErr } = await admin
+    .from('pc_children')
+    .select('id, org_id, parent_id')
+    .eq('id', childId)
+    .single()
+
+  if (childErr || !child) return json({ error: 'Child not found' }, 404)
+  if (child.parent_id !== userData.user.id) return json({ error: 'Not authorized for this child' }, 403)
+
+  // --- Create the device-only auth user ---
+  const deviceUuid = crypto.randomUUID()
+  const deviceEmail = `device-${deviceUuid}@voice.kids.internal`
+  const devicePassword = randomPassword()
+
+  const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
+    email: deviceEmail,
+    password: devicePassword,
+    email_confirm: true,
+    user_metadata: { role: 'pc_device', child_id: childId },
+  })
+  if (authErr || !authUser?.user) return json({ error: `Could not create device account: ${authErr?.message}` }, 500)
+
+  // --- Create the pc_devices row ---
+  const { data: device, error: deviceErr } = await admin
+    .from('pc_devices')
+    .insert({
+      child_id: childId,
+      org_id: child.org_id,
+      device_name: deviceName,
+      auth_user_id: authUser.user.id,
+      device_owner_mode: 'none',
+      is_active: true,
+    })
+    .select('id')
+    .single()
+
+  if (deviceErr || !device) return json({ error: `Could not create device: ${deviceErr?.message}` }, 500)
+
+  // --- Generate the pairing code ---
+  const code = generateCode()
+  const codeHash = await sha256Hex(code)
+  const expiresAt = new Date(Date.now() + CODE_TTL_MIN * 60_000).toISOString()
+
+  const { error: codeErr } = await admin.from('pc_pairing_codes').insert({
+    device_id: device.id,
+    code_hash: codeHash,
+    issued_by: userData.user.id,
+    expires_at: expiresAt,
+  })
+  if (codeErr) return json({ error: `Could not create pairing code: ${codeErr.message}` }, 500)
+
+  return json({
+    ok: true,
+    device_id: device.id,
+    pairing_code: code,
+    expires_at: expiresAt,
+  })
+})

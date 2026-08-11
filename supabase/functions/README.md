@@ -48,3 +48,59 @@ await sendWhatsApp({ to: '+9198XXXXXXXX', message: 'Hare Krishna Prabhu' })
   production needs an approved sender and message templates.
 - Store phone numbers in E.164 format (e.g. `+9198XXXXXXXX`).
 - Never commit real provider credentials — they live in Supabase secrets.
+
+## admin-create-user
+
+Admin-only. Creates an auth user + approved profile for a devotee (initial
+password defaults to their mobile number).
+
+```bash
+supabase functions deploy admin-create-user
+```
+
+## send-push
+
+Sends a push notification via FCM to a device token.
+
+```bash
+supabase functions deploy send-push
+```
+
+## pc-generate-pairing-code
+
+Parent-authenticated. Call from the VOICE parent app when adding a child
+device. Creates the `pc_devices` row + a device-only auth user (random,
+never-exposed password) and returns a 6-character pairing code (10 min TTL)
+to show/QR to the child.
+
+```bash
+supabase functions deploy pc-generate-pairing-code
+```
+
+```js
+const { data } = await supabase.functions.invoke('pc-generate-pairing-code', {
+  body: { child_id, device_name: "Aarav's Phone" },
+})
+// data.pairing_code, data.device_id, data.expires_at
+```
+
+## pc-redeem-pairing-code
+
+PUBLIC (no JWT required — the code is the credential). Call from the VOICE
+Kids child app during enrollment. Exchanges the pairing code for a real
+Supabase session for the device's auth user via a magic-link token, so a
+password is never generated on the client or transmitted over the wire.
+
+```bash
+supabase functions deploy pc-redeem-pairing-code --no-verify-jwt
+```
+
+```js
+const { data } = await supabase.functions.invoke('pc-redeem-pairing-code', {
+  body: { pairing_code: 'AB12CD' },
+})
+await supabase.auth.setSession({
+  access_token: data.access_token,
+  refresh_token: data.refresh_token,
+})
+```

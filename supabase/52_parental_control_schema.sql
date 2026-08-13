@@ -41,6 +41,7 @@ CREATE TYPE pc_command_type AS ENUM (
   'pause_internet',
   'resume_internet',
   'lock_device',
+  'unlock_device',
   'sync_rules',
   'grant_bonus_time',
   'revoke_bonus_time',

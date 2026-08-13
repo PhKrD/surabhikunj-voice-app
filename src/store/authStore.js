@@ -3,10 +3,8 @@ import { supabase } from '@/lib/supabase'
 import { clearCache } from '@/lib/useCachedQuery'
 import { getWithFallback, saveProfileOffline } from '@/lib/offlineDatabase'
 
-const DEFAULT_VOICE_ID = import.meta.env.VITE_DEFAULT_VOICE_ID
-
-// Roles that default to the "counsellor" view (they can still toggle in the sidebar)
-const COUNSELLOR_VIEW_ROLES = ['counsellor', 'sadhana_incharge', 'admin', 'vmc', 'oc']
+// Roles that imply a mentorship/counsellor view by default
+const MENTOR_ROLES = ['counsellor', 'sadhana_incharge', 'admin', 'vmc', 'oc']
 
 // --- localStorage profile cache (synchronous, survives Supabase outages) ---
 const LS_KEY = (uid) => `profile_cache:${uid}`
@@ -64,16 +62,23 @@ const useAuthStore = create((set, get) => ({
     })
 
     if (session?.user) {
-      get().fetchProfile(session.user.id)
+      await get().fetchProfile(session.user.id)
+      // Boot org context after profile is ready
+      const { default: useOrgStore } = await import('@/store/orgStore')
+      useOrgStore.getState().initialize()
     }
 
-    supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        set({ user: session.user })
-        get().fetchProfile(session.user.id)
+    supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (event === 'SIGNED_IN' && newSession?.user) {
+        set({ user: newSession.user })
+        await get().fetchProfile(newSession.user.id)
+        const { default: useOrgStore } = await import('@/store/orgStore')
+        useOrgStore.getState().initialize()
       } else if (event === 'SIGNED_OUT') {
         localStorage.removeItem('loginType')
         clearCache()
+        const { default: useOrgStore } = await import('@/store/orgStore')
+        useOrgStore.getState().reset()
         set({ user: null, profile: null, profileError: null, loginType: 'counsellee' })
       }
     })
@@ -85,12 +90,12 @@ const useAuthStore = create((set, get) => ({
     if (!hasCached) set({ profileLoading: true, profileError: null })
 
     try {
-      let data = await getWithFallback(
+      const data = await getWithFallback(
         `profile:${userId}`,
         async () => {
           const { data, error } = await supabase
             .from('profiles')
-            .select('*, voices(name, location)')
+            .select('*')
             .eq('id', userId)
             .single()
           if (error) throw error
@@ -99,31 +104,15 @@ const useAuthStore = create((set, get) => ({
         24 * 60 * 60 * 1000
       )
 
-      if (data && !data.voice_id && DEFAULT_VOICE_ID) {
-        try {
-          await supabase.rpc('bootstrap_current_user_to_default_voice')
-        } catch (rpcError) {
-          console.error('[auth] bootstrap RPC failed:', rpcError)
-        }
-
-        const refresh = await supabase
-          .from('profiles')
-          .select('*, voices(name, location)')
-          .eq('id', userId)
-          .single()
-
-        if (refresh.error) throw refresh.error
-        data = refresh.data
-      }
-
       if (data) {
+        // Derive a display_name from whichever name fields exist
+        data.display_name = data.spiritual_name || data.legal_name || data.email
         // Save to localStorage so next visit is instant
         writeProfileCache(data)
         await saveProfileOffline(data)
-        // Default the counsellor/counsellee view from the role on first login
-        // (no stored preference yet). The sidebar toggle overrides this later.
+        // Default the mentor/mentee view from the role on first login
         if (!localStorage.getItem('loginType')) {
-          const lt = COUNSELLOR_VIEW_ROLES.includes(data.role) ? 'counsellor' : 'counsellee'
+          const lt = MENTOR_ROLES.includes(data.role) ? 'counsellor' : 'counsellee'
           localStorage.setItem('loginType', lt)
           set({ loginType: lt })
         }

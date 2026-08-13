@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "275726787767",
+    "project_id": "surabhikunjvoice",
+    "storage_bucket": "surabhikunjvoice.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:275726787767:android:619ea3533bbb826a3ad932",
+        "android_client_info": {
+          "package_name": "com.surabhikunj.voice"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDZCfPebTvL5alrfO8LE_LhaKn_y7cUimo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

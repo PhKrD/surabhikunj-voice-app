@@ -1,714 +1,767 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { ListChecks, Clock, CheckCircle2, Plus, X, Pencil, Trash2 } from 'lucide-react'
-import { format, startOfWeek } from 'date-fns'
-import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  HeartHandshake, Plus, X, Calendar, Clock, MapPin, MessageCircle,
+  CheckCircle2, ShieldCheck, CalendarClock, Inbox, ChevronDown, ChevronUp,
+  Repeat, UserCog, Ban,
+} from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
-import { useCachedQuery } from '@/lib/useCachedQuery'
-import Card, { CardBody } from '@/components/ui/Card'
-import Badge from '@/components/ui/Badge'
-import Button from '@/components/ui/Button'
-import { cn, formatTime, isAdmin } from '@/lib/utils'
+import useOrgStore from '@/store/orgStore'
 import useToastStore from '@/store/toastStore'
-import DailyRoster from './DailyRoster'
+import Card, { CardBody } from '@/components/ui/Card'
+import Button from '@/components/ui/Button'
+import Badge from '@/components/ui/Badge'
+import Avatar from '@/components/ui/Avatar'
+import { cn, formatTime } from '@/lib/utils'
+import { shareToWhatsApp } from '@/lib/whatsapp'
 
-const statusConfig = {
-  pending: { label: 'Pending', color: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
-  done: { label: 'Done', color: 'bg-tulasi-50 border-tulasi-200 text-tulasi-700' },
-  missed: { label: 'Missed', color: 'bg-red-50 border-red-200 text-red-700' },
-  excused: { label: 'Excused', color: 'bg-slate-50 border-slate-200 text-slate-600' },
+const MODULE = 'service'
+
+const INPUT_CLASS = 'w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
+
+const PRIORITY_OPTIONS = ['low', 'normal', 'high', 'urgent']
+
+const PRIORITY_BADGE = {
+  urgent: 'red',
+  high: 'yellow',
+  normal: 'default',
+  low: 'default',
 }
 
-export default function ServicesPage() {
-  const { profile } = useAuthStore()
-  const location = useLocation()
-  const navigate = useNavigate()
-  const toast = useToastStore()
-  const [updating, setUpdating] = useState({})
-  const [showForm, setShowForm] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [archivingId, setArchivingId] = useState(null)
-  const [preferenceSaving, setPreferenceSaving] = useState({})
-  const [editingId, setEditingId] = useState(null)
-  const [formError, setFormError] = useState('')
-  const [focusedServiceId, setFocusedServiceId] = useState(null)
-  const today = new Date().toISOString().split('T')[0]
-  const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
-  const [schedulerDate, setSchedulerDate] = useState(today)
-  const [scheduling, setScheduling] = useState(false)
-  const [rosterReload, setRosterReload] = useState(0)
-  const [form, setForm] = useState({
-    name: '',
-    description: '',
-    default_time: '',
-    duration_min: 30,
-    instructions: '',
-    is_recurring: false,
-  })
-  const canManage = profile?.role === 'im' || isAdmin(profile?.role)
-  const linkedServiceId = location.state?.referenceId
-  const serviceRefs = useRef({})
+const STATUS_BADGE = {
+  assigned: { label: 'Assigned', variant: 'default' },
+  accepted: { label: 'Accepted', variant: 'blue' },
+  declined: { label: 'Declined', variant: 'red' },
+  in_progress: { label: 'In Progress', variant: 'saffron' },
+  completed: { label: 'Completed', variant: 'cyan' },
+  verified: { label: 'Verified', variant: 'tulasi' },
+  cancelled: { label: 'Cancelled', variant: 'default' },
+}
 
-  useEffect(() => {
-    if (!linkedServiceId) return
+const RECURRENCE_OPTIONS = [
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+]
 
-    const id = setTimeout(() => {
-      setFocusedServiceId(linkedServiceId)
-      const node = serviceRefs.current[linkedServiceId]
-      if (node) {
-        node.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
-      navigate('/services', { replace: true })
-    }, 120)
+const emptyForm = {
+  title: '',
+  user_id: '',
+  task_date: '',
+  task_time: '',
+  priority: 'normal',
+  requires_acceptance: false,
+  coordinator_id: '',
+  instructions: '',
+  repeat: false,
+  from_date: '',
+  to_date: '',
+  recurrence: 'daily',
+}
 
-    return () => clearTimeout(id)
-  }, [linkedServiceId, navigate])
+function capitalize(value) {
+  if (!value) return ''
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
 
-  useEffect(() => {
-    if (!focusedServiceId) return
+function memberLabel(member) {
+  if (!member) return 'Unknown'
+  return member.display_name ?? member.spiritual_name ?? member.legal_name ?? member.email ?? 'Unknown'
+}
 
-    const id = setTimeout(() => {
-      setFocusedServiceId(null)
-    }, 3000)
+function isValidDateString(d) {
+  return typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d)
+}
 
-    return () => clearTimeout(id)
-  }, [focusedServiceId])
-
-  const { data, loading, refetch } = useCachedQuery(
-    profile ? `services:${profile.id}:${today}:${weekStart}` : null,
-    async () => {
-      const [allocRes, servicesRes, prefRes] = await Promise.all([
-        supabase
-          .from('service_allocations')
-          .select('*, services(name, description, instructions)')
-          .eq('profile_id', profile.id)
-          .gte('service_date', today)
-          .order('service_date', { ascending: true })
-          .order('service_time', { ascending: true })
-          .limit(20),
-        supabase
-          .from('services')
-          .select('*')
-          .eq('voice_id', profile.voice_id)
-          .eq('is_active', true)
-          .order('name'),
-        supabase
-          .from('service_preferences')
-          .select('service_id, preference')
-          .eq('profile_id', profile.id)
-          .eq('week_start', weekStart)
-      ])
-      
-      if (allocRes.error) throw allocRes.error
-      if (servicesRes.error) throw servicesRes.error
-      if (prefRes.error) throw prefRes.error
-      
-      const prefMap = {}
-      ;(prefRes.data ?? []).forEach((p) => {
-        prefMap[p.service_id] = p.preference
-      })
-      
-      return {
-        allocations: allocRes.data ?? [],
-        masterServices: servicesRes.data ?? [],
-        preferences: prefMap
-      }
+function formatWhen(assignment) {
+  if (!assignment?.task_date) return ''
+  let out
+  if (isValidDateString(assignment.task_date)) {
+    try {
+      out = format(parseISO(assignment.task_date), 'EEE, dd MMM yyyy')
+    } catch {
+      out = String(assignment.task_date)
     }
+  } else {
+    out = String(assignment.task_date)
+  }
+  if (assignment.task_time && typeof assignment.task_time === 'string') {
+    try {
+      out += ` \u00b7 ${formatTime(assignment.task_time)}`
+    } catch {
+      // ignore time formatting errors
+    }
+  }
+  return out
+}
+
+function PriorityBadge({ priority }) {
+  const key = priority ?? 'normal'
+  return <Badge variant={PRIORITY_BADGE[key] ?? 'default'}>{capitalize(key)}</Badge>
+}
+
+function StatusBadge({ status }) {
+  const cfg = STATUS_BADGE[status] ?? { label: capitalize(status), variant: 'default' }
+  return <Badge variant={cfg.variant}>{cfg.label}</Badge>
+}
+
+function EmptyState({ icon: Icon, message }) {
+  return (
+    <Card>
+      <CardBody>
+        <div className="flex flex-col items-center py-10 text-slate-400">
+          <Icon className="w-12 h-12 mb-3 opacity-30" />
+          <p className="text-sm">{message}</p>
+        </div>
+      </CardBody>
+    </Card>
   )
+}
 
-  const allocations = data?.allocations ?? []
-  const masterServices = data?.masterServices ?? []
-  const preferences = data?.preferences ?? {}
+function ServiceCard({ assignment, busy, onRespond }) {
+  const a = assignment
+  const [showInstructions, setShowInstructions] = useState(false)
 
-  const resetForm = () => {
-    setForm({
-      name: '',
-      description: '',
-      default_time: '',
-      duration_min: 30,
-      instructions: '',
-      is_recurring: false,
-    })
-    setEditingId(null)
-    setFormError('')
+  const requiresAccept = a.requires_acceptance && a.status === 'assigned'
+  const canComplete =
+    a.status === 'accepted' ||
+    a.status === 'in_progress' ||
+    (a.status === 'assigned' && !a.requires_acceptance)
+  const hasContact = Boolean(a.coordinator_id) && Boolean(a.coordinator_phone)
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+      <Card>
+        <CardBody className="py-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-semibold text-slate-800">{a.title}</p>
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+                <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{formatWhen(a)}</span>
+              </div>
+              {a.area_name && (
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+                  <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">{a.area_name}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+              <StatusBadge status={a.status} />
+              <PriorityBadge priority={a.priority} />
+            </div>
+          </div>
+
+          {a.instructions && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowInstructions((v) => !v)}
+                className="inline-flex items-center gap-1 text-xs font-medium text-saffron-600 hover:text-saffron-700"
+              >
+                {showInstructions ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                {showInstructions ? 'Hide instructions' : 'View instructions'}
+              </button>
+              {showInstructions && (
+                <p className="mt-2 text-sm text-slate-600 whitespace-pre-wrap bg-slate-50 rounded-xl px-3 py-2">
+                  {a.instructions}
+                </p>
+              )}
+            </div>
+          )}
+
+          {a.coordinator_name && (
+            <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Avatar name={a.coordinator_name} size="sm" />
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-400">Coordinator</p>
+                  <p className="text-sm text-slate-700 truncate">{a.coordinator_name}</p>
+                </div>
+              </div>
+              {hasContact && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={MessageCircle}
+                  onClick={() => shareToWhatsApp({ to: a.coordinator_phone, message: `Regarding service: ${a.title}` })}
+                >
+                  Contact
+                </Button>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {requiresAccept && (
+              <>
+                <Button size="sm" variant="tulasi" loading={busy} onClick={() => onRespond(a.id, 'accept')}>
+                  Accept
+                </Button>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => onRespond(a.id, 'decline')}>
+                  Decline
+                </Button>
+              </>
+            )}
+            {canComplete && (
+              <Button size="sm" loading={busy} onClick={() => onRespond(a.id, 'complete')}>
+                Mark Complete
+              </Button>
+            )}
+            {a.status === 'completed' && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                <Clock className="w-3.5 h-3.5" /> Awaiting verification
+              </span>
+            )}
+            {a.status === 'verified' && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-tulasi-600">
+                <ShieldCheck className="w-4 h-4" /> Verified
+              </span>
+            )}
+            {a.status === 'declined' && (
+              <span className="text-xs font-medium text-red-500">You declined this seva</span>
+            )}
+          </div>
+        </CardBody>
+      </Card>
+    </motion.div>
+  )
+}
+
+function ManageCard({ assignment, members, canVerify, busy, onReassign, onCancel, onVerify }) {
+  const a = assignment
+  const [reassigning, setReassigning] = useState(false)
+  const [pick, setPick] = useState(a.user_id ?? '')
+
+  const submitReassign = () => {
+    if (!pick || pick === a.user_id) {
+      setReassigning(false)
+      return
+    }
+    onReassign(a.id, pick)
+    setReassigning(false)
   }
 
-  const createOrUpdateService = async () => {
-    if (!profile) return
-    if (!form.name.trim()) {
-      setFormError('Service name is required.')
+  return (
+    <Card>
+      <CardBody className="py-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-semibold text-slate-800">{a.title}</p>
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+              <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>{formatWhen(a)}</span>
+            </div>
+            {a.area_name && (
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+                <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate">{a.area_name}</span>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+            <StatusBadge status={a.status} />
+            <PriorityBadge priority={a.priority} />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
+          <Avatar name={a.assignee_name} url={a.assignee_avatar} size="sm" />
+          <div className="min-w-0">
+            <p className="text-xs text-slate-400">Assigned to</p>
+            <p className="text-sm text-slate-700 truncate">{a.assignee_name ?? 'Unassigned'}</p>
+          </div>
+        </div>
+
+        {reassigning ? (
+          <div className="flex items-center gap-2">
+            <select
+              value={pick}
+              onChange={(e) => setPick(e.target.value)}
+              className={cn(INPUT_CLASS, 'mt-0 flex-1')}
+            >
+              <option value="">Select devotee…</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>{memberLabel(m)}</option>
+              ))}
+            </select>
+            <Button size="sm" loading={busy} onClick={submitReassign}>Save</Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              onClick={() => { setReassigning(false); setPick(a.user_id ?? '') }}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : a.status !== 'cancelled' && (
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Button size="sm" variant="secondary" icon={UserCog} disabled={busy} onClick={() => setReassigning(true)}>
+              Reassign
+            </Button>
+            {canVerify && a.status === 'completed' && (
+              <Button size="sm" variant="tulasi" icon={ShieldCheck} loading={busy} onClick={() => onVerify(a.id)}>
+                Verify
+              </Button>
+            )}
+            <Button size="sm" variant="danger" icon={Ban} disabled={busy} onClick={() => onCancel(a.id, a.title)}>
+              Cancel
+            </Button>
+          </div>
+        )}
+      </CardBody>
+    </Card>
+  )
+}
+
+function NewServiceForm({ members, orgId, assignedBy, onCreated }) {
+  const toastSuccess = useToastStore((s) => s.success)
+  const toastError = useToastStore((s) => s.error)
+  const [form, setForm] = useState(emptyForm)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const set = (patch) => setForm((f) => ({ ...f, ...patch }))
+
+  const submit = async () => {
+    if (!orgId) return
+    if (!form.title.trim()) { setError('Title is required.'); return }
+    if (!form.user_id) { setError('Please choose who to assign this to.'); return }
+    if (form.repeat) {
+      if (!form.from_date || !form.to_date) { setError('Recurring services need a from and to date.'); return }
+    } else if (!form.task_date) {
+      setError('Please choose a date.')
       return
     }
 
-    setFormError('')
+    setError('')
     setSaving(true)
-
     try {
-      const payload = {
-        voice_id: profile.voice_id,
-        name: form.name.trim(),
-        description: form.description.trim() || null,
-        default_time: form.default_time || null,
-        duration_min: Number(form.duration_min) || null,
-        instructions: form.instructions.trim() || null,
-        is_recurring: form.is_recurring,
-        is_active: true,
-      }
-
-      const query = editingId
-        ? supabase.from('services').update(payload).eq('id', editingId)
-        : supabase.from('services').insert(payload)
-
-      const { data: result, error } = await query.select().single()
-
-      if (error) {
-        setFormError(error.message)
-        toast.error('Could not save service', error.message)
-        return
-      }
-
-      if (!editingId && result) {
-        const { data: recipients, error: recipientsError } = await supabase
-          .from('profiles')
+      if (form.repeat) {
+        const { data: template, error: templateError } = await supabase
+          .from('task_templates')
+          .insert({
+            org_id: orgId,
+            name: form.title.trim(),
+            module_key: MODULE,
+            recurrence: form.recurrence,
+            default_time: form.task_time || null,
+            priority: form.priority,
+            coordinator_id: form.coordinator_id || null,
+            requires_acceptance: form.requires_acceptance,
+            instructions: form.instructions.trim() || null,
+            is_active: true,
+          })
           .select('id')
-          .eq('voice_id', profile.voice_id)
-          .eq('is_active', true)
+          .single()
+        if (templateError) throw templateError
 
-        if (recipientsError) {
-          toast.error('Service created, but notifications failed', recipientsError.message)
-        } else if (recipients?.length) {
-          const { error: notificationsError } = await supabase.from('notifications').insert(
-            recipients.map((member) => ({
-              voice_id: profile.voice_id,
-              profile_id: member.id,
-              title: 'New service created',
-              body: `${result.name} has been added to service master.`,
-              type: 'service',
-              reference_id: result.id,
-            }))
-          )
+        const { data: count, error: generateError } = await supabase.rpc('generate_assignments_from_template', {
+          p_template_id: template.id,
+          p_user_id: form.user_id,
+          p_from: form.from_date,
+          p_to: form.to_date,
+          p_area_id: null,
+        })
+        if (generateError) throw generateError
 
-          if (notificationsError) {
-            toast.error('Service created, but notifications failed', notificationsError.message)
-          }
-        }
+        const created = count ?? 0
+        toastSuccess('Recurring service scheduled', `${created} assignment${created === 1 ? '' : 's'} created`)
+      } else {
+        const { error: insertError } = await supabase.from('task_assignments').insert({
+          org_id: orgId,
+          module_key: MODULE,
+          user_id: form.user_id,
+          assigned_by: assignedBy,
+          status: 'assigned',
+          title: form.title.trim(),
+          instructions: form.instructions.trim() || null,
+          task_date: form.task_date,
+          task_time: form.task_time || null,
+          priority: form.priority,
+          requires_acceptance: form.requires_acceptance,
+          coordinator_id: form.coordinator_id || null,
+        })
+        if (insertError) throw insertError
+        toastSuccess('Service assigned')
       }
 
-      toast.success(editingId ? 'Service updated' : 'Service created')
-      resetForm()
-      setShowForm(false)
-      await refetch()
-    } catch (error) {
-      setFormError(error.message)
-      toast.error('Could not save service', error.message)
+      setForm(emptyForm)
+      onCreated()
+    } catch (e) {
+      setError(e.message)
+      toastError('Could not create service', e.message)
     } finally {
       setSaving(false)
     }
   }
 
-  const startEdit = (service) => {
-    setEditingId(service.id)
-    setShowForm(true)
-    setFormError('')
-    setForm({
-      name: service.name ?? '',
-      description: service.description ?? '',
-      default_time: service.default_time ?? '',
-      duration_min: service.duration_min ?? 30,
-      instructions: service.instructions ?? '',
-      is_recurring: service.is_recurring ?? false,
-    })
-  }
+  return (
+    <Card>
+      <CardBody className="py-4 space-y-3">
+        <p className="text-sm font-semibold text-slate-700">New Service</p>
 
-  const archiveService = async (service) => {
-    const ok = window.confirm(`Archive service "${service.name}"?`)
-    if (!ok) return
+        <label className="block">
+          <span className="text-xs text-slate-500">Title</span>
+          <input
+            value={form.title}
+            onChange={(e) => set({ title: e.target.value })}
+            placeholder="Evening arati seva"
+            className={INPUT_CLASS}
+          />
+        </label>
 
-    setArchivingId(service.id)
-    try {
-      const { error } = await supabase
-        .from('services')
-        .update({ is_active: false })
-        .eq('id', service.id)
+        <div className="grid sm:grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-xs text-slate-500">Assignee</span>
+            <select value={form.user_id} onChange={(e) => set({ user_id: e.target.value })} className={INPUT_CLASS}>
+              <option value="">Select devotee…</option>
+              {members.map((m) => <option key={m.id} value={m.id}>{memberLabel(m)}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs text-slate-500">Coordinator (optional)</span>
+            <select value={form.coordinator_id} onChange={(e) => set({ coordinator_id: e.target.value })} className={INPUT_CLASS}>
+              <option value="">None</option>
+              {members.map((m) => <option key={m.id} value={m.id}>{memberLabel(m)}</option>)}
+            </select>
+          </label>
+        </div>
 
-      if (error) {
-        toast.error('Could not archive service', error.message)
-        return
-      }
+        <div className="grid sm:grid-cols-3 gap-3">
+          <label className="block">
+            <span className="text-xs text-slate-500">{form.repeat ? 'Date (single, unused)' : 'Date'}</span>
+            <input
+              type="date"
+              value={form.task_date}
+              onChange={(e) => set({ task_date: e.target.value })}
+              disabled={form.repeat}
+              className={cn(INPUT_CLASS, form.repeat && 'opacity-50')}
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs text-slate-500">Time (optional)</span>
+            <input type="time" value={form.task_time} onChange={(e) => set({ task_time: e.target.value })} className={INPUT_CLASS} />
+          </label>
+          <label className="block">
+            <span className="text-xs text-slate-500">Priority</span>
+            <select value={form.priority} onChange={(e) => set({ priority: e.target.value })} className={INPUT_CLASS}>
+              {PRIORITY_OPTIONS.map((p) => <option key={p} value={p}>{capitalize(p)}</option>)}
+            </select>
+          </label>
+        </div>
 
-      toast.success('Service archived', '', {
-        actionLabel: 'Undo',
-        action: async () => {
-          const { error: restoreError } = await supabase
-            .from('services')
-            .update({ is_active: true })
-            .eq('id', service.id)
+        <label className="block">
+          <span className="text-xs text-slate-500">Instructions</span>
+          <textarea
+            value={form.instructions}
+            onChange={(e) => set({ instructions: e.target.value })}
+            rows={3}
+            className={cn(INPUT_CLASS, 'resize-none')}
+          />
+        </label>
 
-          if (restoreError) {
-            toast.error('Could not restore service', restoreError.message)
-            return
-          }
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.requires_acceptance}
+            onChange={(e) => set({ requires_acceptance: e.target.checked })}
+            className="w-4 h-4 rounded border-slate-300 accent-saffron-500"
+          />
+          <span className="text-sm text-slate-600">Requires acceptance by the devotee</span>
+        </label>
 
-          await refetch()
-          toast.info('Service restored')
-        },
-      })
-      await refetch()
-    } catch (error) {
-      toast.error('Could not archive service', error.message)
-    } finally {
-      setArchivingId(null)
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.repeat}
+            onChange={(e) => set({ repeat: e.target.checked })}
+            className="w-4 h-4 rounded border-slate-300 accent-saffron-500"
+          />
+          <span className="text-sm text-slate-600 inline-flex items-center gap-1">
+            <Repeat className="w-3.5 h-3.5" /> Repeat on a schedule
+          </span>
+        </label>
+
+        {form.repeat && (
+          <div className="grid sm:grid-cols-3 gap-3 rounded-2xl bg-saffron-50 p-3">
+            <label className="block">
+              <span className="text-xs text-slate-500">From</span>
+              <input type="date" value={form.from_date} onChange={(e) => set({ from_date: e.target.value })} className={INPUT_CLASS} />
+            </label>
+            <label className="block">
+              <span className="text-xs text-slate-500">To</span>
+              <input type="date" value={form.to_date} onChange={(e) => set({ to_date: e.target.value })} className={INPUT_CLASS} />
+            </label>
+            <label className="block">
+              <span className="text-xs text-slate-500">Recurrence</span>
+              <select value={form.recurrence} onChange={(e) => set({ recurrence: e.target.value })} className={INPUT_CLASS}>
+                {RECURRENCE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </label>
+          </div>
+        )}
+
+        {error && (
+          <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+        )}
+
+        <div>
+          <Button size="sm" onClick={submit} loading={saving}>
+            {form.repeat ? 'Schedule Services' : 'Assign Service'}
+          </Button>
+        </div>
+      </CardBody>
+    </Card>
+  )
+}
+
+export default function ServicesPage() {
+  const { profile } = useAuthStore()
+  const { org, hasPermission } = useOrgStore()
+  const toastSuccess = useToastStore((s) => s.success)
+  const toastError = useToastStore((s) => s.error)
+  const orgId = org?.id
+  const canManage = hasPermission('tasks.assign') || hasPermission('tasks.manage')
+  const canVerify = hasPermission('tasks.verify') || hasPermission('tasks.manage')
+
+  const [tab, setTab] = useState('upcoming')
+  const [mine, setMine] = useState([])
+  const [all, setAll] = useState([])
+  const [members, setMembers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState(null)
+  const [showForm, setShowForm] = useState(false)
+
+  const load = useCallback(async () => {
+    if (!orgId) {
+      setMine([])
+      setAll([])
+      setMembers([])
+      setLoading(false)
+      return
     }
-  }
 
-  const markDone = async (id) => {
-    setUpdating((u) => ({ ...u, [id]: true }))
+    setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('service_allocations')
-        .update({ status: 'done' })
-        .eq('id', id)
-        .select()
-        .single()
+      const mineRes = await supabase.rpc('my_assignments', { p_module: MODULE, p_scope: 'mine' })
+      if (mineRes.error) throw mineRes.error
+      setMine(mineRes.data ?? [])
 
-      if (error) {
-        toast.error('Could not mark service done', error.message)
-        return
+      if (canManage) {
+        const [allRes, membersRes] = await Promise.all([
+          supabase.rpc('my_assignments', { p_module: MODULE, p_scope: 'all' }),
+          supabase.rpc('org_members'),
+        ])
+        if (allRes.error) throw allRes.error
+        if (membersRes.error) throw membersRes.error
+        setAll(allRes.data ?? [])
+        setMembers(membersRes.data ?? [])
       }
-
-      if (data) {
-        await refetch()
-      }
-    } catch (error) {
-      toast.error('Could not mark service done', error.message)
+    } catch (e) {
+      toastError('Could not load services', e.message)
     } finally {
-      setUpdating((u) => ({ ...u, [id]: false }))
+      setLoading(false)
     }
-  }
+  }, [orgId, canManage, toastError])
 
-  const savePreference = async (serviceId, preferenceValue) => {
-    if (!profile) return
+  useEffect(() => { load() }, [load])
 
-    setPreferenceSaving((prev) => ({ ...prev, [serviceId]: true }))
+  const respond = async (id, action) => {
+    setBusyId(id)
     try {
-      const payload = {
-        profile_id: profile.id,
-        service_id: serviceId,
-        week_start: weekStart,
-        preference: preferenceValue,
-      }
-
-      const { error } = await supabase
-        .from('service_preferences')
-        .upsert(payload, { onConflict: 'profile_id,service_id,week_start' })
-
+      const { error } = await supabase.rpc('respond_to_assignment', { p_assignment_id: id, p_action: action })
       if (error) throw error
-
-      await refetch()
-      toast.success('Preference updated')
-    } catch (error) {
-      toast.error('Could not save preference', error.message)
-    } finally {
-      setPreferenceSaving((prev) => ({ ...prev, [serviceId]: false }))
-    }
-  }
-
-  const runAutoScheduler = async () => {
-    if (!profile || !canManage || !schedulerDate) return
-
-    setScheduling(true)
-    try {
-      const scheduleWeekStart = format(startOfWeek(new Date(schedulerDate), { weekStartsOn: 1 }), 'yyyy-MM-dd')
-
-      const { data: prefRows, error: prefError } = await supabase
-        .from('service_preferences')
-        .select('profile_id, service_id, preference')
-        .eq('week_start', scheduleWeekStart)
-
-      if (prefError) throw prefError
-
-      const { data: existingAllocations, error: existingError } = await supabase
-        .from('service_allocations')
-        .select('service_id, profile_id')
-        .eq('voice_id', profile.voice_id)
-        .eq('service_date', schedulerDate)
-
-      if (existingError) throw existingError
-
-      const existingServiceIds = new Set((existingAllocations ?? []).map((a) => a.service_id))
-      const usedProfileIds = new Set((existingAllocations ?? []).map((a) => a.profile_id))
-
-      const grouped = {}
-      ;(prefRows ?? []).forEach((row) => {
-        if (!grouped[row.service_id]) grouped[row.service_id] = []
-        grouped[row.service_id].push(row)
-      })
-
-      Object.values(grouped).forEach((rows) => {
-        rows.sort((a, b) => b.preference - a.preference)
-      })
-
-      const inserts = []
-      masterServices.forEach((service) => {
-        if (existingServiceIds.has(service.id)) return
-
-        const candidates = grouped[service.id] ?? []
-        const pick = candidates.find((c) => !usedProfileIds.has(c.profile_id))
-        if (!pick) return
-
-        usedProfileIds.add(pick.profile_id)
-        inserts.push({
-          voice_id: profile.voice_id,
-          service_id: service.id,
-          profile_id: pick.profile_id,
-          service_date: schedulerDate,
-          service_time: service.default_time || null,
-          status: 'pending',
-          allocated_by: profile.id,
-        })
-      })
-
-      if (inserts.length > 0) {
-        const { error: insertError } = await supabase
-          .from('service_allocations')
-          .insert(inserts)
-
-        if (insertError) throw insertError
+      await load()
+      const messages = {
+        accept: 'Service accepted',
+        decline: 'Service declined',
+        start: 'Service started',
+        complete: 'Marked as complete',
       }
-
-      await refetch()
-      setRosterReload((n) => n + 1)
-      toast.success(`Auto-scheduler completed (${inserts.length} allocations)`)
-    } catch (error) {
-      toast.error('Could not run auto-scheduler', error.message)
+      toastSuccess(messages[action] ?? 'Service updated')
+    } catch (e) {
+      toastError('Could not update service', e.message)
     } finally {
-      setScheduling(false)
+      setBusyId(null)
     }
   }
 
-  if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
+  const reassign = async (id, userId) => {
+    setBusyId(id)
+    try {
+      const { error } = await supabase.from('task_assignments').update({ user_id: userId }).eq('id', id)
+      if (error) throw error
+      await load()
+      toastSuccess('Service reassigned')
+    } catch (e) {
+      toastError('Could not reassign service', e.message)
+    } finally {
+      setBusyId(null)
+    }
+  }
 
-  const today_alloc = allocations.filter((a) => a.service_date === today)
-  const upcoming = allocations.filter((a) => a.service_date > today)
+  const cancel = async (id, title) => {
+    const ok = window.confirm(`Cancel service "${title}"? The assignee will be notified.`)
+    if (!ok) return
+    setBusyId(id)
+    try {
+      const { error } = await supabase.from('task_assignments').update({ status: 'cancelled' }).eq('id', id)
+      if (error) throw error
+      await load()
+      toastSuccess('Service cancelled')
+    } catch (e) {
+      toastError('Could not cancel service', e.message)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const verify = async (id) => {
+    setBusyId(id)
+    try {
+      const { error } = await supabase.rpc('verify_assignment', { p_assignment_id: id, p_approve: true })
+      if (error) throw error
+      await load()
+      toastSuccess('Service verified')
+    } catch (e) {
+      toastError('Could not verify service', e.message)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const today = format(new Date(), 'yyyy-MM-dd')
+
+  const upcoming = useMemo(() => (
+    (mine ?? [])
+      .filter((a) => a && typeof a.task_date === 'string' && ['assigned', 'accepted', 'in_progress'].includes(a?.status) && a.task_date >= today)
+      .sort((x, y) => (
+        x.task_date === y.task_date
+          ? String(x.task_time ?? '').localeCompare(String(y.task_time ?? ''))
+          : x.task_date.localeCompare(y.task_date)
+      ))
+  ), [mine, today])
+
+  const completed = useMemo(() => (
+    (mine ?? [])
+      .filter((a) => a && typeof a.task_date === 'string' && (['completed', 'verified'].includes(a?.status) || a.task_date < today))
+      .sort((x, y) => (
+        x.task_date === y.task_date
+          ? String(y.task_time ?? '').localeCompare(String(x.task_time ?? ''))
+          : y.task_date.localeCompare(x.task_date)
+      ))
+  ), [mine, today])
+
+  const allSorted = useMemo(() => (
+    [...(all ?? [])].sort((x, y) => (
+      x.task_date === y.task_date
+        ? String(y.task_time ?? '').localeCompare(String(x.task_time ?? ''))
+        : String(y.task_date ?? '').localeCompare(String(x.task_date ?? ''))
+    ))
+  ), [all])
+
+  const tabs = [
+    { key: 'upcoming', label: 'Upcoming' },
+    { key: 'completed', label: 'Completed' },
+    ...(canManage ? [{ key: 'manage', label: 'Manage' }] : []),
+  ]
+
+  const activeTab = tab === 'manage' && !canManage ? 'upcoming' : tab
+
+  if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading services…</div>
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
-      {canManage && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold text-slate-700">Service Master</h3>
-            <Button
-              size="sm"
-              icon={showForm ? X : Plus}
-              onClick={() => {
-                if (showForm) resetForm()
-                setShowForm((v) => !v)
-              }}
-            >
-              {showForm ? 'Close' : 'Add Service'}
-            </Button>
+    <div className="max-w-3xl mx-auto space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-9 h-9 rounded-2xl grad-saffron flex items-center justify-center flex-shrink-0">
+            <HeartHandshake className="w-5 h-5 text-white" />
           </div>
-
-          <Card>
-            <CardBody className="py-4 space-y-2">
-              <p className="text-sm font-semibold text-slate-700">Weekly Auto Allocation</p>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <input
-                  type="date"
-                  value={schedulerDate}
-                  onChange={(e) => setSchedulerDate(e.target.value)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-sm"
-                />
-                <Button size="sm" onClick={runAutoScheduler} loading={scheduling}>
-                  Auto-allocate from preferences
-                </Button>
-              </div>
-              <p className="text-xs text-slate-400">Allocates one devotee per service for selected date based on weekly preferences.</p>
-            </CardBody>
-          </Card>
-
-          <DailyRoster
-            voiceId={profile.voice_id}
-            services={masterServices}
-            date={schedulerDate}
-            allocatedBy={profile.id}
-            reloadSignal={rosterReload}
-          />
-
-          {showForm && (
-            <Card>
-              <CardBody className="py-4 space-y-3">
-                <p className="text-sm font-semibold text-slate-700">
-                  {editingId ? 'Edit Service' : 'Create Service'}
-                </p>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <label className="block">
-                    <span className="text-xs text-slate-500">Service Name</span>
-                    <input
-                      value={form.name}
-                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                      className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-xs text-slate-500">Default Time</span>
-                    <input
-                      type="time"
-                      value={form.default_time}
-                      onChange={(e) => setForm((f) => ({ ...f, default_time: e.target.value }))}
-                      className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
-                    />
-                  </label>
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <label className="block">
-                    <span className="text-xs text-slate-500">Duration (minutes)</span>
-                    <input
-                      type="number"
-                      min={5}
-                      value={form.duration_min}
-                      onChange={(e) => setForm((f) => ({ ...f, duration_min: e.target.value }))}
-                      className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
-                    />
-                  </label>
-                  <label className="flex items-end gap-2 pb-2 text-sm text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={form.is_recurring}
-                      onChange={(e) => setForm((f) => ({ ...f, is_recurring: e.target.checked }))}
-                    />
-                    Recurring service
-                  </label>
-                </div>
-
-                <label className="block">
-                  <span className="text-xs text-slate-500">Description</span>
-                  <textarea
-                    rows={2}
-                    value={form.description}
-                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                    className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-none"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-xs text-slate-500">Instructions</span>
-                  <textarea
-                    rows={2}
-                    value={form.instructions}
-                    onChange={(e) => setForm((f) => ({ ...f, instructions: e.target.value }))}
-                    className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-none"
-                  />
-                </label>
-
-                <div className="flex items-center gap-2">
-                  <Button size="sm" onClick={createOrUpdateService} loading={saving}>
-                    {editingId ? 'Save Changes' : 'Create Service'}
-                  </Button>
-                  {editingId ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        resetForm()
-                        setShowForm(false)
-                      }}
-                    >
-                      Cancel Edit
-                    </Button>
-                  ) : null}
-                </div>
-                {formError ? (
-                  <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{formError}</p>
-                ) : null}
-              </CardBody>
-            </Card>
-          )}
-
-          {masterServices.length > 0 && (
-            <Card>
-              <CardBody className="py-4">
-                <div className="space-y-2">
-                  {masterServices.map((service) => (
-                    <div
-                      key={service.id}
-                      ref={(el) => {
-                        if (el) {
-                          serviceRefs.current[service.id] = el
-                        }
-                      }}
-                      className={cn(
-                        'flex items-center justify-between py-2 border-b border-slate-50 last:border-0 rounded-lg px-2',
-                        focusedServiceId === service.id
-                          ? 'bg-saffron-50 border-saffron-200 transition-colors duration-300 animate-pulse'
-                          : ''
-                      )}
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">{service.name}</p>
-                        <p className="text-xs text-slate-400">
-                          {service.default_time ? formatTime(service.default_time) : 'No default time'}
-                          {service.duration_min ? ` • ${service.duration_min} min` : ''}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {service.is_recurring && <Badge variant="blue">Recurring</Badge>}
-                        <button
-                          onClick={() => startEdit(service)}
-                          disabled={archivingId === service.id}
-                          className="p-1 rounded-md text-slate-400 hover:text-saffron-600 hover:bg-saffron-50"
-                          title="Edit service"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => archiveService(service)}
-                          disabled={archivingId === service.id}
-                          className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50"
-                          title="Archive service"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardBody>
-            </Card>
-          )}
+          <h2 className="text-lg font-bold text-slate-800">IM Services</h2>
         </div>
-      )}
-
-      {!canManage && masterServices.length > 0 && (
-        <div>
-          <h3 className="text-base font-semibold text-slate-700 mb-3">My Weekly Service Preferences</h3>
-          <Card>
-            <CardBody>
-              <div className="space-y-2">
-                {masterServices.map((service) => {
-                  const current = preferences[service.id]
-                  return (
-                    <div key={service.id} className="flex flex-col sm:flex-row sm:items-center gap-2 py-2 border-b border-slate-50 last:border-0">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-700">{service.name}</p>
-                        {service.description ? <p className="text-xs text-slate-400 line-clamp-1">{service.description}</p> : null}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {[
-                          { label: 'Prefer', value: 1, active: 'bg-tulasi-50 text-tulasi-700 border-tulasi-200' },
-                          { label: 'Okay', value: 0, active: 'bg-saffron-50 text-saffron-700 border-saffron-200' },
-                          { label: 'Avoid', value: -1, active: 'bg-red-50 text-red-700 border-red-200' },
-                        ].map((option) => (
-                          <button
-                            key={option.value}
-                            onClick={() => savePreference(service.id, option.value)}
-                            disabled={preferenceSaving[service.id]}
-                            className={cn(
-                              'px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors',
-                              current === option.value
-                                ? option.active
-                                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                            )}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </CardBody>
-          </Card>
-        </div>
-      )}
-
-      {/* Today */}
-      <div>
-        <h3 className="text-base font-semibold text-slate-700 mb-3">
-          Today's Services — {format(new Date(), 'dd MMM yyyy')}
-        </h3>
-        {today_alloc.length === 0 ? (
-          <Card>
-            <CardBody>
-              <div className="flex flex-col items-center py-8 text-slate-400">
-                <ListChecks className="w-10 h-10 mb-3 opacity-30" />
-                <p className="text-sm">No services assigned for today.</p>
-              </div>
-            </CardBody>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {today_alloc.map((alloc) => (
-              <motion.div key={alloc.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-                <Card>
-                  <CardBody className="py-4">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-saffron-50 flex items-center justify-center flex-shrink-0">
-                        <ListChecks className="w-5 h-5 text-saffron-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-semibold text-slate-800">{alloc.services?.name}</p>
-                          <div className={cn('px-2 py-0.5 rounded-lg border text-xs font-medium flex-shrink-0', statusConfig[alloc.status]?.color)}>
-                            {statusConfig[alloc.status]?.label}
-                          </div>
-                        </div>
-                        {alloc.service_time && (
-                          <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
-                            <Clock className="w-3 h-3" />
-                            {formatTime(alloc.service_time)}
-                          </div>
-                        )}
-                        {alloc.services?.instructions && (
-                          <p className="text-xs text-slate-400 mt-1 line-clamp-2">{alloc.services.instructions}</p>
-                        )}
-                        {alloc.status === 'pending' && (
-                          <Button
-                            size="sm"
-                            variant="tulasi"
-                            className="mt-2"
-                            loading={updating[alloc.id]}
-                            onClick={() => markDone(alloc.id)}
-                            icon={CheckCircle2}
-                          >
-                            Mark Done
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardBody>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+        {canManage && activeTab === 'manage' && (
+          <Button size="sm" icon={showForm ? X : Plus} onClick={() => setShowForm((v) => !v)}>
+            {showForm ? 'Close' : 'New Service'}
+          </Button>
         )}
       </div>
 
-      {/* Upcoming */}
-      {upcoming.length > 0 && (
-        <div>
-          <h3 className="text-base font-semibold text-slate-700 mb-3">Upcoming Services</h3>
-          <Card>
-            <CardBody>
-              <div className="space-y-3">
-                {upcoming.map((alloc) => (
-                  <div key={alloc.id} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-700">{alloc.services?.name}</p>
-                      <p className="text-xs text-slate-400">
-                        {format(new Date(alloc.service_date), 'dd MMM')}
-                        {alloc.service_time && ` at ${formatTime(alloc.service_time)}`}
-                      </p>
-                    </div>
-                    <Badge variant="default">{statusConfig[alloc.status]?.label}</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardBody>
-          </Card>
+      <div className="flex items-center gap-2 flex-wrap">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={cn(
+              'px-4 py-1.5 rounded-full text-sm font-semibold transition-all',
+              activeTab === t.key
+                ? 'bg-saffron-500 text-white shadow-sm'
+                : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'upcoming' && (
+        <div className="space-y-3">
+          {upcoming.length === 0 ? (
+            <EmptyState icon={CalendarClock} message="No upcoming services right now." />
+          ) : (
+            upcoming.map((a) => (
+              <ServiceCard key={a.id} assignment={a} busy={busyId === a.id} onRespond={respond} />
+            ))
+          )}
+        </div>
+      )}
+
+      {activeTab === 'completed' && (
+        <div className="space-y-3">
+          {completed.length === 0 ? (
+            <EmptyState icon={CheckCircle2} message="No completed services yet." />
+          ) : (
+            completed.map((a) => (
+              <ServiceCard key={a.id} assignment={a} busy={busyId === a.id} onRespond={respond} />
+            ))
+          )}
+        </div>
+      )}
+
+      {activeTab === 'manage' && canManage && (
+        <div className="space-y-4">
+          {showForm && (
+            <NewServiceForm
+              members={members}
+              orgId={orgId}
+              assignedBy={profile?.id}
+              onCreated={() => { setShowForm(false); load() }}
+            />
+          )}
+
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-slate-700">All services ({allSorted.length})</p>
+            {allSorted.length === 0 ? (
+              <EmptyState icon={Inbox} message="No services assigned yet." />
+            ) : (
+              allSorted.map((a) => (
+                <ManageCard
+                  key={a.id}
+                  assignment={a}
+                  members={members}
+                  canVerify={canVerify}
+                  busy={busyId === a.id}
+                  onReassign={reassign}
+                  onCancel={cancel}
+                  onVerify={verify}
+                />
+              ))
+            )}
+          </div>
         </div>
       )}
     </div>

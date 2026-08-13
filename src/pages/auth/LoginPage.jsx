@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Flame, Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
+import { Flame, Mail, Lock, User, Eye, EyeOff, Building2 } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import Button from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
@@ -62,10 +62,12 @@ export default function LoginPage() {
             <Flame className="w-8 h-8 text-white" />
           </motion.div>
           <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-saffron-600 via-saffron-500 to-lotus-500 bg-clip-text text-transparent">
-            SurabhiKunj VOICE
+            VOICE
           </h1>
           <p className="text-slate-500 text-sm mt-1.5 max-w-xs mx-auto">
-            Vaishnava Organisation for Inspired &amp; Committed Enthusiasts
+            {mode === 'login'
+              ? 'Sign in to your organization'
+              : 'Create an account, then start or join an organization'}
           </p>
         </div>
 
@@ -156,6 +158,17 @@ export default function LoginPage() {
               {mode === 'login' ? 'Sign In' : 'Create Account'}
             </Button>
           </form>
+
+          {mode === 'signup' && (
+            <div className="mt-4 flex items-start gap-2.5 px-4 py-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <Building2 className="w-4 h-4 text-saffron-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-slate-500 leading-relaxed">
+                After signing up you'll choose to{' '}
+                <span className="font-semibold text-slate-600">create a new organization</span> or{' '}
+                <span className="font-semibold text-slate-600">join an existing one</span> with a join code.
+              </p>
+            </div>
+          )}
 
           <p className="text-center text-xs text-slate-400 mt-6">
             Hare Krishna 🙏 — All glories to Srila Prabhupada

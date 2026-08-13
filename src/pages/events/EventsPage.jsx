@@ -9,7 +9,8 @@ import { useCachedQuery } from '@/lib/useCachedQuery'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import { cn, isAdmin } from '@/lib/utils'
+import useOrgStore from '@/store/orgStore'
+import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
 
 const eventTypeColors = {
@@ -29,9 +30,11 @@ function getDateLabel(dateStr) {
 
 export default function EventsPage() {
   const { profile } = useAuthStore()
+  const { org, hasPermission } = useOrgStore()
   const location = useLocation()
   const navigate = useNavigate()
   const toast = useToastStore()
+  const orgId = org?.id ?? profile?.org_id
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [archivingId, setArchivingId] = useState(null)
@@ -42,13 +45,15 @@ export default function EventsPage() {
     title: '',
     description: '',
     event_type: 'program',
-    start_datetime: '',
-    end_datetime: '',
+    start_date: '',
+    start_time: '',
+    end_date: '',
+    end_time: '',
     venue: '',
     is_mandatory: false,
     notify_all: true,
   })
-  const admin = isAdmin(profile?.role)
+  const canManage = hasPermission('events.manage')
   const linkedEventId = location.state?.referenceId
   const eventRefs = useRef({})
 
@@ -79,12 +84,12 @@ export default function EventsPage() {
 
   const todayStr = new Date().toISOString().split('T')[0]
   const { data: events = [], loading, refetch } = useCachedQuery(
-    profile ? `events:${profile.voice_id}:${todayStr}` : null,
+    orgId ? `events:${orgId}:${todayStr}` : null,
     async () => {
       const { data, error } = await supabase
         .from('events')
         .select('*')
-        .eq('voice_id', profile.voice_id)
+        .eq('org_id', orgId)
         .eq('is_active', true)
         .gte('start_datetime', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
         .order('start_datetime', { ascending: true })
@@ -100,8 +105,10 @@ export default function EventsPage() {
       title: '',
       description: '',
       event_type: 'program',
-      start_datetime: '',
-      end_datetime: '',
+      start_date: '',
+      start_time: '',
+      end_date: '',
+      end_time: '',
       venue: '',
       is_mandatory: false,
       notify_all: true,
@@ -111,14 +118,29 @@ export default function EventsPage() {
   }
 
   const createOrUpdateEvent = async () => {
-    if (!profile) return
+    if (!profile || !orgId) return
     if (!form.title.trim()) {
       setFormError('Title is required.')
       return
     }
-    if (!form.start_datetime) {
-      setFormError('Start date/time is required.')
+    if (!form.start_date || !form.start_time) {
+      setFormError('Start date and time are required.')
       return
+    }
+
+    const startDatetime = new Date(`${form.start_date}T${form.start_time}`)
+    if (isNaN(startDatetime.getTime())) {
+      setFormError('Start date/time is invalid.')
+      return
+    }
+
+    let endDatetime = null
+    if (form.end_date && form.end_time) {
+      endDatetime = new Date(`${form.end_date}T${form.end_time}`)
+      if (isNaN(endDatetime.getTime())) {
+        setFormError('End date/time is invalid.')
+        return
+      }
     }
 
     setFormError('')
@@ -126,12 +148,12 @@ export default function EventsPage() {
 
     try {
       const payload = {
-        voice_id: profile.voice_id,
+        org_id: orgId,
         title: form.title.trim(),
         description: form.description.trim() || null,
         event_type: form.event_type,
-        start_datetime: new Date(form.start_datetime).toISOString(),
-        end_datetime: form.end_datetime ? new Date(form.end_datetime).toISOString() : null,
+        start_datetime: startDatetime.toISOString(),
+        end_datetime: endDatetime ? endDatetime.toISOString() : null,
         venue: form.venue.trim() || null,
         is_mandatory: form.is_mandatory,
         notify_all: form.notify_all,
@@ -154,7 +176,7 @@ export default function EventsPage() {
         const { data: recipients, error: recipientsError } = await supabase
           .from('profiles')
           .select('id')
-          .eq('voice_id', profile.voice_id)
+          .eq('org_id', orgId)
           .eq('is_active', true)
 
         if (recipientsError) {
@@ -162,7 +184,7 @@ export default function EventsPage() {
         } else if (recipients?.length) {
           const { error: notificationsError } = await supabase.from('notifications').insert(
             recipients.map((member) => ({
-              voice_id: profile.voice_id,
+              org_id: orgId,
               profile_id: member.id,
               title: `New ${form.event_type}: ${result.title}`,
               body: result.description ?? 'A new event has been created.',
@@ -197,8 +219,10 @@ export default function EventsPage() {
       title: event.title ?? '',
       description: event.description ?? '',
       event_type: event.event_type ?? 'program',
-      start_datetime: event.start_datetime ? event.start_datetime.slice(0, 16) : '',
-      end_datetime: event.end_datetime ? event.end_datetime.slice(0, 16) : '',
+      start_date: event.start_datetime ? event.start_datetime.slice(0, 10) : '',
+      start_time: event.start_datetime ? event.start_datetime.slice(11, 16) : '',
+      end_date: event.end_datetime ? event.end_datetime.slice(0, 10) : '',
+      end_time: event.end_datetime ? event.end_datetime.slice(11, 16) : '',
       venue: event.venue ?? '',
       is_mandatory: event.is_mandatory ?? false,
       notify_all: event.notify_all ?? true,
@@ -252,7 +276,7 @@ export default function EventsPage() {
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-800">Events & Festivals</h2>
-        {admin && (
+        {canManage && (
           <Button
             size="sm"
             icon={showForm ? X : Plus}
@@ -266,7 +290,7 @@ export default function EventsPage() {
         )}
       </div>
 
-      {admin && showForm && (
+      {canManage && showForm && (
         <Card>
           <CardBody className="py-4 space-y-3">
             <p className="text-sm font-semibold text-slate-700">
@@ -307,21 +331,41 @@ export default function EventsPage() {
               </label>
 
               <label className="block">
-                <span className="text-xs text-slate-500">Start</span>
+                <span className="text-xs text-slate-500">Start Date</span>
                 <input
-                  type="datetime-local"
-                  value={form.start_datetime}
-                  onChange={(e) => setForm((f) => ({ ...f, start_datetime: e.target.value }))}
+                  type="date"
+                  value={form.start_date ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
                   className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
                 />
               </label>
 
               <label className="block">
-                <span className="text-xs text-slate-500">End (optional)</span>
+                <span className="text-xs text-slate-500">Start Time</span>
                 <input
-                  type="datetime-local"
-                  value={form.end_datetime}
-                  onChange={(e) => setForm((f) => ({ ...f, end_datetime: e.target.value }))}
+                  type="time"
+                  value={form.start_time ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs text-slate-500">End Date</span>
+                <input
+                  type="date"
+                  value={form.end_date ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs text-slate-500">End Time</span>
+                <input
+                  type="time"
+                  value={form.end_time ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, end_time: e.target.value }))}
                   className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
                 />
               </label>
@@ -428,7 +472,7 @@ export default function EventsPage() {
                         <div className="flex gap-1.5 flex-shrink-0 items-center">
                           {event.is_mandatory && <Badge variant="saffron">Mandatory</Badge>}
                           <Badge className={eventTypeColors[event.event_type]}>{event.event_type}</Badge>
-                          {admin ? (
+                          {canManage ? (
                             <>
                               <button
                                 onClick={() => startEdit(event)}

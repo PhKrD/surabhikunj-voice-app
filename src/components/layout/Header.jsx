@@ -4,32 +4,21 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useCachedQuery } from '@/lib/useCachedQuery'
 import useAuthStore from '@/store/authStore'
+import useOrgStore from '@/store/orgStore'
 import Avatar from '@/components/ui/Avatar'
 
-const routeLabels = {
-  '/': 'Dashboard',
-  '/residents': 'Residents',
-  '/sadhana': 'Sadhana Tracker',
-  '/counsellor': 'Counsellor',
-  '/departments': 'Departments',
-  '/services': 'Services (IM)',
-  '/cleanliness': 'Cleanliness',
-  '/kitchen': 'Kitchen',
-  '/events': 'Events & Festivals',
-  '/hierarchy': 'Org Structure',
-  '/announcements': 'Announcements',
-  '/notifications': 'Notifications',
-  '/settings': 'Settings',
-}
 
 export default function Header({ onMenuClick }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { profile } = useAuthStore()
+  const { org, nav } = useOrgStore()
   const profileId = profile?.id
-  const label =
-    routeLabels[location.pathname] ??
-    (location.pathname.startsWith('/residents/') ? 'Resident Profile' : 'SurabhiKunj VOICE')
+
+  const routeLabel = nav.find(
+    (n) => n.route === location.pathname || location.pathname.startsWith(n.route + '/')
+  )?.label
+  const label = routeLabel ?? (location.pathname.startsWith('/residents/') ? 'Resident Profile' : (org?.name ?? 'Platform'))
 
   const { data: unread = 0, refetch } = useCachedQuery(
     profileId ? `notif:unread:${profileId}` : null,
@@ -84,7 +73,7 @@ export default function Header({ onMenuClick }) {
         </button>
         {profile && (
           <Avatar
-            name={profile.spiritual_name}
+            name={profile.display_name ?? profile.spiritual_name ?? profile.email}
             url={profile.avatar_url}
             size="sm"
             className="cursor-pointer ring-2 ring-saffron-200 ring-offset-1"

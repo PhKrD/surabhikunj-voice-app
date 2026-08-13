@@ -15,8 +15,6 @@ declare const Deno: {
   serve: (handler: (req: Request) => Response | Promise<Response>) => void
 }
 
-const ADMIN_ROLES = ['admin', 'vmc', 'oc']
-
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -57,14 +55,23 @@ Deno.serve(async (req: Request) => {
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
 
+  // Permission check via caller's own session. Matches the frontend gate
+  // (MembersPage only shows "Add member" for members.manage) — using a
+  // different key here ('members.create', which isn't in the permission
+  // catalog at all) meant only a literal '*' wildcard holder could ever
+  // pass this check, so every non-owner admin got "Permission denied".
+  const { data: permitted, error: permErr } = await caller.rpc('has_permission', { p_key: 'members.manage' })
+  if (permErr || !permitted) return json({ error: 'Permission denied (members.manage required)' }, 403)
+
+  // Fetch caller's active org_id
   const { data: callerProfile } = await admin
     .from('profiles')
-    .select('role, voice_id')
+    .select('org_id')
     .eq('id', userData.user.id)
     .single()
 
-  if (!callerProfile || !ADMIN_ROLES.includes(callerProfile.role)) {
-    return json({ error: 'Admins only' }, 403)
+  if (!callerProfile?.org_id) {
+    return json({ error: 'Could not determine caller\'s organization' }, 403)
   }
 
   let payload: NewMember
@@ -113,14 +120,48 @@ Deno.serve(async (req: Request) => {
       legal_name: legalName || null,
       spiritual_name: spiritualName,
       phone: phone || null,
-      role,
+      role,  // legacy column — kept during expand phase
       is_approved: true,
-      voice_id: callerProfile.voice_id,
+      org_id: callerProfile.org_id,
       is_active: true,
     })
     .eq('id', userId)
 
   if (upErr) return json({ error: upErr.message }, 400)
+
+  // --- Ensure membership row exists for the target org ---
+  const { error: memErr } = await admin
+    .from('memberships')
+    .upsert(
+      { user_id: userId, org_id: callerProfile.org_id, status: 'active', joined_at: new Date().toISOString() },
+      { onConflict: 'user_id,org_id' }
+    )
+  if (memErr) return json({ error: `Membership error: ${memErr.message}` }, 400)
+
+  // --- Optionally assign a named role from the roles table ---
+  if (role) {
+    const { data: roleRow } = await admin
+      .from('roles')
+      .select('id')
+      .eq('org_id', callerProfile.org_id)
+      .ilike('name', role)
+      .maybeSingle()
+    if (roleRow) {
+      // Find the active membership to attach the role
+      const { data: mem } = await admin
+        .from('memberships')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('org_id', callerProfile.org_id)
+        .single()
+      if (mem) {
+        await admin.from('membership_roles').upsert(
+          { membership_id: mem.id, role_id: roleRow.id },
+          { onConflict: 'membership_id,role_id' }
+        )
+      }
+    }
+  }
 
   return json({ ok: true, id: userId, email, role })
 })

@@ -9,12 +9,12 @@
 //   - VAPID_PRIVATE_KEY -> Supabase secret (send-push function)
 //   supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:you@example.com
 
-import { generateKeyPairSync, createPublicKey } from 'node:crypto'
+import { generateKeyPairSync } from 'node:crypto'
 
 const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
 
 // Public key: uncompressed point (0x04 || X || Y), 65 bytes, base64url.
-const pubDer = createPublicKey(publicKey).export({ type: 'spki', format: 'der' })
+const pubDer = publicKey.export({ type: 'spki', format: 'der' })
 // The last 65 bytes of the SPKI DER are the raw uncompressed point.
 const rawPub = pubDer.subarray(pubDer.length - 65)
 

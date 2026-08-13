@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.surabhikunj.voice',
-  appName: 'SurabhiKunj VOICE',
+  appName: 'VOICE',
   webDir: 'dist',
   plugins: {
     CapacitorUpdater: {

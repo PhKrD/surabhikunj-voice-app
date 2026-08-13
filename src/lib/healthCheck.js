@@ -37,7 +37,7 @@ class HealthMonitor {
     try {
       const start = Date.now()
       const { error } = await Promise.race([
-        supabase.from('voices').select('id').limit(1),
+        supabase.from('organizations').select('id').limit(1),
         new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Health check timeout')), 3000)
         )

@@ -4,6 +4,7 @@ import { Users, Search, MapPin, ChevronRight, BadgeCheck, Building2 } from 'luci
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
+import useOrgStore from '@/store/orgStore'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
@@ -17,6 +18,8 @@ const STATUS_OPTIONS = [
 
 export default function ResidentsPage() {
   const { profile } = useAuthStore()
+  const { org } = useOrgStore()
+  const orgId = org?.id ?? profile?.org_id
   const navigate = useNavigate()
   const [residents, setResidents] = useState([])
   const [departments, setDepartments] = useState([])
@@ -30,18 +33,18 @@ export default function ResidentsPage() {
   const [initiatedOnly, setInitiatedOnly] = useState(false)
 
   const load = useCallback(async () => {
-    if (!profile) return
+    if (!orgId) return
     setLoading(true)
     const [profilesRes, deptRes, memberRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('id, spiritual_name, legal_name, role, avatar_url, room_number, phone, initiated, is_active')
-        .eq('voice_id', profile.voice_id)
+        .eq('org_id', orgId)
         .order('spiritual_name', { ascending: true }),
       supabase
         .from('departments')
         .select('id, name')
-        .eq('voice_id', profile.voice_id)
+        .eq('org_id', orgId)
         .eq('is_active', true)
         .order('name', { ascending: true }),
       supabase
@@ -58,7 +61,7 @@ export default function ResidentsPage() {
     }
     setDeptByProfile(map)
     setLoading(false)
-  }, [profile])
+  }, [orgId])
 
   useEffect(() => {
     const id = setTimeout(() => { load() }, 0)

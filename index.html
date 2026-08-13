@@ -9,11 +9,42 @@
     <link rel="apple-touch-icon" href="/icon.svg" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="SurabhiKunj VOICE" />
-    <title>SurabhiKunj VOICE</title>
+    <meta name="apple-mobile-web-app-title" content="VOICE" />
+    <title>VOICE</title>
   </head>
   <body>
     <div id="root"></div>
+    <div
+      id="error-log"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #fff;
+        color: #dc2626;
+        padding: 1.5rem;
+        overflow: auto;
+        white-space: pre-wrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        z-index: 9999;
+      "
+    ></div>
+    <script>
+      const errorLog = document.getElementById('error-log')
+      function showError(source, message, stack) {
+        errorLog.style.display = 'block'
+        errorLog.textContent = `${source}: ${message}\n\n${stack || '(no stack)'}`
+      }
+      window.onerror = (message, source, lineno, colno, error) => {
+        showError('Runtime error', message, (error && error.stack) || `${source}:${lineno}:${colno}`)
+      }
+      window.addEventListener('unhandledrejection', (event) => {
+        const reason = event.reason
+        const message = reason && (reason.message || reason)
+        const stack = reason && (reason.stack || JSON.stringify(reason))
+        showError('Unhandled promise rejection', message, stack)
+      })
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

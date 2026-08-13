@@ -8,15 +8,19 @@ import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
-import { ROLES, ADMIN_ROLES, cn } from '@/lib/utils'
+import useOrgStore from '@/store/orgStore'
+import { cn } from '@/lib/utils'
 
-const SELECT_COLS = 'id, spiritual_name, legal_name, email, avatar_url, role, is_approved, counsellor_id'
+const SELECT_COLS = 'id, spiritual_name, legal_name, email, avatar_url, role, is_approved'
 
 export default function MembersPage() {
   const { profile } = useAuthStore()
+  const { org, hasPermission } = useOrgStore()
   const toast = useToastStore()
-  const isAdmin = ADMIN_ROLES.includes(profile?.role)
+  const orgId = org?.id ?? profile?.org_id
+  const isAdmin = hasPermission('members.manage')
 
+  const [orgRoles, setOrgRoles] = useState([]) // [{ id, name }]
   const [members, setMembers] = useState([])
   const [drafts, setDrafts] = useState({}) // { [id]: { role, is_approved } }
   const [loading, setLoading] = useState(true)
@@ -26,35 +30,41 @@ export default function MembersPage() {
   const [highlightId, setHighlightId] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [newMember, setNewMember] = useState({ legal_name: '', email: '', phone: '', role: 'devotee' })
+  const [newMember, setNewMember] = useState({ legal_name: '', email: '', phone: '', role_id: '' })
 
   const seedDrafts = useCallback((rows) => {
-    setDrafts(Object.fromEntries(rows.map((r) => [r.id, { role: r.role, is_approved: r.is_approved }])))
+    setDrafts(Object.fromEntries(rows.map((r) => [r.id, { role_id: r.role_id, is_approved: r.is_approved }])))
   }, [])
 
   useEffect(() => {
-    if (!profile?.voice_id || !isAdmin) return
-    const load = async () => {
-      setLoading(true)
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select(SELECT_COLS)
-          .eq('voice_id', profile.voice_id)
-          .order('is_approved', { ascending: true })
-          .order('spiritual_name', { ascending: true })
-        if (error) throw error
-        const rows = data ?? []
-        setMembers(rows)
-        seedDrafts(rows)
-      } catch (err) {
-        toast.error('Could not load members', err.message)
-      } finally {
-        setLoading(false)
-      }
+    if (!org?.id) return
+    supabase.from('roles').select('id, name').eq('org_id', org.id).order('name')
+      .then(({ data }) => { if (data?.length) { setOrgRoles(data); setNewMember((n) => ({ ...n, role_id: data[0].id })) } })
+  }, [org?.id])
+
+  const load = useCallback(async () => {
+    if (!isAdmin) return
+    setLoading(true)
+    try {
+      // org_members() reads from `memberships`, so pending join requests are
+      // included — filtering profiles by org_id would hide them entirely.
+      const { data, error } = await supabase.rpc('org_members')
+      if (error) throw error
+      const rows = (data ?? []).map((r) => ({
+        ...r,
+        spiritual_name: r.spiritual_name ?? r.display_name,
+        is_approved:    r.status === 'active',
+      }))
+      setMembers(rows)
+      seedDrafts(rows)
+    } catch (err) {
+      toast.error('Could not load members', err.message)
+    } finally {
+      setLoading(false)
     }
-    load()
-  }, [profile?.voice_id, isAdmin, seedDrafts, toast])
+  }, [isAdmin, seedDrafts, toast])
+
+  useEffect(() => { load() }, [load])
 
   const pendingCount = useMemo(() => members.filter((m) => !m.is_approved).length, [members])
 
@@ -73,7 +83,7 @@ export default function MembersPage() {
 
   const isDirty = (m) => {
     const d = drafts[m.id]
-    return d && (d.role !== m.role || d.is_approved !== m.is_approved)
+    return d && (d.role_id !== m.role_id || d.is_approved !== m.is_approved)
   }
 
   const handleFindByEmail = async (e) => {
@@ -93,7 +103,7 @@ export default function MembersPage() {
       const { data, error } = await supabase
         .from('profiles')
         .select(SELECT_COLS)
-        .eq('voice_id', profile.voice_id)
+        .eq('org_id', orgId)
         .ilike('email', q)
         .maybeSingle()
       if (error) throw error
@@ -102,7 +112,9 @@ export default function MembersPage() {
         return
       }
       setMembers((prev) => [data, ...prev])
-      setDrafts((d) => ({ ...d, [data.id]: { role: data.role, is_approved: data.is_approved } }))
+      // This profile wasn't in org_members() (no membership row yet), so we
+      // have no role_id for it — leave the draft unset until an admin picks one.
+      setDrafts((d) => ({ ...d, [data.id]: { role_id: null, is_approved: data.is_approved } }))
       setSearch(emailQuery.trim())
       setHighlightId(data.id)
       setTimeout(() => setHighlightId(null), 2500)
@@ -116,14 +128,29 @@ export default function MembersPage() {
     if (!d) return
     setSavingId(m.id)
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: d.role, is_approved: d.is_approved })
-        .eq('id', m.id)
-        .eq('voice_id', profile.voice_id)
-      if (error) throw error
-      setMembers((prev) => prev.map((x) => (x.id === m.id ? { ...x, role: d.role, is_approved: d.is_approved } : x)))
+      // Approval lives on the membership, not the profile, so it must go
+      // through the RPC — updating profiles.is_approved alone would leave the
+      // membership 'pending' and the member still locked out.
+      if (d.is_approved !== m.is_approved) {
+        const { error } = await supabase.rpc('approve_membership', {
+          p_user_id: m.id,
+          p_approve: d.is_approved,
+        })
+        if (error) throw error
+      }
+
+      if (d.role_id && d.role_id !== m.role_id) {
+        // Writes membership_roles (what has_permission() actually reads),
+        // not profiles.role — the legacy column has no effect on access.
+        const { error } = await supabase.rpc('set_member_role', {
+          p_user_id: m.id,
+          p_role_id: d.role_id,
+        })
+        if (error) throw error
+      }
+
       toast.success('Member updated', `${m.spiritual_name} saved`)
+      await load()
     } catch (err) {
       toast.error('Could not save', err.message)
     } finally {
@@ -141,13 +168,14 @@ export default function MembersPage() {
     if (phone && phone.length < 6) return toast.error('Invalid mobile', 'Mobile becomes their first password, so it must be at least 6 digits.')
     setCreating(true)
     try {
+      const roleName = orgRoles.find((r) => r.id === newMember.role_id)?.name
       const { data, error } = await supabase.functions.invoke('admin-create-user', {
         body: {
           email,
           legal_name: newMember.legal_name.trim(),
           spiritual_name: newMember.legal_name.trim(),
           phone,
-          role: newMember.role,
+          role: roleName,
         },
       })
       if (error) throw error
@@ -159,13 +187,14 @@ export default function MembersPage() {
         legal_name: newMember.legal_name.trim(),
         email,
         avatar_url: null,
-        role: newMember.role,
+        role_id: newMember.role_id,
+        role_name: roleName,
         is_approved: true,
-        counsellor_id: null,
+        status: 'active',
       }
       setMembers((prev) => [row, ...prev.filter((m) => m.id !== row.id)])
-      setDrafts((d) => ({ ...d, [row.id]: { role: row.role, is_approved: row.is_approved } }))
-      setNewMember({ legal_name: '', email: '', phone: '', role: 'devotee' })
+      setDrafts((d) => ({ ...d, [row.id]: { role_id: row.role_id, is_approved: row.is_approved } }))
+      setNewMember({ legal_name: '', email: '', phone: '', role_id: orgRoles[0]?.id ?? '' })
       setShowAdd(false)
       setHighlightId(row.id)
       setTimeout(() => setHighlightId(null), 2500)
@@ -237,12 +266,12 @@ export default function MembersPage() {
                   />
                 </div>
                 <select
-                  value={newMember.role}
-                  onChange={(e) => setNew({ role: e.target.value })}
+                  value={newMember.role_id}
+                  onChange={(e) => setNew({ role_id: e.target.value })}
                   className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-saffron-300"
                 >
-                  {Object.entries(ROLES).map(([key, label]) => (
-                    <option key={key} value={key}>{label}</option>
+                  {orgRoles.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
                   ))}
                 </select>
               </div>
@@ -302,7 +331,7 @@ export default function MembersPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((m) => {
-            const d = drafts[m.id] ?? { role: m.role, is_approved: m.is_approved }
+            const d = drafts[m.id] ?? { role_id: m.role_id, is_approved: m.is_approved }
             const dirty = isDirty(m)
             const self = m.id === profile.id
             return (
@@ -326,13 +355,14 @@ export default function MembersPage() {
                         {/* Controls */}
                         <div className="flex flex-wrap items-center gap-2 mt-3">
                           <select
-                            value={d.role}
-                            onChange={(e) => setDraft(m.id, { role: e.target.value })}
+                            value={d.role_id ?? ''}
+                            onChange={(e) => setDraft(m.id, { role_id: e.target.value })}
                             disabled={self}
                             className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-saffron-300 disabled:opacity-60"
                           >
-                            {Object.entries(ROLES).map(([key, label]) => (
-                              <option key={key} value={key}>{label}</option>
+                            {!d.role_id && <option value="">Select a role…</option>}
+                            {orgRoles.map((r) => (
+                              <option key={r.id} value={r.id}>{r.name}</option>
                             ))}
                           </select>
 

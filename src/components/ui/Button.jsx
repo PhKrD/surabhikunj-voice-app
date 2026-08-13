@@ -2,18 +2,23 @@ import { cn } from '@/lib/utils'
 import { Loader2 } from 'lucide-react'
 
 const variants = {
-  primary: 'grad-saffron text-white shadow-[0_8px_20px_-6px_rgba(249,115,22,0.5)] hover:brightness-105 active:brightness-95',
-  secondary: 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm',
-  ghost: 'hover:bg-slate-100 text-slate-600',
-  danger: 'grad-rose text-white shadow-[0_8px_20px_-6px_rgba(244,63,94,0.5)] hover:brightness-105 active:brightness-95',
-  tulasi: 'grad-tulasi text-white shadow-[0_8px_20px_-6px_rgba(34,197,94,0.5)] hover:brightness-105 active:brightness-95',
+  primary:   'grad-saffron text-white glow-saffron sheen hover:brightness-[1.07]',
+  tulasi:    'grad-tulasi text-white glow-tulasi sheen hover:brightness-[1.07]',
+  danger:    'grad-rose text-white shadow-[0_10px_26px_-8px_rgba(244,63,94,0.55)] sheen hover:brightness-[1.07]',
+  blue:      'grad-blue text-white glow-blue sheen hover:brightness-[1.07]',
+  secondary: 'bg-white text-slate-700 border border-slate-200 elev-1 hover:border-slate-300 hover:bg-slate-50 hover:elev-2',
+  ghost:     'text-slate-600 hover:bg-slate-100/80 hover:text-slate-800',
+  soft:      'bg-saffron-50 text-saffron-700 border border-saffron-100 hover:bg-saffron-100',
 }
 
 const sizes = {
-  sm: 'px-3.5 py-1.5 text-sm rounded-xl',
-  md: 'px-4 py-2.5 text-sm rounded-xl',
-  lg: 'px-6 py-3 text-base rounded-2xl',
+  xs: 'px-3 py-1 text-xs rounded-lg gap-1.5',
+  sm: 'px-3.5 py-1.5 text-sm rounded-xl gap-1.5',
+  md: 'px-4.5 py-2.5 text-sm rounded-2xl gap-2',
+  lg: 'px-6 py-3.5 text-base rounded-2xl gap-2.5',
 }
+
+const iconSizes = { xs: 'w-3.5 h-3.5', sm: 'w-4 h-4', md: 'w-4 h-4', lg: 'w-5 h-5' }
 
 export default function Button({
   children,
@@ -23,17 +28,19 @@ export default function Button({
   disabled = false,
   className,
   icon: Icon,
+  iconRight: IconRight,
   ...props
 }) {
-  const hasVisual = loading || Boolean(Icon)
+  const hasLeft = loading || Boolean(Icon)
+  const iconCls = iconSizes[size]
 
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center font-semibold transition-all duration-150',
-        hasVisual ? 'gap-2' : 'gap-0',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron-400 focus-visible:ring-offset-1',
-        'disabled:opacity-80 disabled:cursor-not-allowed disabled:pointer-events-none',
+        'relative inline-flex items-center justify-center font-semibold whitespace-nowrap',
+        'transition-all duration-200 press',
+        'focus:outline-none focus-visible:ring-4 focus-visible:ring-saffron-400/35',
+        'disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none',
         variants[variant],
         sizes[size],
         className
@@ -41,16 +48,17 @@ export default function Button({
       disabled={disabled || loading}
       {...props}
     >
-      {hasVisual ? (
-        <span className="inline-flex w-4 h-4 items-center justify-center flex-shrink-0">
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : Icon ? (
-            <Icon className="w-4 h-4" />
-          ) : null}
+      {hasLeft && (
+        <span className={cn('inline-flex items-center justify-center flex-shrink-0', iconCls)}>
+          {loading ? <Loader2 className={cn(iconCls, 'animate-spin')} /> : Icon ? <Icon className={iconCls} /> : null}
         </span>
-      ) : null}
+      )}
       {children}
+      {IconRight && !loading && (
+        <span className={cn('inline-flex items-center justify-center flex-shrink-0', iconCls)}>
+          <IconRight className={iconCls} />
+        </span>
+      )}
     </button>
   )
 }

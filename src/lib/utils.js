@@ -6,12 +6,15 @@ export function cn(...inputs) {
 }
 
 export function formatTime(timeStr) {
-  if (!timeStr) return '--'
+  if (!timeStr || typeof timeStr !== 'string') return '--'
   const [h, m] = timeStr.split(':')
-  const hour = parseInt(h)
+  if (!h || m === undefined) return timeStr
+  const hour = parseInt(h, 10)
+  if (Number.isNaN(hour)) return timeStr
   const ampm = hour >= 12 ? 'PM' : 'AM'
   const displayHour = hour % 12 || 12
-  return `${displayHour}:${m} ${ampm}`
+  const displayMinute = String(m).padStart(2, '0').slice(0, 2)
+  return `${displayHour}:${displayMinute} ${ampm}`
 }
 
 export function formatDate(dateStr) {

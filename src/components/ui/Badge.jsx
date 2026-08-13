@@ -11,15 +11,29 @@ const variants = {
   cyan: 'bg-cyan-100 text-cyan-700',
 }
 
-export default function Badge({ children, variant = 'default', className }) {
+const dotColors = {
+  default: 'bg-slate-400',
+  saffron: 'bg-saffron-500',
+  tulasi: 'bg-tulasi-500',
+  lotus: 'bg-lotus-500',
+  blue: 'bg-blue-500',
+  red: 'bg-red-500',
+  yellow: 'bg-yellow-500',
+  cyan: 'bg-cyan-500',
+}
+
+export default function Badge({ children, variant = 'default', dot = false, className }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold tracking-tight',
         variants[variant],
         className
       )}
     >
+      {dot && (
+        <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', dotColors[variant])} />
+      )}
       {children}
     </span>
   )

@@ -8,16 +8,18 @@ import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Avatar from '@/components/ui/Avatar'
-import { formatDate, isAdmin } from '@/lib/utils'
+import useOrgStore from '@/store/orgStore'
+import { formatDate } from '@/lib/utils'
 
-const POST_ROLES = ['admin', 'vmc', 'oc', 'im', 'dept_incharge', 'sadhana_incharge', 'counsellor']
 const inputCls =
   'w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300 focus:border-transparent transition'
 
 export default function AnnouncementsPage() {
   const { profile } = useAuthStore()
+  const { org, hasPermission } = useOrgStore()
   const toast = useToastStore()
-  const canPost = POST_ROLES.includes(profile?.role)
+  const orgId = org?.id ?? profile?.org_id
+  const canPost = hasPermission('announcements.create')
 
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -29,18 +31,18 @@ export default function AnnouncementsPage() {
   const [deletingId, setDeletingId] = useState(null)
 
   const load = useCallback(async () => {
-    if (!profile) return
+    if (!orgId) return
     setLoading(true)
     const { data } = await supabase
       .from('announcements')
       .select('id, title, body, is_pinned, created_at, created_by, author:created_by(spiritual_name, avatar_url)')
-      .eq('voice_id', profile.voice_id)
+      .eq('org_id', orgId)
       .order('is_pinned', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(50)
     setItems(data ?? [])
     setLoading(false)
-  }, [profile])
+  }, [orgId])
 
   useEffect(() => {
     const t = setTimeout(() => { load() }, 0)
@@ -55,7 +57,7 @@ export default function AnnouncementsPage() {
     setSaving(true)
     try {
       const { error } = await supabase.from('announcements').insert({
-        voice_id: profile.voice_id,
+        org_id: orgId,
         title: title.trim(),
         body: body.trim() || null,
         is_pinned: pinned,

@@ -1,86 +1,164 @@
 import { motion } from 'framer-motion'
-import { BookOpen, Users, Sparkles, UtensilsCrossed, CalendarDays, ListChecks, TrendingUp, Clock, MapPin, Megaphone, MessageCircle, AlertCircle, RefreshCw } from 'lucide-react'
+import { BookOpen, UtensilsCrossed, CalendarDays, ListChecks, TrendingUp, Clock, MapPin, Megaphone, MessageCircle, AlertCircle, RefreshCw, CheckCircle2, Users, Building2, GitBranch, BarChart3 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import { useCachedQuery } from '@/lib/useCachedQuery'
 import useAuthStore from '@/store/authStore'
+import useOrgStore from '@/store/orgStore'
 import StatCard from '@/components/ui/StatCard'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
-import { ROLES, ROLE_COLORS, scoreBg, formatDate, formatTime } from '@/lib/utils'
+import { scoreBg, formatDate, formatTime } from '@/lib/utils'
 
-const modules = [
-  { label: 'Sadhana', icon: BookOpen, to: '/sadhana', grad: 'grad-lotus', desc: 'Track daily spiritual practices' },
-  { label: 'Counsellor', icon: Users, to: '/counsellor', grad: 'grad-blue', desc: 'Manage counsellee relationships' },
-  { label: 'Services', icon: ListChecks, to: '/services', grad: 'grad-saffron', desc: 'View & manage service assignments' },
-  { label: 'Cleanliness', icon: Sparkles, to: '/cleanliness', grad: 'grad-tulasi', desc: 'Daily cleaning assignments' },
-  { label: 'Kitchen', icon: UtensilsCrossed, to: '/kitchen', grad: 'grad-amber', desc: 'Meal plans & menus' },
-  { label: 'Events', icon: CalendarDays, to: '/events', grad: 'grad-indigo', desc: 'Programs & festivals' },
-]
-
-const todayQuote = {
+const FALLBACK_QUOTE = {
+  label: 'Verse of the Day',
   text: 'One who has taken birth in this human form of life, if he does not utilize this opportunity for self-realization, is certainly the killer of his own self.',
   source: 'Śrīmad-Bhāgavatam 11.20.17',
 }
 
-const SERVICE_STATUS_VARIANT = { done: 'tulasi', pending: 'yellow', missed: 'red', excused: 'blue' }
-const SERVICE_STATUS_LABEL = { done: 'Done', pending: 'Pending', missed: 'Missed', excused: 'Excused' }
-const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'prasad_special']
-const MEAL_LABEL = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', prasad_special: 'Special Prasad' }
+const TASK_STATUS_VARIANT = { done: 'tulasi', pending: 'yellow', missed: 'red', excused: 'blue', partial: 'yellow', verified: 'blue' }
+
+const QUICK_ICON_MAP = {
+  trackers: BookOpen, mentorship: MessageCircle, tasks: ListChecks,
+  resources: UtensilsCrossed, events: CalendarDays, departments: Building2,
+  announcements: Megaphone, hierarchy: GitBranch, members: Users,
+  reports: BarChart3,
+}
 
 export default function Dashboard() {
   const { profile, profileLoading, profileError, user, fetchProfile } = useAuthStore()
+  const { org, nav, t, settings } = useOrgStore()
+  const orgId = org?.id ?? profile?.org_id
+  const quote = settings?.branding?.dailyQuote ?? FALLBACK_QUOTE
+
+  const quickNav = nav.filter((n) => !['settings', 'notifications', 'dashboard'].includes(n.key)).slice(0, 6)
+
+  const GRAD_MAP = {
+    trackers: 'grad-lotus', mentorship: 'grad-blue', tasks: 'grad-saffron',
+    resources: 'grad-amber', events: 'grad-indigo', departments: 'grad-tulasi',
+    announcements: 'grad-rose', hierarchy: 'grad-emerald', members: 'grad-cyan',
+    reports: 'grad-violet',
+  }
+  const greeting = t('greeting', 'Welcome')
+  const displayName = profile?.display_name ?? profile?.spiritual_name ?? profile?.legal_name ?? ''
+  const firstName = displayName.split(' ')[0] || t('member', 'Member')
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
   const todayISO = new Date().toISOString().split('T')[0]
 
   const { data, loading: queryLoading } = useCachedQuery(
-    profile ? `dashboard:${profile.id}:${todayISO}` : null,
+    profile && orgId ? `dashboard:${profile.id}:${orgId}:${todayISO}` : null,
     async () => {
       const nowISO = new Date().toISOString()
-      const [sadhanaRes, servicesRes, logsRes, assignRes, eventsRes, recentRes, mealsRes, announcementsRes, counsellorRes] = await Promise.all([
-        supabase.from('sadhana_reports').select('score, report_date').eq('profile_id', profile.id).eq('report_date', todayISO).maybeSingle(),
-        supabase.from('service_allocations').select('id, status, service_time, service:service_id(name)').eq('profile_id', profile.id).eq('service_date', todayISO).order('service_time', { ascending: true }),
-        supabase.from('cleaning_logs').select('id, status').eq('profile_id', profile.id).eq('log_date', todayISO),
-        supabase.from('cleaning_assignments').select('id').eq('profile_id', profile.id),
-        supabase.from('events').select('id, title, start_datetime, venue, event_type, is_mandatory').eq('voice_id', profile.voice_id).eq('is_active', true).gte('start_datetime', nowISO).order('start_datetime', { ascending: true }).limit(4),
-        supabase.from('sadhana_reports').select('id, report_date, score, japa_rounds, mangal_arti, morning_class').eq('profile_id', profile.id).order('report_date', { ascending: false }).limit(5),
-        supabase.from('meal_plans').select('id, meal_type, menu_items, notes, is_special').eq('voice_id', profile.voice_id).eq('plan_date', todayISO),
-        supabase.from('announcements').select('id, title, body, is_pinned, created_at').eq('voice_id', profile.voice_id).order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(2),
-        profile.counsellor_id
-          ? supabase.from('profiles').select('id, spiritual_name, avatar_url, role, phone').eq('id', profile.counsellor_id).maybeSingle()
-          : Promise.resolve({ data: null }),
+
+      // Fetch from new primitive tables; gracefully returns empty on pre-migration DB
+      const [
+        trackerEntriesRes,
+        taskAssignRes,
+        taskLogRes,
+        resourcePlansRes,
+        eventsRes,
+        recentTrackerRes,
+        announcementsRes,
+        mentorRes,
+      ] = await Promise.all([
+        // Today's tracker entries (all trackers)
+        supabase.from('tracker_entries')
+          .select('id, score, tracker_definitions(id, name, color)')
+          .eq('user_id', profile.id)
+          .eq('org_id', orgId)
+          .eq('period_date', todayISO),
+
+        // Today's task assignments
+        supabase.from('task_assignments')
+          .select('id, task_time, task_templates(name)')
+          .eq('user_id', profile.id)
+          .eq('task_date', todayISO)
+          .order('task_time'),
+
+        // Today's task logs (for status)
+        supabase.from('task_logs')
+          .select('assignment_id, status')
+          .eq('user_id', profile.id)
+          .eq('log_date', todayISO),
+
+        // Today's resource plans
+        supabase.from('resource_plans')
+          .select('id, resource_types(name, icon, color), resource_plan_items(name, quantity, sort_order)')
+          .eq('org_id', orgId)
+          .eq('plan_date', todayISO),
+
+        // Upcoming events
+        supabase.from('events')
+          .select('id, title, start_datetime, venue, event_type, is_mandatory')
+          .eq('org_id', orgId)
+          .eq('is_active', true)
+          .gte('start_datetime', nowISO)
+          .order('start_datetime', { ascending: true })
+          .limit(4),
+
+        // Recent tracker entries (across all trackers, last 5)
+        supabase.from('tracker_entries')
+          .select('id, period_date, score, tracker_definitions(name, color)')
+          .eq('user_id', profile.id)
+          .eq('org_id', orgId)
+          .order('period_date', { ascending: false })
+          .limit(5),
+
+        // Announcements
+        supabase.from('announcements')
+          .select('id, title, body, is_pinned, created_at')
+          .eq('org_id', orgId)
+          .order('is_pinned', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(2),
+
+        // Mentor via RPC
+        supabase.rpc('my_mentor'),
       ])
-      const logs = logsRes.data ?? []
+
+      const taskLogMap = {}
+      for (const l of taskLogRes.data ?? []) taskLogMap[l.assignment_id] = l.status
+
+      const tasks = (taskAssignRes.data ?? []).map((a) => ({
+        ...a,
+        status: taskLogMap[a.id] ?? 'pending',
+      }))
+
+      // Score: average of today's tracker entries that have a score
+      const scoredEntries = (trackerEntriesRes.data ?? []).filter((e) => e.score != null)
+      const avgScore = scoredEntries.length
+        ? Math.round(scoredEntries.reduce((s, e) => s + e.score, 0) / scoredEntries.length)
+        : null
+
       return {
-        todaySadhana: sadhanaRes.data ?? null,
-        services: servicesRes.data ?? [],
-        cleaning: { assigned: (assignRes.data ?? []).length, done: logs.filter((l) => l.status === 'done').length },
+        trackerScore: avgScore,
+        trackerCount: (trackerEntriesRes.data ?? []).length,
+        tasks,
+        resourcePlans: resourcePlansRes.data ?? [],
         events: eventsRes.data ?? [],
-        recent: recentRes.data ?? [],
-        meals: mealsRes.data ?? [],
+        recentEntries: recentTrackerRes.data ?? [],
         announcements: announcementsRes.data ?? [],
-        counsellor: counsellorRes.data ?? null,
+        mentor: (mentorRes.data ?? [])[0] ?? null,
       }
     }
   )
 
   const {
-    todaySadhana = null,
-    services = [],
-    cleaning = { assigned: 0, done: 0 },
+    trackerScore = null,
+    trackerCount = 0,
+    tasks = [],
+    resourcePlans = [],
     events = [],
-    recent = [],
-    meals = [],
+    recentEntries = [],
     announcements = [],
-    counsellor = null,
+    mentor = null,
   } = data ?? {}
 
   const loading = queryLoading
-  const servicesDone = services.filter((s) => s.status === 'done').length
-  const sadhanaValue = todaySadhana?.score != null ? Math.round(todaySadhana.score) : null
+  const tasksDone = tasks.filter((t) => t.status === 'done' || t.status === 'verified').length
 
   // Profile failed to load → show recoverable error instead of hanging forever
   if (profileError && !profile) {
@@ -125,31 +203,35 @@ export default function Dashboard() {
       >
         <div>
           <h2 className="text-2xl font-bold text-slate-800">
-            Hare Krishna, {profile?.spiritual_name?.split(' ')[0] ?? 'Prabhuji'} 🙏
+            {greeting}, {firstName}
           </h2>
           <p className="text-sm text-slate-500 mt-0.5">{today}</p>
         </div>
         {profile && (
-          <Badge className={ROLE_COLORS[profile.role]}>
-            {ROLES[profile.role]}
+          <Badge variant="default">
+            {profile.role ?? t('member', 'Member')}
           </Badge>
         )}
       </motion.div>
 
       {/* Daily Quote */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden grad-saffron rounded-3xl p-6 text-white glow-saffron"
-      >
-        <div className="pointer-events-none absolute -top-10 -right-8 w-40 h-40 rounded-full bg-white/10 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-12 -left-10 w-40 h-40 rounded-full bg-black/10 blur-2xl" />
-        <div className="relative">
-          <p className="text-xs font-bold uppercase tracking-widest text-white/80 mb-2">Verse of the Day</p>
-          <p className="text-lg font-medium leading-relaxed italic">"{todayQuote.text}"</p>
-          <p className="text-xs text-white/80 mt-3 font-semibold">— {todayQuote.source}</p>
-        </div>
-      </motion.div>
+      {quote && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden grad-saffron rounded-3xl p-6 text-white glow-saffron"
+        >
+          <div className="pointer-events-none absolute -top-10 -right-8 w-40 h-40 rounded-full bg-white/10 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-12 -left-10 w-40 h-40 rounded-full bg-black/10 blur-2xl" />
+          <div className="relative">
+            <p className="text-xs font-bold uppercase tracking-widest text-white/80 mb-2">{quote.label ?? 'Thought of the Day'}</p>
+            <p className="text-lg font-medium leading-relaxed italic">"{quote.text}"</p>
+            {quote.source && (
+              <p className="text-xs text-white/80 mt-3 font-semibold">— {quote.source}</p>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* Announcements */}
       {announcements.length > 0 && (
@@ -193,60 +275,76 @@ export default function Dashboard() {
         animate={{ opacity: 1, y: 0 }}
         className="grid grid-cols-2 lg:grid-cols-4 gap-4"
       >
-        <StatCard label="Sadhana Today" value={sadhanaValue != null ? sadhanaValue : '—'} icon={BookOpen} color="lotus" />
-        <StatCard label="Today's Services" value={services.length ? `${servicesDone}/${services.length}` : '—'} icon={ListChecks} color="saffron" />
-        <StatCard label="Cleanliness" value={cleaning.assigned ? `${cleaning.done}/${cleaning.assigned}` : '—'} icon={Sparkles} color="tulasi" />
-        <StatCard label="Upcoming Events" value={events.length} icon={CalendarDays} color="blue" />
+        <StatCard
+          label={t('tracker', 'Tracker') + ' Today'}
+          value={trackerScore != null ? trackerScore : trackerCount > 0 ? '✓' : '—'}
+          icon={BookOpen}
+          color="lotus"
+        />
+        <StatCard
+          label={t('tasks', 'Tasks') + ' Today'}
+          value={tasks.length ? `${tasksDone}/${tasks.length}` : '—'}
+          icon={ListChecks}
+          color="saffron"
+        />
+        <StatCard
+          label="Resources Today"
+          value={resourcePlans.length || '—'}
+          icon={UtensilsCrossed}
+          color="amber"
+        />
+        <StatCard label="Upcoming Events" value={events.length || '—'} icon={CalendarDays} color="blue" />
       </motion.div>
 
-      {/* Quick Access Modules */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <h3 className="text-base font-semibold text-slate-700 mb-3">Quick Access</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {modules.map((mod) => (
-            <Link
-              key={mod.to}
-              to={mod.to}
-              className="group block"
-            >
-              <div className={`relative overflow-hidden rounded-3xl p-4 text-white hover-lift ${mod.grad}`}>
-                <div className="pointer-events-none absolute -top-6 -right-6 w-20 h-20 rounded-full bg-white/15 blur-lg" />
-                <div className="relative">
-                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-white/20 backdrop-blur-sm ring-1 ring-white/30 mb-3">
-                    <mod.icon className="w-6 h-6" />
+      {/* Quick Access Modules — driven by my_navigation() */}
+      {quickNav.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h3 className="text-base font-semibold text-slate-700 mb-3">Quick Access</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {quickNav.map((mod) => {
+              const grad = GRAD_MAP[mod.key] ?? 'grad-saffron'
+              const ModIcon = QUICK_ICON_MAP[mod.key] ?? BookOpen
+              return (
+                <Link key={mod.route} to={mod.route} className="group block">
+                  <div className={`relative overflow-hidden rounded-3xl p-4 text-white hover-lift ${grad}`}>
+                    <div className="pointer-events-none absolute -top-6 -right-6 w-20 h-20 rounded-full bg-white/15 blur-lg" />
+                    <div className="relative">
+                      <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-white/20 backdrop-blur-sm ring-1 ring-white/30 mb-3">
+                        <ModIcon className="w-6 h-6" />
+                      </div>
+                      <p className="font-bold text-sm">{mod.label || mod.key}</p>
+                    </div>
                   </div>
-                  <p className="font-bold text-sm">{mod.label}</p>
-                  <p className="text-xs text-white/80 mt-0.5 leading-snug">{mod.desc}</p>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </motion.div>
+                </Link>
+              )
+            })}
+          </div>
+        </motion.div>
+      )}
 
-      {/* Your Counsellor */}
-      {counsellor && (
+      {/* Your Mentor */}
+      {mentor && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
           <Card>
             <CardHeader>
-              <h3 className="font-semibold text-slate-700">Your Counsellor</h3>
+              <h3 className="font-semibold text-slate-700">Your {t('mentor', 'Mentor')}</h3>
             </CardHeader>
             <CardBody className="pt-0">
               <div className="flex items-center gap-3">
-                <Avatar name={counsellor.spiritual_name} url={counsellor.avatar_url} size="md" />
+                <Avatar name={mentor.mentor_name} url={mentor.mentor_avatar} size="md" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-slate-800 truncate">{counsellor.spiritual_name}</p>
-                  <Badge className={ROLE_COLORS[counsellor.role]}>{ROLES[counsellor.role] ?? counsellor.role}</Badge>
+                  <p className="font-semibold text-slate-800 truncate">{mentor.mentor_name}</p>
+                  {mentor.type_name && <Badge variant="default">{mentor.type_name}</Badge>}
                 </div>
-                {counsellor.phone && (
+                {mentor.mentor_phone && (
                   <a
-                    href={`https://wa.me/${counsellor.phone.replace(/[^0-9]/g, '')}`}
+                    href={`https://wa.me/${mentor.mentor_phone.replace(/[^0-9]/g, '')}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-tulasi-600 hover:bg-tulasi-700 text-white text-sm font-medium transition-colors"
@@ -261,8 +359,8 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* Today's Services */}
-      {services.length > 0 && (
+      {/* Today's Tasks */}
+      {tasks.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -270,29 +368,34 @@ export default function Dashboard() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-slate-700">Today's Services</h3>
-                <Link to="/services" className="text-sm text-saffron-600 hover:text-saffron-700 font-medium">
+                <h3 className="font-semibold text-slate-700">Today's {t('tasks', 'Tasks')}</h3>
+                <Link to="/tasks" className="text-sm text-saffron-600 hover:text-saffron-700 font-medium">
                   View all →
                 </Link>
               </div>
             </CardHeader>
             <CardBody className="pt-0">
               <div className="divide-y divide-slate-50">
-                {services.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between gap-3 py-2.5">
+                {tasks.map((task) => (
+                  <div key={task.id} className="flex items-center justify-between gap-3 py-2.5">
                     <div className="flex items-center gap-2 min-w-0">
-                      <ListChecks className="w-4 h-4 text-saffron-500 flex-shrink-0" />
-                      <span className="text-sm text-slate-700 truncate">{s.service?.name ?? 'Service'}</span>
+                      {task.status === 'done' || task.status === 'verified'
+                        ? <CheckCircle2 className="w-4 h-4 text-tulasi-600 flex-shrink-0" />
+                        : <ListChecks className="w-4 h-4 text-saffron-400 flex-shrink-0" />
+                      }
+                      <span className="text-sm text-slate-700 truncate">
+                        {task.task_templates?.name ?? 'Task'}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {s.service_time && (
+                      {task.task_time && (
                         <span className="flex items-center gap-1 text-xs text-slate-400">
                           <Clock className="w-3 h-3" />
-                          {formatTime(s.service_time)}
+                          {formatTime(task.task_time)}
                         </span>
                       )}
-                      <Badge variant={SERVICE_STATUS_VARIANT[s.status] ?? 'default'}>
-                        {SERVICE_STATUS_LABEL[s.status] ?? s.status}
+                      <Badge variant={TASK_STATUS_VARIANT[task.status] ?? 'default'}>
+                        {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
                       </Badge>
                     </div>
                   </div>
@@ -303,8 +406,8 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* Today's Prasadam */}
-      {meals.length > 0 && (
+      {/* Today's Resources */}
+      {resourcePlans.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -312,28 +415,31 @@ export default function Dashboard() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-slate-700">Today's Prasadam</h3>
-                <Link to="/kitchen" className="text-sm text-saffron-600 hover:text-saffron-700 font-medium">
+                <h3 className="font-semibold text-slate-700">Today's Resources</h3>
+                <Link to="/resources" className="text-sm text-saffron-600 hover:text-saffron-700 font-medium">
                   View all →
                 </Link>
               </div>
             </CardHeader>
             <CardBody className="pt-0">
               <div className="divide-y divide-slate-50">
-                {[...meals].sort((a, b) => MEAL_ORDER.indexOf(a.meal_type) - MEAL_ORDER.indexOf(b.meal_type)).map((m) => (
-                  <div key={m.id} className="flex items-start gap-3 py-2.5">
+                {resourcePlans.map((plan) => (
+                  <div key={plan.id} className="flex items-start gap-3 py-2.5">
                     <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
                       <UtensilsCrossed className="w-4 h-4 text-orange-500" />
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-700">{MEAL_LABEL[m.meal_type] ?? m.meal_type}</p>
-                        {m.is_special && <Badge variant="saffron">Special</Badge>}
-                      </div>
-                      {Array.isArray(m.menu_items) && m.menu_items.length > 0 && (
-                        <p className="text-sm text-slate-500 mt-0.5">{m.menu_items.join(', ')}</p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {plan.resource_types?.name ?? 'Resource'}
+                      </p>
+                      {(plan.resource_plan_items ?? []).length > 0 && (
+                        <p className="text-sm text-slate-500 mt-0.5">
+                          {[...plan.resource_plan_items]
+                            .sort((a, b) => a.sort_order - b.sort_order)
+                            .map((i) => i.name)
+                            .join(', ')}
+                        </p>
                       )}
-                      {m.notes && <p className="text-xs text-slate-400 mt-0.5">{m.notes}</p>}
                     </div>
                   </div>
                 ))}
@@ -386,7 +492,7 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* Recent Sadhana Reports */}
+      {/* Recent Tracker Entries */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -394,8 +500,8 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-slate-700">Recent Sadhana Reports</h3>
-              <Link to="/sadhana" className="text-sm text-saffron-600 hover:text-saffron-700 font-medium">
+              <h3 className="font-semibold text-slate-700">Recent {t('tracker', 'Tracker')} Entries</h3>
+              <Link to="/trackers" className="text-sm text-saffron-600 hover:text-saffron-700 font-medium">
                 View all →
               </Link>
             </div>
@@ -403,32 +509,29 @@ export default function Dashboard() {
           <CardBody>
             {loading ? (
               <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
-            ) : recent.length === 0 ? (
+            ) : recentEntries.length === 0 ? (
               <div className="flex flex-col items-center py-8 text-slate-400">
                 <TrendingUp className="w-10 h-10 mb-3 opacity-30" />
-                <p className="text-sm">No reports yet. Submit your first sadhana report!</p>
-                <Link
-                  to="/sadhana"
-                  className="mt-3 text-sm text-saffron-600 hover:text-saffron-700 font-medium"
-                >
-                  Submit Report →
+                <p className="text-sm">No entries yet. Submit your first tracker entry!</p>
+                <Link to="/trackers" className="mt-3 text-sm text-saffron-600 hover:text-saffron-700 font-medium">
+                  Submit Entry →
                 </Link>
               </div>
             ) : (
               <div className="divide-y divide-slate-50">
-                {recent.map((r) => (
+                {recentEntries.map((r) => (
                   <div key={r.id} className="flex items-center justify-between gap-3 py-2.5">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-700">{formatDate(r.report_date)}</p>
-                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <span className="text-xs text-slate-400">{r.japa_rounds ?? 0} rounds</span>
-                        {r.mangal_arti && <Badge variant="tulasi">MA ✓</Badge>}
-                        {r.morning_class && <Badge variant="blue">MC ✓</Badge>}
+                      <p className="text-sm font-medium text-slate-700">{formatDate(r.period_date)}</p>
+                      {r.tracker_definitions?.name && (
+                        <p className="text-xs text-slate-400 mt-0.5">{r.tracker_definitions.name}</p>
+                      )}
+                    </div>
+                    {r.score != null && (
+                      <div className={`px-3 py-1.5 rounded-xl text-sm font-bold ${scoreBg(r.score)}`}>
+                        {r.score.toFixed(1)}
                       </div>
-                    </div>
-                    <div className={`px-3 py-1.5 rounded-xl text-sm font-bold ${scoreBg(r.score ?? 0)}`}>
-                      {(r.score ?? 0).toFixed(1)}
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>

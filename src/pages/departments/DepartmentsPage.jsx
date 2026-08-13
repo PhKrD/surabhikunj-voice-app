@@ -11,8 +11,9 @@ import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
-import { isAdmin } from '@/lib/utils'
+import useOrgStore from '@/store/orgStore'
 import useToastStore from '@/store/toastStore'
+import DepartmentDetail from './DepartmentDetail'
 
 // Curated map so departments can render a lucide icon by stored name WITHOUT
 // pulling the entire icon set into the bundle. Unknown names (e.g. emojis)
@@ -31,7 +32,9 @@ const defaultForm = {
 
 export default function DepartmentsPage() {
   const { profile } = useAuthStore()
+  const { org, hasPermission } = useOrgStore()
   const toast = useToastStore()
+  const orgId = org?.id ?? profile?.org_id
   const [departments, setDepartments] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -40,10 +43,11 @@ export default function DepartmentsPage() {
   const [editingId, setEditingId] = useState(null)
   const [formError, setFormError] = useState('')
   const [form, setForm] = useState(defaultForm)
-  const admin = isAdmin(profile?.role)
+  const [selectedDept, setSelectedDept] = useState(null)
+  const canManage = hasPermission('departments.manage')
 
   const loadDepartments = useCallback(async () => {
-    if (!profile) {
+    if (!orgId) {
       setDepartments([])
       setLoading(false)
       return
@@ -59,7 +63,7 @@ export default function DepartmentsPage() {
           sub_incharge:sub_incharge_id(spiritual_name, avatar_url),
           department_members(count)
         `)
-        .eq('voice_id', profile.voice_id)
+        .eq('org_id', orgId)
         .eq('is_active', true)
         .order('name')
 
@@ -70,7 +74,7 @@ export default function DepartmentsPage() {
     } finally {
       setLoading(false)
     }
-  }, [profile, toast])
+  }, [orgId, toast])
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -86,7 +90,7 @@ export default function DepartmentsPage() {
   }
 
   const createOrUpdateDepartment = async () => {
-    if (!profile) return
+    if (!orgId) return
     if (!form.name.trim()) {
       setFormError('Department name is required.')
       return
@@ -96,7 +100,7 @@ export default function DepartmentsPage() {
     setSaving(true)
     try {
       const payload = {
-        voice_id: profile.voice_id,
+        org_id: orgId,
         name: form.name.trim(),
         description: form.description.trim() || null,
         icon: form.icon.trim() || null,
@@ -186,7 +190,7 @@ export default function DepartmentsPage() {
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-800">Departments ({departments.length})</h2>
-        {admin && (
+        {canManage && (
           <Button
             size="sm"
             icon={showForm ? X : Plus}
@@ -200,7 +204,7 @@ export default function DepartmentsPage() {
         )}
       </div>
 
-      {admin && showForm && (
+      {canManage && showForm && (
         <Card>
           <CardBody className="py-4 space-y-3">
             <p className="text-sm font-semibold text-slate-700">
@@ -286,7 +290,10 @@ export default function DepartmentsPage() {
       <div className="grid sm:grid-cols-2 gap-3">
         {departments.map((dept) => (
           <motion.div key={dept.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="hover:shadow-md transition-shadow duration-200 cursor-pointer group">
+            <Card
+              className="hover:shadow-md transition-shadow duration-200 cursor-pointer group"
+              onClick={() => setSelectedDept(dept)}
+            >
               <CardBody className="py-4">
                 <div className="flex items-start gap-3">
                   <div
@@ -304,7 +311,7 @@ export default function DepartmentsPage() {
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-semibold text-slate-800 truncate">{dept.name}</p>
                       <div className="flex items-center gap-1">
-                        {admin ? (
+                        {canManage ? (
                           <>
                             <button
                               onClick={(e) => {
@@ -357,6 +364,16 @@ export default function DepartmentsPage() {
           </motion.div>
         ))}
       </div>
+
+      {selectedDept && (
+        <DepartmentDetail
+          department={selectedDept}
+          orgId={orgId}
+          canManage={canManage}
+          onClose={() => setSelectedDept(null)}
+          onChanged={loadDepartments}
+        />
+      )}
     </div>
   )
 }

@@ -75,7 +75,7 @@ export default function ResidentProfilePage() {
     setLoading(true)
     const [resRes, reportsRes] = await Promise.all([
       supabase.from('profiles').select(PROFILE_SELECT).eq('id', id).maybeSingle(),
-      supabase.from('sadhana_reports').select('id, report_date, score').eq('profile_id', id).order('report_date', { ascending: false }).limit(7),
+      supabase.from('sadhana_weekly_reports').select('id, week_start, total_score').eq('profile_id', id).order('week_start', { ascending: false }).limit(7),
     ])
     setResident(resRes.data ?? null)
     setReports(reportsRes.data ?? [])
@@ -256,9 +256,9 @@ export default function ResidentProfilePage() {
                 <div className="divide-y divide-slate-50">
                   {reports.map((r) => (
                     <div key={r.id} className="flex items-center justify-between py-2">
-                      <span className="text-sm text-slate-600">{formatDate(r.report_date)}</span>
-                      <span className={`px-2.5 py-1 rounded-lg text-sm font-bold ${scoreBg(r.score ?? 0)}`}>
-                        {(r.score ?? 0).toFixed(1)}
+                      <span className="text-sm text-slate-600">{formatDate(r.week_start)}</span>
+                      <span className={`px-2.5 py-1 rounded-lg text-sm font-bold ${scoreBg(r.total_score ?? 0)}`}>
+                        {(r.total_score ?? 0).toFixed(1)}
                       </span>
                     </div>
                   ))}

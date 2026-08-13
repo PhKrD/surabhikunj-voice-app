@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Smartphone, Sliders, MapPin, Bell, Gift, Lock, WifiOff, Wifi } from 'lucide-react'
+import { ArrowLeft, Smartphone, Sliders, MapPin, Bell, Gift, Lock, LockOpen, WifiOff, Wifi } from 'lucide-react'
 import Avatar from '@/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
@@ -113,6 +113,13 @@ export default function ChildDetailPage() {
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm font-medium text-slate-600 hover:border-slate-400 disabled:opacity-50"
         >
           <Lock className="w-4 h-4" /> Lock now
+        </button>
+        <button
+          disabled={sendingCommand}
+          onClick={() => broadcastCommand('unlock_device', 'Unlock command sent to all devices')}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm font-medium text-slate-600 hover:border-emerald-200 hover:text-emerald-600 disabled:opacity-50"
+        >
+          <LockOpen className="w-4 h-4" /> Unlock now
         </button>
       </div>
 

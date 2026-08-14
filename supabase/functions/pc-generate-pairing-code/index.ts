@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
   const { data: userData, error: userErr } = await caller.auth.getUser()
   if (userErr || !userData?.user) return json({ error: 'Not authenticated' }, 401)
 
-  let payload: { child_id?: string; device_name?: string }
+  let payload: { child_id?: string; device_name?: string; device_id?: string }
   try {
     payload = await req.json()
   } catch {
@@ -68,6 +68,8 @@ Deno.serve(async (req: Request) => {
 
   const childId = payload.child_id
   const deviceName = (payload.device_name ?? 'New device').trim()
+  // Optional: re-pair a specific existing device instead of reusing/creating.
+  const requestedDeviceId = payload.device_id
   if (!childId) return json({ error: 'child_id is required' }, 400)
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
@@ -82,34 +84,70 @@ Deno.serve(async (req: Request) => {
   if (childErr || !child) return json({ error: 'Child not found' }, 404)
   if (child.parent_id !== userData.user.id) return json({ error: 'Not authorized for this child' }, 403)
 
-  // --- Create the device-only auth user ---
-  const deviceUuid = crypto.randomUUID()
-  const deviceEmail = `device-${deviceUuid}@voice.kids.internal`
-  const devicePassword = randomPassword()
-
-  const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
-    email: deviceEmail,
-    password: devicePassword,
-    email_confirm: true,
-    user_metadata: { role: 'pc_device', child_id: childId },
-  })
-  if (authErr || !authUser?.user) return json({ error: `Could not create device account: ${authErr?.message}` }, 500)
-
-  // --- Create the pc_devices row ---
-  const { data: device, error: deviceErr } = await admin
+  // --- Reuse an existing device (re-pair) or create a new one ---
+  // Reusing keeps the same device_id + auth user, so command history, rules,
+  // location and usage data survive a re-pair (e.g. after the child app is
+  // reinstalled / storage cleared). Only create a brand-new device when the
+  // child has none yet. This prevents piling up orphaned duplicate devices
+  // every time "Generate code" is tapped.
+  let deviceId: string | undefined
+  let deviceQuery = admin
     .from('pc_devices')
-    .insert({
-      child_id: childId,
-      org_id: child.org_id,
-      device_name: deviceName,
-      auth_user_id: authUser.user.id,
-      device_owner_mode: 'none',
-      is_active: true,
-    })
-    .select('id')
-    .single()
+    .select('id, auth_user_id')
+    .eq('child_id', childId)
 
-  if (deviceErr || !device) return json({ error: `Could not create device: ${deviceErr?.message}` }, 500)
+  if (requestedDeviceId) deviceQuery = deviceQuery.eq('id', requestedDeviceId)
+
+  const { data: existing } = await deviceQuery
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (existing?.id && existing.auth_user_id) {
+    // Re-pair the existing device.
+    deviceId = existing.id
+    await admin
+      .from('pc_devices')
+      .update({ device_name: deviceName, is_active: true, device_owner_mode: 'none' })
+      .eq('id', deviceId)
+    // Invalidate any still-valid unused codes for this device.
+    await admin
+      .from('pc_pairing_codes')
+      .update({ used_at: new Date().toISOString() })
+      .eq('device_id', deviceId)
+      .is('used_at', null)
+  } else {
+    // No existing device — create the device-only auth user + device row.
+    const deviceUuid = crypto.randomUUID()
+    const deviceEmail = `device-${deviceUuid}@voice.kids.internal`
+    const devicePassword = randomPassword()
+
+    const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
+      email: deviceEmail,
+      password: devicePassword,
+      email_confirm: true,
+      user_metadata: { role: 'pc_device', child_id: childId },
+    })
+    if (authErr || !authUser?.user) {
+      return json({ error: `Could not create device account: ${authErr?.message}` }, 500)
+    }
+
+    const { data: device, error: deviceErr } = await admin
+      .from('pc_devices')
+      .insert({
+        child_id: childId,
+        org_id: child.org_id,
+        device_name: deviceName,
+        auth_user_id: authUser.user.id,
+        device_owner_mode: 'none',
+        is_active: true,
+      })
+      .select('id')
+      .single()
+
+    if (deviceErr || !device) return json({ error: `Could not create device: ${deviceErr?.message}` }, 500)
+    deviceId = device.id
+  }
 
   // --- Generate the pairing code ---
   const code = generateCode()
@@ -117,7 +155,7 @@ Deno.serve(async (req: Request) => {
   const expiresAt = new Date(Date.now() + CODE_TTL_MIN * 60_000).toISOString()
 
   const { error: codeErr } = await admin.from('pc_pairing_codes').insert({
-    device_id: device.id,
+    device_id: deviceId,
     code_hash: codeHash,
     issued_by: userData.user.id,
     expires_at: expiresAt,
@@ -126,7 +164,7 @@ Deno.serve(async (req: Request) => {
 
   return json({
     ok: true,
-    device_id: device.id,
+    device_id: deviceId,
     pairing_code: code,
     expires_at: expiresAt,
   })

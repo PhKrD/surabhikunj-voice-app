@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Smartphone, Sliders, MapPin, Bell, Gift, Lock, LockOpen, WifiOff, Wifi } from 'lucide-react'
+import { ArrowLeft, Smartphone, Sliders, MapPin, Bell, Gift, Lock, LockOpen, WifiOff, Wifi, BarChart3 } from 'lucide-react'
 import Avatar from '@/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
 import { getChild, listDevices, sendDeviceCommand } from '@/lib/parentalControlApi'
 import DevicesTab from './tabs/DevicesTab'
+import UsageTab from './tabs/UsageTab'
 import RulesTab from './tabs/RulesTab'
 import LocationTab from './tabs/LocationTab'
 import AlertsTab from './tabs/AlertsTab'
@@ -13,6 +14,7 @@ import BonusTab from './tabs/BonusTab'
 
 const TABS = [
   { key: 'devices', label: 'Devices', icon: Smartphone, Component: DevicesTab },
+  { key: 'usage', label: 'Screen Time', icon: BarChart3, Component: UsageTab },
   { key: 'rules', label: 'App Rules', icon: Sliders, Component: RulesTab },
   { key: 'location', label: 'Location', icon: MapPin, Component: LocationTab },
   { key: 'alerts', label: 'Alerts', icon: Bell, Component: AlertsTab },

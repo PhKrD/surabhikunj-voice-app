@@ -240,6 +240,18 @@ export async function getTodayUsage(childId) {
   return data ?? []
 }
 
+export async function getInstalledApps(deviceIds) {
+  const ids = Array.isArray(deviceIds) ? deviceIds : [deviceIds]
+  if (ids.length === 0) return []
+  const { data, error } = await supabase
+    .from('pc_installed_apps')
+    .select('*')
+    .in('device_id', ids)
+    .order('app_name', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
 // ---------------------------------------------------------------------
 // Device commands (parent -> child)
 // ---------------------------------------------------------------------

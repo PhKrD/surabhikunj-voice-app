@@ -210,6 +210,10 @@ async function handleCommand(cmd) {
     case 'grant_bonus_time': {
       const { expires_at } = cmd.payload ?? {}
       if (expires_at) localStorage.setItem(BONUS_KEY, expires_at)
+      // Mirror into native prefs so the background PolicyEnforcer (which
+      // cannot read localStorage) also lifts time_limit rules — see
+      // PolicyEnforcer.kt / VoiceKidsDpcPlugin.setBonusExpiry.
+      dpc.setBonusExpiry(expires_at ?? null).catch(() => {})
       resetScreenTimeEnforcement()
       enforceScreenTime().catch(() => {})
       // Bonus time also lifts per-app time_limit rules (policy.js), so the
@@ -219,6 +223,7 @@ async function handleCommand(cmd) {
     }
     case 'revoke_bonus_time': {
       localStorage.removeItem(BONUS_KEY)
+      dpc.setBonusExpiry(null).catch(() => {})
       resetScreenTimeEnforcement()
       enforceScreenTime().catch(() => {})
       enforceRules({ force: true }).catch(() => {})

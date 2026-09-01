@@ -189,7 +189,7 @@ AS $$
       'com.android.launcher3',
       'com.google.android.apps.nexuslauncher',
       -- The parental-control agent itself
-      'com.surabhikunj.voice.kids'
+      'com.surabhikunj.voice'
     )
   );
 $$;
@@ -236,7 +236,7 @@ BEGIN
     NEW.always_allowed_packages := ARRAY(
       SELECT DISTINCT unnest(
         COALESCE(NEW.always_allowed_packages, ARRAY[]::TEXT[])
-        || ARRAY['com.android.server.telecom', 'com.android.dialer', 'com.surabhikunj.voice.kids']
+        || ARRAY['com.android.server.telecom', 'com.android.dialer', 'com.surabhikunj.voice']
       )
     );
   END IF;

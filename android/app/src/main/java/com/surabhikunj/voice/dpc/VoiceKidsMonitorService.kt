@@ -96,6 +96,19 @@ class VoiceKidsMonitorService : Service() {
         }
     }
 
+    // ── Policy enforcement (schedules + per-app rules) ─────────────────
+    // Runs on the SAME cadence as native command polling, not the slower
+    // reporting tick — a schedule boundary (e.g. bedtime at 22:00) or a
+    // parent deleting a block rule should take effect within seconds, not
+    // minutes, regardless of whether the WebView is alive. See
+    // PolicyEnforcer.kt for why this exists.
+    private val policyRunnable = object : Runnable {
+        override fun run() {
+            executor.execute { PolicyEnforcer.enforce(applicationContext) }
+            if (commandPollingActive) commandHandler.postDelayed(this, POLICY_ENFORCE_INTERVAL_MS)
+        }
+    }
+
     /**
      * Updates pc_devices.last_seen_at so the parent dashboard can show an
      * accurate online/offline indicator even when the WebView (and its JS
@@ -149,12 +162,14 @@ class VoiceKidsMonitorService : Service() {
         if (commandPollingActive) return
         commandPollingActive = true
         commandHandler.post(commandPollRunnable)
-        Log.i(TAG, "Native command polling started")
+        commandHandler.postDelayed(policyRunnable, POLICY_ENFORCE_INTERVAL_MS)
+        Log.i(TAG, "Native command polling + policy enforcement started")
     }
 
     private fun stopCommandPolling() {
         commandPollingActive = false
         commandHandler.removeCallbacks(commandPollRunnable)
+        commandHandler.removeCallbacks(policyRunnable)
     }
 
     private fun startPeriodicReporting() {
@@ -251,6 +266,16 @@ class VoiceKidsMonitorService : Service() {
             "unlock_device" -> DpcActions.unlockDevice(context)
             "pause_internet" -> DpcActions.pauseInternet(context)
             "resume_internet" -> DpcActions.resumeInternet(context)
+            "grant_bonus_time" -> {
+                val expiresAt = cmd.optJSONObject("payload")?.optString("expires_at")?.takeIf { it.isNotEmpty() }
+                val epoch = expiresAt?.let { parseIsoToEpochMillis(it) }
+                VoiceKidsPrefs.setBonusExpiresAt(context, epoch)
+                true
+            }
+            "revoke_bonus_time" -> {
+                VoiceKidsPrefs.setBonusExpiresAt(context, null)
+                true
+            }
             else -> false
         }
         Log.i(TAG, "Native command executed: $commandType id=$commandId success=$success")
@@ -498,6 +523,27 @@ class VoiceKidsMonitorService : Service() {
         return sdf.format(Date(epochMillis))
     }
 
+    /** Parses a Supabase/Postgres ISO timestamp (e.g. "2026-09-01T12:00:00+00:00") to epoch millis. */
+    private fun parseIsoToEpochMillis(iso: String): Long? {
+        val formats = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        )
+        for (pattern in formats) {
+            try {
+                val sdf = SimpleDateFormat(pattern, Locale.US)
+                if (pattern.endsWith("'Z'")) sdf.timeZone = TimeZone.getTimeZone("UTC")
+                return sdf.parse(iso)?.time
+            } catch (e: Exception) {
+                // try next pattern
+            }
+        }
+        Log.w(TAG, "Could not parse ISO timestamp: $iso")
+        return null
+    }
+
     /** Device-local calendar date (matches pc_app_usage_events.usage_date, a DATE column). */
     private fun isoDate(epochMillis: Long): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
@@ -553,6 +599,15 @@ class VoiceKidsMonitorService : Service() {
         private const val COMMAND_POLL_INTERVAL_MS = 4_000L   // native command poll cadence
         private const val NATIVE_CLAIM_DELAY_MS = 5_000L      // let the foreground JS poller (2s) win first
         private const val STUCK_DELIVERED_MS = 30_000L        // retry commands stuck in 'delivered' past this
-        private val NATIVE_COMMAND_TYPES = listOf("lock_device", "unlock_device", "pause_internet", "resume_internet")
+        private val NATIVE_COMMAND_TYPES = listOf(
+            "lock_device", "unlock_device", "pause_internet", "resume_internet",
+            "grant_bonus_time", "revoke_bonus_time",
+        )
+
+        // Schedules/app-rules must react within seconds of a boundary (bedtime,
+        // a parent revoking bonus time, a rule being deleted) — reuse the same
+        // fast cadence as native command polling rather than the slower
+        // REPORTING_INTERVAL_MS used for usage/location telemetry.
+        private const val POLICY_ENFORCE_INTERVAL_MS = 4_000L
     }
 }

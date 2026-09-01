@@ -126,7 +126,7 @@ test('disabled rules are ignored', () => {
 })
 
 test('protected packages can never be blocked, even if a rule exists', () => {
-  for (const pkg of ['com.android.server.telecom', 'com.surabhikunj.voice.kids', 'com.android.settings']) {
+  for (const pkg of ['com.android.server.telecom', 'com.surabhikunj.voice', 'com.android.settings']) {
     const res = resolvePolicy({ rules: [rule({ package_name: pkg })], now: at(12, 0) })
     assert.deepEqual(res.blockList, [], `${pkg} must not be blockable`)
     assert.equal(res.skipped[0].reason, 'protected_package')
@@ -245,7 +245,7 @@ test('reconciliation never unsuspends-then-resuspends a still-blocked app', () =
 test('reconciliation refuses to touch protected packages in either direction', () => {
   const d = diffSuspension(['com.android.server.telecom'], ['com.android.server.telecom'], [
     'com.android.server.telecom',
-    'com.surabhikunj.voice.kids',
+    'com.surabhikunj.voice',
   ])
   assert.deepEqual(d.toSuspend, [])
   assert.deepEqual(d.toUnsuspend, [])

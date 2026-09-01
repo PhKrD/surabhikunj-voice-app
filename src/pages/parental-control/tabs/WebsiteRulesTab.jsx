@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, Globe, Ban, CheckCircle } from 'lucide-react'
+import { Plus, Trash2, Globe, Ban, CheckCircle, AlertTriangle } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
@@ -75,6 +75,16 @@ export default function WebsiteRulesTab({ childId }) {
 
   return (
     <div className="space-y-4">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 flex items-start gap-3">
+        <AlertTriangle className="w-4.5 h-4.5 text-amber-600 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-amber-800 leading-relaxed">
+          <span className="font-semibold">Not yet enforced.</span> Rules saved here are stored but
+          nothing on the device currently blocks these domains — there is no on-device filtering
+          mechanism yet. Do not rely on this to actually restrict browsing. See
+          PLATFORM_LIMITATIONS.md for what full support requires.
+        </p>
+      </div>
+
       <div className="flex justify-end">
         <Button size="sm" icon={showForm ? Trash2 : Plus} onClick={() => setShowForm((v) => !v)}>
           {showForm ? 'Close' : 'Add rule'}

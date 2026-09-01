@@ -98,4 +98,15 @@ export const dpc = {
     if (!isNative()) return webFallback()
     return NativeDpc.grantRuntimePermissions()
   },
+
+  /**
+   * Mirrors bonus-time expiry into native SharedPreferences so the
+   * background PolicyEnforcer (which cannot read localStorage) also lifts
+   * time_limit rules while the app is backgrounded. Does NOT require
+   * Device Owner. Pass null to clear (revoke).
+   */
+  async setBonusExpiry(expiresAtIso) {
+    if (!isNative()) return webFallback()
+    return NativeDpc.setBonusExpiry({ expiresAt: expiresAtIso ?? null })
+  },
 }

@@ -32,6 +32,41 @@ object DpcActions {
     fun isDeviceOwner(context: Context): Boolean =
         dpm(context).isDeviceOwnerApp(context.packageName)
 
+    /**
+     * Suspends (`suspend = true`) or unsuspends the given packages. Returns the
+     * subset that could NOT be changed (per DevicePolicyManager semantics — e.g.
+     * a package that isn't installed). Empty list = fully applied. Null = not
+     * Device Owner / call failed outright.
+     */
+    fun setPackagesSuspended(context: Context, packages: List<String>, suspend: Boolean): List<String>? {
+        if (packages.isEmpty()) return emptyList()
+        if (!isDeviceOwner(context)) {
+            Log.e(TAG, "setPackagesSuspended (native): NOT Device Owner")
+            return null
+        }
+        return try {
+            dpm(context).setPackagesSuspended(adminComponent(context), packages.toTypedArray(), suspend).toList()
+        } catch (e: Exception) {
+            Log.e(TAG, "setPackagesSuspended failed: ${e.message}")
+            null
+        }
+    }
+
+    /** Sets the lock-task (kiosk) allow-list. Empty list clears it. */
+    fun setAllowedPackages(context: Context, packages: List<String>): Boolean {
+        if (!isDeviceOwner(context)) {
+            Log.e(TAG, "setAllowedPackages (native): NOT Device Owner")
+            return false
+        }
+        return try {
+            dpm(context).setLockTaskPackages(adminComponent(context), packages.toTypedArray())
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "setAllowedPackages failed: ${e.message}")
+            false
+        }
+    }
+
     fun lockDevice(context: Context): Boolean {
         if (!isDeviceOwner(context)) {
             Log.e(TAG, "lockDevice (native): NOT Device Owner")

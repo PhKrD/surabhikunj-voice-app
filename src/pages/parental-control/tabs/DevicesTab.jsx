@@ -196,6 +196,25 @@ export default function DevicesTab({ childId }) {
                           </div>
                         )
                       })}
+                      {checklist.some((row) => row.key === 'device_owner' && row.ok === false) && (
+                        <div className="mt-2 pt-2 border-t border-slate-200 space-y-1.5">
+                          <p className="text-xs font-semibold text-slate-600">
+                            Lock, unlock, internet pause, app blocking and screen time will NOT
+                            work until this is fixed. This one-time step needs a computer:
+                          </p>
+                          <ol className="text-xs text-slate-500 list-decimal list-inside space-y-0.5">
+                            <li>Make sure the child's phone has no Google/other accounts added yet (or factory reset it first).</li>
+                            <li>Connect it to a computer via USB with adb installed, and enable USB debugging on the phone.</li>
+                            <li>Run this command from the computer:</li>
+                          </ol>
+                          <code className="block text-[11px] bg-slate-800 text-slate-100 rounded-lg px-2.5 py-2 font-mono select-all">
+                            adb shell dpm set-device-owner com.surabhikunj.voice/.dpc.VoiceKidsDeviceAdminReceiver
+                          </code>
+                          <p className="text-xs text-slate-400">
+                            Then reopen VOICE on the child's device — it will pick up Device Owner automatically.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

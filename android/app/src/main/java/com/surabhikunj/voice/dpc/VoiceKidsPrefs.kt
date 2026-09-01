@@ -62,4 +62,39 @@ object VoiceKidsPrefs {
     fun orgId(context: Context): String? = prefs(context).getString("org_id", null)
     fun accessToken(context: Context): String? = prefs(context).getString("access_token", null)
     fun refreshToken(context: Context): String? = prefs(context).getString("refresh_token", null)
+
+    // ── Policy enforcement state (mirrors enforcementStore.js) ──────────
+    // Persisted so the native enforcer (PolicyEnforcer) and the JS engine
+    // (ruleEngine.js, via commandPoller.js's grant/revoke_bonus_time handling)
+    // agree on what's currently applied, regardless of which layer is alive.
+
+    /** Comma-separated package names currently suspended by the native/JS enforcer. */
+    fun appliedSuspended(context: Context): Set<String> =
+        prefs(context).getStringSet("applied_suspended", emptySet()) ?: emptySet()
+
+    fun setAppliedSuspended(context: Context, packages: Set<String>) {
+        prefs(context).edit().putStringSet("applied_suspended", packages).apply()
+    }
+
+    fun appliedScheduleLock(context: Context): Boolean =
+        prefs(context).getBoolean("applied_schedule_lock", false)
+
+    fun setAppliedScheduleLock(context: Context, locked: Boolean) {
+        prefs(context).edit().putBoolean("applied_schedule_lock", locked).apply()
+    }
+
+    fun appliedSignature(context: Context): String? = prefs(context).getString("applied_signature", null)
+
+    fun setAppliedSignature(context: Context, signature: String?) {
+        prefs(context).edit().putString("applied_signature", signature).apply()
+    }
+
+    /** Parent-granted bonus time expiry (epoch millis), shared with the JS layer's localStorage flag. */
+    fun bonusExpiresAt(context: Context): Long = prefs(context).getLong("bonus_expires_at", 0L)
+
+    fun setBonusExpiresAt(context: Context, epochMillis: Long?) {
+        prefs(context).edit().putLong("bonus_expires_at", epochMillis ?: 0L).apply()
+    }
+
+    fun isBonusActive(context: Context): Boolean = bonusExpiresAt(context) > System.currentTimeMillis()
 }

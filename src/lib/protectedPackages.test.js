@@ -4,7 +4,7 @@ import { PROTECTED_PACKAGES, isProtectedPackage } from './protectedPackages.js'
 
 test('the emergency dialer and agent package are protected', () => {
   assert.equal(isProtectedPackage('com.android.server.telecom'), true)
-  assert.equal(isProtectedPackage('com.surabhikunj.voice.kids'), true)
+  assert.equal(isProtectedPackage('com.surabhikunj.voice'), true)
 })
 
 test('an ordinary app is not protected', () => {

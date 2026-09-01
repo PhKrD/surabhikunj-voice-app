@@ -44,7 +44,7 @@ export const PROTECTED_PACKAGES = Object.freeze([
   'com.android.launcher3',
   'com.google.android.apps.nexuslauncher',
   // The agent itself — suspending it makes the device unmanageable
-  'com.surabhikunj.voice.kids',
+  'com.surabhikunj.voice',
 ])
 
 const PROTECTED_SET = new Set(PROTECTED_PACKAGES)

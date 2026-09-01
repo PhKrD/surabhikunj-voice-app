@@ -310,6 +310,28 @@ class VoiceKidsDpcPlugin : Plugin() {
         }
     }
 
+    // ── Bonus time (shared with the native PolicyEnforcer) ─────────────
+    // commandPoller.js stores bonus expiry in localStorage, which the
+    // native background enforcer (PolicyEnforcer, running in
+    // VoiceKidsMonitorService) cannot read. This mirrors it into
+    // SharedPreferences so bonus time lifts time_limit rules regardless of
+    // whether the WebView or the native poller last processed the
+    // grant/revoke_bonus_time command. Does not require Device Owner —
+    // it's just a local pref write, not a DevicePolicyManager call.
+    @PluginMethod
+    fun setBonusExpiry(call: PluginCall) {
+        val expiresAtIso = call.getString("expiresAt")
+        val epoch = expiresAtIso?.let {
+            try {
+                java.time.Instant.parse(it).toEpochMilli()
+            } catch (e: Exception) {
+                null
+            }
+        }
+        VoiceKidsPrefs.setBonusExpiresAt(context, epoch)
+        call.resolve(successResult())
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────────
 
     private fun runDeviceOwnerAction(call: PluginCall, action: () -> Unit) {

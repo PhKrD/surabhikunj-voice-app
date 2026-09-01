@@ -26,7 +26,7 @@ export const PROTECTED_PACKAGES = Object.freeze([
   'com.android.providers.settings',
   'com.android.launcher3',
   'com.google.android.apps.nexuslauncher',
-  'com.surabhikunj.voice.kids',
+  'com.surabhikunj.voice',
 ])
 
 const PROTECTED_SET = new Set(PROTECTED_PACKAGES)

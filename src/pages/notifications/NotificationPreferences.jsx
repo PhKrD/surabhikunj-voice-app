@@ -53,7 +53,7 @@ function Toggle({ on, onClick, disabled, busy, color = 'saffron', onLabel = 'On'
       disabled={disabled || busy}
       onClick={onClick}
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all min-w-[76px]',
+        'inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all min-w-[70px] sm:min-w-[76px]',
         on ? activeColors[color] : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300',
         (disabled || busy) && 'opacity-60 cursor-not-allowed hover:border-slate-200'
       )}
@@ -243,7 +243,7 @@ export default function NotificationPreferences() {
           </div>
         </CardHeader>
         <CardBody className="space-y-5">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <p className="font-semibold text-slate-800 text-sm">Mute all push</p>
               <p className="text-xs text-slate-500 mt-0.5">Silence every push notification on your devices.</p>
@@ -259,7 +259,7 @@ export default function NotificationPreferences() {
           </div>
 
           <div className="border-t border-slate-100 pt-4 space-y-3">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="font-semibold text-slate-800 text-sm">WhatsApp notifications</p>
                 <p className="text-xs text-slate-500 mt-0.5">Receive selected alerts on WhatsApp.</p>
@@ -314,7 +314,7 @@ export default function NotificationPreferences() {
             </div>
           </div>
 
-          <div className="border-t border-slate-100 pt-4 flex items-center justify-between gap-3">
+          <div className="border-t border-slate-100 pt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-slate-400">{dirty ? 'You have unsaved changes.' : 'All changes saved.'}</p>
             <Button size="sm" icon={Save} loading={savingSettings} disabled={!dirty} onClick={saveSettings}>
               Save settings
@@ -335,7 +335,7 @@ export default function NotificationPreferences() {
                   const Icon = iconFor(cat)
                   const locked = !cat.user_can_disable
                   return (
-                    <div key={cat.key} className="py-3.5 flex items-start justify-between gap-3">
+                    <div key={cat.key} className="py-3.5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex items-start gap-3 min-w-0">
                         <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0">
                           <Icon className="w-4 h-4" />
@@ -353,7 +353,7 @@ export default function NotificationPreferences() {
                           )}
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center justify-end gap-1.5 flex-shrink-0">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
                         <Toggle
                           on={effective(cat, 'inapp')}
                           color="saffron"

@@ -1,0 +1,101 @@
+/**
+ * dpcPlugin.js
+ * JS bridge to the native VoiceKidsDpcPlugin (android/.../VoiceKidsDpcPlugin.kt).
+ *
+ * This is a LOCAL custom Capacitor plugin (not published to npm) — it's
+ * registered directly in MainActivity.java, so we just need registerPlugin()
+ * with the matching name to get a typed proxy.
+ *
+ * On web (browser dev), all methods resolve to { success: false, reason: 'web_platform' }
+ * so the UI can be built and tested without a device.
+ */
+
+import { registerPlugin } from '@capacitor/core'
+
+const NativeDpc = registerPlugin('VoiceKidsDpc')
+
+const isNative = () => {
+  try {
+    return typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()
+  } catch {
+    return false
+  }
+}
+
+function webFallback(extra = {}) {
+  return Promise.resolve({ success: false, reason: 'web_platform', ...extra })
+}
+
+export const dpc = {
+  async isDeviceOwner() {
+    if (!isNative()) return { isDeviceOwner: false, isDeviceAdmin: false }
+    return NativeDpc.isDeviceOwner()
+  },
+
+  async getProvisioningPayload() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.getProvisioningPayload()
+  },
+
+  async suspendPackages(packages) {
+    if (!isNative()) return webFallback()
+    return NativeDpc.suspendPackages({ packages })
+  },
+
+  async unsuspendPackages(packages) {
+    if (!isNative()) return webFallback()
+    return NativeDpc.unsuspendPackages({ packages })
+  },
+
+  async setAllowedPackages(packages) {
+    if (!isNative()) return webFallback()
+    return NativeDpc.setAllowedPackages({ packages })
+  },
+
+  async startKioskMode() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.startKioskMode()
+  },
+
+  async stopKioskMode() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.stopKioskMode()
+  },
+
+  async pauseInternet() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.pauseInternet()
+  },
+
+  async resumeInternet() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.resumeInternet()
+  },
+
+  async lockDevice() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.lockDevice()
+  },
+
+  async unlockDevice() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.unlockDevice()
+  },
+
+  /** DESTRUCTIVE — only call after explicit parent confirmation. */
+  async wipeDevice() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.wipeDevice()
+  },
+
+  async disallowFactoryReset() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.disallowFactoryReset()
+  },
+
+  /** Device Owner only — silently grants location/notification permissions without a prompt. */
+  async grantRuntimePermissions() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.grantRuntimePermissions()
+  },
+}

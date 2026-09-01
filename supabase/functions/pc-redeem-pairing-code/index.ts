@@ -54,16 +54,28 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
   const codeHash = await sha256Hex(rawCode)
 
-  // --- Look up the pairing code ---
-  const { data: pairing, error: pairingErr } = await admin
+  // --- Atomically claim the pairing code ---
+  // A single UPDATE ... WHERE used_at IS NULL ... RETURNING is the guard
+  // against two concurrent redeem requests racing the same still-valid
+  // code (a check-then-update with separate round-trips would let both
+  // pass the SELECT before either UPDATE lands). Whichever request's
+  // UPDATE actually matches a row wins; the loser gets 0 rows back and is
+  // rejected below, even though the code was technically valid at the
+  // moment it read it.
+  const { data: claimed, error: claimErr } = await admin
     .from('pc_pairing_codes')
-    .select('id, device_id, expires_at, used_at')
+    .update({ used_at: new Date().toISOString() })
     .eq('code_hash', codeHash)
     .is('used_at', null)
-    .maybeSingle()
+    .select('id, device_id, expires_at')
 
-  if (pairingErr || !pairing) return json({ error: 'Invalid or already-used pairing code' }, 404)
+  if (claimErr) return json({ error: 'Could not redeem pairing code' }, 500)
+  const pairing = claimed?.[0]
+  if (!pairing) return json({ error: 'Invalid or already-used pairing code' }, 404)
+
   if (new Date(pairing.expires_at) < new Date()) {
+    // Expired codes are still marked used above (correct — they should
+    // never be redeemable again), but we must not proceed with enrollment.
     return json({ error: 'Pairing code has expired. Ask your parent to generate a new one.' }, 410)
   }
 
@@ -96,8 +108,7 @@ Deno.serve(async (req: Request) => {
   })
   if (verifyErr || !session?.session) return json({ error: `Could not verify session: ${verifyErr?.message}` }, 500)
 
-  // --- Mark the code used + the device enrolled ---
-  await admin.from('pc_pairing_codes').update({ used_at: new Date().toISOString() }).eq('id', pairing.id)
+  // --- Mark the device enrolled (the code was already atomically claimed above) ---
   await admin
     .from('pc_devices')
     .update({ enrolled_at: new Date().toISOString(), last_seen_at: new Date().toISOString() })

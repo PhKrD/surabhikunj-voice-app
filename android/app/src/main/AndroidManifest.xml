@@ -1,5 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ================================================================
+         Device Policy Controller (parental control) permissions.
+         Ported from the former standalone "VOICE Kids" child app so that
+         one installed app can act as either a parent-management device or
+         a supervised child device (see src/store/deviceModeStore.js). Only
+         exercised on a device where the family owner has chosen
+         "I am a Child" in Parental Control setup and completed Device
+         Owner provisioning — an ordinary VOICE org member is never
+         prompted for any of these.
+         ================================================================ -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- Special-access permissions: PACKAGE_USAGE_STATS cannot be granted
+         programmatically (parent must enable Settings > Apps > Special app
+         access > Usage access on the CHILD device only). QUERY_ALL_PACKAGES
+         is required to enumerate installed apps for app-blocking rules. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="true"
@@ -15,6 +50,8 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:exported="true">
 
             <intent-filter>
@@ -23,6 +60,46 @@
             </intent-filter>
 
         </activity>
+
+        <!-- ── Device Policy Controller components (child-device mode only) ── -->
+
+        <receiver
+            android:name="com.surabhikunj.voice.dpc.VoiceKidsDeviceAdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin_policies" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                <action android:name="android.app.action.PROFILE_PROVISIONING_COMPLETE" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="com.surabhikunj.voice.dpc.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name="com.surabhikunj.voice.dpc.VoiceKidsMonitorService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
+
+        <!-- BIND_VPN_SERVICE restricts binding to the system; DpcActions
+             (Device Owner only) silently acquires VPN permission via
+             setAlwaysOnVpnPackage() — no user dialog. -->
+        <service
+            android:name="com.surabhikunj.voice.dpc.InternetBlockVpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -48,7 +48,10 @@ export default function Header({ onMenuClick }) {
   }, [profileId, refetch])
 
   return (
-    <header className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-white/60 px-4 py-3 flex items-center gap-3">
+    <header
+      className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-white/60 px-4 py-3 flex items-center gap-3"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
+    >
       <button
         onClick={onMenuClick}
         className="lg:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors"

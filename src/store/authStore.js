@@ -153,6 +153,13 @@ const useAuthStore = create((set, get) => ({
     return data
   },
 
+  resetPassword: async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    if (error) throw error
+  },
+
   signOut: async () => {
     const { profile } = get()
     if (profile?.id) clearProfileCache(profile.id)

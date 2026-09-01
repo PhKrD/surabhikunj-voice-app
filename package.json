@@ -1,7 +1,7 @@
 {
   "name": "surabhikunj-voice-app",
   "private": true,
-  "version": "0.0.10",
+  "version": "0.0.17-final",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,7 +21,7 @@
     "@capacitor/core": "^8.4.0",
     "@capacitor/push-notifications": "^8.1.1",
     "@capgo/capacitor-updater": "^8.49.1",
-    "@supabase/supabase-js": "^2.106.1",
+    "@supabase/supabase-js": "^2.112.3",
     "@tailwindcss/vite": "^4.3.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.3.0",

@@ -9,7 +9,7 @@ import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import Avatar from '@/components/ui/Avatar'
 import useOrgStore from '@/store/orgStore'
-import { formatDate } from '@/lib/utils'
+import { formatDate, isAdmin } from '@/lib/utils'
 
 const inputCls =
   'w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300 focus:border-transparent transition'

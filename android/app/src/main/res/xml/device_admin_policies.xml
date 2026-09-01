@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    device_admin_policies.xml
+    Declares which DevicePolicyManager capabilities VOICE Kids requests.
+
+    In Device Owner mode (provisioned via QR code) all of these are
+    granted automatically — no per-capability user approval needed.
+
+    In Device Administrator mode (legacy fallback) only the capabilities
+    the user explicitly approves are granted.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <!-- Lock the screen immediately (used for scheduled blocking) -->
+        <force-lock />
+
+        <!-- Wipe device (factory_reset command, parent-triggered) -->
+        <wipe-data />
+    </uses-policies>
+</device-admin>

@@ -129,13 +129,13 @@ export default function NotificationsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-bold text-slate-800">Notifications</h2>
-        <div className="inline-flex items-center gap-1 p-1 rounded-full bg-slate-100">
+        <div className="inline-flex items-center gap-1 p-1 rounded-full bg-slate-100 w-full sm:w-auto">
           <button
             onClick={() => setTab('inbox')}
             className={cn(
-              'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all',
+              'inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all flex-1 sm:flex-none',
               tab === 'inbox' ? 'bg-white text-saffron-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             )}
           >
@@ -145,7 +145,7 @@ export default function NotificationsPage() {
           <button
             onClick={() => setTab('prefs')}
             className={cn(
-              'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all',
+              'inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all flex-1 sm:flex-none',
               tab === 'prefs' ? 'bg-white text-saffron-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             )}
           >
@@ -159,7 +159,7 @@ export default function NotificationsPage() {
         <NotificationPreferences />
       ) : (
         <>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
@@ -175,7 +175,7 @@ export default function NotificationsPage() {
               icon={CheckCheck}
               onClick={markAllRead}
               disabled={unreadCount === 0}
-              className="flex-shrink-0"
+              className="w-full sm:w-auto flex-shrink-0"
             >
               Mark all read
             </Button>

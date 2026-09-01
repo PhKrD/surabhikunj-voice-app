@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, X, ChevronRight, Smartphone, ShieldCheck } from 'lucide-react'
+import { Plus, X, ChevronRight, Smartphone, ShieldCheck, BarChart3 } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
@@ -8,6 +8,8 @@ import Button from '@/components/ui/Button'
 import useOrgStore from '@/store/orgStore'
 import useToastStore from '@/store/toastStore'
 import { listChildren, createChild } from '@/lib/parentalControlApi'
+import { useDeviceModeStore } from '@/store/deviceModeStore'
+import DeviceModeSetupPage from './DeviceModeSetupPage'
 
 const defaultForm = { displayName: '', dateOfBirth: '', ageGroup: 'child' }
 
@@ -15,6 +17,7 @@ export default function ParentalControlPage() {
   const navigate = useNavigate()
   const { org } = useOrgStore()
   const toast = useToastStore()
+  const deviceMode = useDeviceModeStore((s) => s.mode)
 
   const [children, setChildren] = useState([])
   const [loading, setLoading] = useState(true)
@@ -73,22 +76,37 @@ export default function ParentalControlPage() {
     }
   }
 
+  // First time this device touches Parental Control: decide whether it
+  // behaves as a parent console or hands off to the child pairing flow.
+  // See src/store/deviceModeStore.js — this never creates a second app.
+  if (deviceMode === 'unset') return <DeviceModeSetupPage />
+
   if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-800">Parental Control ({children.length})</h2>
-        <Button
-          size="sm"
-          icon={showForm ? X : Plus}
-          onClick={() => {
-            if (showForm) resetForm()
-            setShowForm((v) => !v)
-          }}
-        >
-          {showForm ? 'Close' : 'Add Child'}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={BarChart3}
+            onClick={() => navigate('/parental-control/dashboard')}
+          >
+            Dashboard
+          </Button>
+          <Button
+            size="sm"
+            icon={showForm ? X : Plus}
+            onClick={() => {
+              if (showForm) resetForm()
+              setShowForm((v) => !v)
+            }}
+          >
+            {showForm ? 'Close' : 'Add Child'}
+          </Button>
+        </div>
       </div>
 
       {showForm && (
@@ -149,6 +167,19 @@ export default function ParentalControlPage() {
             <p className="text-xs text-slate-400 mt-1">Add a child to start managing their devices and screen time.</p>
           </CardBody>
         </Card>
+      )}
+
+      {deviceMode === 'parent' && (
+        <button
+          onClick={() => {
+            if (window.confirm('Reconfigure this device? You will be asked "I am a Parent / I am a Child" again next time you open Parental Control.')) {
+              useDeviceModeStore.getState().reset()
+            }
+          }}
+          className="text-xs text-slate-400 hover:text-slate-600 underline"
+        >
+          Reconfigure this device's Parental Control mode
+        </button>
       )}
 
       <div className="space-y-2">

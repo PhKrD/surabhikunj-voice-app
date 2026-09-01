@@ -252,10 +252,15 @@ BEGIN
     END LOOP;
 
     -- Grant each legacy role a sensible permission set
+    -- NOTE: deliberately does NOT include trackers.view_all / tasks.view_all —
+    -- a counsellor's visibility into other members' trackers/tasks must come
+    -- solely from the assigned-mentee scoping (public.is_active_mentor_of())
+    -- added in 51_counsellor_management.sql. Granting the org-wide *.view_all
+    -- permission here would silently bypass that scoping (see 62_counsellor_scope_fix.sql).
     SELECT id INTO v_role_id FROM public.roles WHERE org_id = o.id AND key = 'counsellor';
     INSERT INTO public.role_permissions (role_id, permission_key)
     SELECT v_role_id, key FROM public.permissions WHERE key IN (
-      'members.view', 'mentorship.view_own', 'trackers.view_all', 'trackers.view_own',
+      'members.view', 'mentorship.view_own', 'trackers.view_own',
       'trackers.submit', 'events.view', 'announcements.view', 'reports.view',
       'departments.view', 'hierarchy.view', 'tasks.view_own', 'resources.view'
     ) ON CONFLICT DO NOTHING;

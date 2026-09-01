@@ -47,6 +47,9 @@
 html {
   /* Native-feeling scroll for any <html>-level scroll on desktop */
   scroll-behavior: smooth;
+  /* Stop iOS Safari/PWA from auto-inflating text, which can look like random zoom. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -280,6 +283,24 @@ body {
     font-weight: 600;
     color: #475569;
     letter-spacing: -0.005em;
+  }
+
+  /* iOS zooms the page when focused inputs are <16px; keep forms stable on mobile. */
+  @media (max-width: 768px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    textarea,
+    select {
+      font-size: 16px;
+    }
   }
 
   /* ---- Nicer scrollbars ---- */

@@ -3,9 +3,13 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { MotionConfig } from 'framer-motion'
 import useAuthStore from '@/store/authStore'
 import ProtectedRoute, { RequireAuth } from '@/components/ProtectedRoute'
-import { healthMonitor } from '@/lib/healthCheck'
+// Imported for its module-level side effect only (starts the singleton
+// HealthMonitor's 30s polling loop on app boot) — no named binding needed.
+import '@/lib/healthCheck'
 import Toaster from '@/components/ui/Toaster'
 import Button from '@/components/ui/Button'
+import { useDeviceModeStore } from '@/store/deviceModeStore'
+import ChildDeviceShell from '@/components/child-device/ChildDeviceShell'
 
 const AppLayout = lazy(() => import('@/components/layout/AppLayout'))
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
@@ -28,6 +32,7 @@ const MentorshipPage = lazy(() => import('@/pages/mentorship/MentorshipPage'))
 const ReportsPage   = lazy(() => import('@/pages/reports/ReportsPage'))
 const BroadcastPage = lazy(() => import('@/pages/admin/BroadcastPage'))
 const ParentalControlPage = lazy(() => import('@/pages/parental-control/ParentalControlPage'))
+const ParentalControlDashboardPage = lazy(() => import('@/pages/parental-control/ParentalControlDashboardPage'))
 const ChildDetailPage = lazy(() => import('@/pages/parental-control/ChildDetailPage'))
 
 class ErrorBoundary extends Component {
@@ -117,17 +122,38 @@ function PageFallback() {
 
 function AppBootstrap() {
   const { initialize, initialized } = useAuthStore()
+  const deviceMode = useDeviceModeStore((s) => s.mode)
 
   useEffect(() => {
+    // A child-mode device's Supabase session belongs to its own device
+    // auth user, not an org member — org bootstrap (profile lookup, org
+    // membership resolution) has nothing valid to resolve there and would
+    // just be a wasted round trip against tables it has no RLS grant to
+    // read anyway.
+    if (deviceMode === 'child') return
     if (!initialized) {
       initialize()
     }
-  }, [initialize, initialized])
+  }, [initialize, initialized, deviceMode])
 
   return null
 }
 
 function AppRoutes() {
+  // A device that has been set up as a supervised child device (see
+  // src/store/deviceModeStore.js + DeviceModeSetupPage) NEVER shows the
+  // org login or any org route — it boots straight into the child
+  // experience. This check happens before ProtectedRoute would otherwise
+  // redirect an unauthenticated device to /login.
+  const deviceMode = useDeviceModeStore((s) => s.mode)
+  if (deviceMode === 'child') {
+    return (
+      <Suspense fallback={<PageFallback />}>
+        <ChildDeviceShell />
+      </Suspense>
+    )
+  }
+
   return (
     <Suspense fallback={<PageFallback />}>
       <Routes>
@@ -160,6 +186,7 @@ function AppRoutes() {
           <Route path="resources/*" element={<ResourcesPage />} />
           <Route path="mentorship/*" element={<MentorshipPage />} />
           <Route path="parental-control" element={<ParentalControlPage />} />
+          <Route path="parental-control/dashboard" element={<ParentalControlDashboardPage />} />
           <Route path="parental-control/:childId" element={<ChildDetailPage />} />
           <Route path="reports"     element={<ReportsPage />} />
           <Route

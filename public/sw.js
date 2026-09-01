@@ -7,7 +7,7 @@
 //   - Same-origin GET assets: stale-while-revalidate for hashed filenames.
 //   - Cross-origin requests (Supabase API/auth): never intercepted.
 
-const CACHE_VERSION = 'skv-cache-v3'
+const CACHE_VERSION = 'skv-cache-v4'
 const APP_SHELL = ['/', '/index.html', '/icon.svg', '/favicon.svg', '/manifest.webmanifest']
 
 self.addEventListener('install', (event) => {

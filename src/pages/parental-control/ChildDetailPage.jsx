@@ -1,23 +1,32 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Smartphone, Sliders, MapPin, Bell, Gift, Lock, LockOpen, WifiOff, Wifi, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Smartphone, Sliders, MapPin, Bell, Gift, BarChart3, Clock, Globe, Send, ShieldAlert } from 'lucide-react'
 import Avatar from '@/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
-import { getChild, listDevices, sendDeviceCommand } from '@/lib/parentalControlApi'
+import { getChild, listDevices } from '@/lib/parentalControlApi'
+import CommandCenter from './CommandCenter'
 import DevicesTab from './tabs/DevicesTab'
 import UsageTab from './tabs/UsageTab'
 import RulesTab from './tabs/RulesTab'
+import SchedulesTab from './tabs/SchedulesTab'
+import WebsiteRulesTab from './tabs/WebsiteRulesTab'
 import LocationTab from './tabs/LocationTab'
 import AlertsTab from './tabs/AlertsTab'
+import RequestsTab from './tabs/RequestsTab'
+import AuditLogTab from './tabs/AuditLogTab'
 import BonusTab from './tabs/BonusTab'
 
 const TABS = [
   { key: 'devices', label: 'Devices', icon: Smartphone, Component: DevicesTab },
   { key: 'usage', label: 'Screen Time', icon: BarChart3, Component: UsageTab },
+  { key: 'schedules', label: 'Schedules', icon: Clock, Component: SchedulesTab },
   { key: 'rules', label: 'App Rules', icon: Sliders, Component: RulesTab },
+  { key: 'websites', label: 'Websites', icon: Globe, Component: WebsiteRulesTab },
   { key: 'location', label: 'Location', icon: MapPin, Component: LocationTab },
   { key: 'alerts', label: 'Alerts', icon: Bell, Component: AlertsTab },
+  { key: 'requests', label: 'Requests', icon: Send, Component: RequestsTab },
+  { key: 'audit', label: 'Audit Log', icon: ShieldAlert, Component: AuditLogTab },
   { key: 'bonus', label: 'Bonus Time', icon: Gift, Component: BonusTab },
 ]
 
@@ -30,7 +39,6 @@ export default function ChildDetailPage() {
   const [devices, setDevices] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('devices')
-  const [sendingCommand, setSendingCommand] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -51,22 +59,6 @@ export default function ChildDetailPage() {
   }, [load])
 
   const activeDevices = devices.filter((d) => d.is_active)
-
-  const broadcastCommand = async (commandType, label) => {
-    if (activeDevices.length === 0) {
-      toast.error('No active devices to send a command to')
-      return
-    }
-    setSendingCommand(true)
-    try {
-      await Promise.all(activeDevices.map((d) => sendDeviceCommand({ deviceId: d.id, commandType })))
-      toast.success(label)
-    } catch (error) {
-      toast.error('Could not send command', error.message)
-    } finally {
-      setSendingCommand(false)
-    }
-  }
 
   if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
   if (!child) return <div className="text-center py-12 text-slate-400 text-sm">Child not found.</div>
@@ -93,37 +85,8 @@ export default function ChildDetailPage() {
         </div>
       </div>
 
-      {/* Quick actions */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          disabled={sendingCommand}
-          onClick={() => broadcastCommand('pause_internet', 'Internet paused on all devices')}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm font-medium text-slate-600 hover:border-red-200 hover:text-red-600 disabled:opacity-50"
-        >
-          <WifiOff className="w-4 h-4" /> Pause internet
-        </button>
-        <button
-          disabled={sendingCommand}
-          onClick={() => broadcastCommand('resume_internet', 'Internet resumed on all devices')}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm font-medium text-slate-600 hover:border-tulasi-200 hover:text-tulasi-600 disabled:opacity-50"
-        >
-          <Wifi className="w-4 h-4" /> Resume internet
-        </button>
-        <button
-          disabled={sendingCommand}
-          onClick={() => broadcastCommand('lock_device', 'Lock command sent to all devices')}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm font-medium text-slate-600 hover:border-slate-400 disabled:opacity-50"
-        >
-          <Lock className="w-4 h-4" /> Lock now
-        </button>
-        <button
-          disabled={sendingCommand}
-          onClick={() => broadcastCommand('unlock_device', 'Unlock command sent to all devices')}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm font-medium text-slate-600 hover:border-emerald-200 hover:text-emerald-600 disabled:opacity-50"
-        >
-          <LockOpen className="w-4 h-4" /> Unlock now
-        </button>
-      </div>
+      {/* Command center — per-device targeting + true command lifecycle */}
+      <CommandCenter devices={devices} />
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-slate-100 overflow-x-auto scrollbar-hide">

@@ -33,15 +33,19 @@ export function shareToWhatsApp({ to, message }) {
 }
 
 function openWhatsAppLink(url) {
-  const isStandalone =
-    typeof window !== 'undefined' &&
-    (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true)
+  if (typeof window === 'undefined') return
 
-  if (isStandalone) {
-    // In a PWA, window.open is often blocked; navigate in the same window.
-    window.location.href = url
+  const isStandalone =
+    (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true)
+  const isCapacitorNative = Boolean(window.Capacitor?.isNativePlatform?.())
+
+  if (isStandalone || isCapacitorNative) {
+    // In PWAs / native shells, popups are often blocked; use same-window navigation.
+    window.location.assign(url)
   } else {
-    window.open(url, '_blank', 'noopener,noreferrer')
+    const popup = window.open(url, '_blank', 'noopener,noreferrer')
+    // Some desktop browsers block popups silently; fallback to same-window navigation.
+    if (!popup) window.location.assign(url)
   }
 }
 

@@ -173,7 +173,10 @@ export default function Sidebar({ mobileOpen, onClose }) {
   const content = (
     <div className="flex flex-col h-full">
       {/* Logo — driven by org branding */}
-      <div className="flex items-center gap-3 px-4 pt-5 pb-4 border-b border-slate-100">
+      <div
+        className="flex items-center gap-3 px-4 pb-4 border-b border-slate-100"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.25rem)' }}
+      >
         <div
           className="w-10 h-10 rounded-2xl flex items-center justify-center animate-float-slow"
           style={{ background: `var(--color-primary, #f97316)` }}

@@ -510,7 +510,6 @@ function TrackerDetail() {
   const { profile } = useAuthStore()
   const { org } = useOrgStore()
   const navigate = useNavigate()
-  const toast = useToastStore()
   const today = format(new Date(), 'yyyy-MM-dd')
 
   // ── Config / meta state (loaded once per trackerId) ─────────────────
@@ -564,13 +563,13 @@ function TrackerDetail() {
         setTemplate(templateRes.data ?? null)
         setEntries(entriesRes.data ?? [])
       } catch (e) {
-        if (!cancelled) toast.error('Could not load tracker', e.message)
+        if (!cancelled) useToastStore.getState().error('Could not load tracker', e.message)
       } finally {
         if (!cancelled) setConfigLoading(false)
       }
     })()
     return () => { cancelled = true }
-  }, [trackerId, toast])
+  }, [trackerId])
 
   // ── 2. Date-entry load — runs when selectedDate changes ──────────────
   // CRITICAL: always clears existingEntry FIRST to prevent stale-ID overwrites
@@ -630,12 +629,12 @@ function TrackerDetail() {
         }
       } catch (e) {
         if (activeRequestRef.current === requestId)
-          toast.error('Could not load entry for this date', e.message)
+          useToastStore.getState().error('Could not load entry for this date', e.message)
       } finally {
         if (activeRequestRef.current === requestId) setDateLoading(false)
       }
     })()
-  }, [trackerId, selectedDate, profile?.id, configLoading, toast])
+  }, [trackerId, selectedDate, profile?.id, configLoading])
 
   const scored = useMemo(() => (
     calculateEntryScore({ rules, fields, groups, calculatedColumns, fieldValues })
@@ -758,9 +757,9 @@ function TrackerDetail() {
         return [savedEntry, ...filtered].sort((a, b) => b.period_date.localeCompare(a.period_date))
       })
 
-      toast.success('Entry saved', snapshotScore != null ? `Score: ${snapshotScore}/100` : '')
+      useToastStore.getState().success('Entry saved', snapshotScore != null ? `Score: ${snapshotScore}/100` : '')
     } catch (e) {
-      toast.error('Could not save entry', e.message)
+      useToastStore.getState().error('Could not save entry', e.message)
     } finally {
       setSaving(false)
     }

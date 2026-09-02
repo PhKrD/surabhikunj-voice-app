@@ -74,14 +74,14 @@ function PlanModal({ type, slot, plan, dateStr, orgId, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-slate-100">
+      <div className="bg-[var(--surface)] rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border-color)]">
           <div>
-            <p className="font-bold text-slate-800">{type.name} — {slot}</p>
-            <p className="text-sm text-slate-500">{format(new Date(dateStr), 'EEE, dd MMM yyyy')}</p>
+            <p className="font-bold text-primary-token">{type.name} — {slot}</p>
+            <p className="text-sm text-secondary-token">{format(new Date(dateStr), 'EEE, dd MMM yyyy')}</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100">
-            <X className="w-5 h-5 text-slate-500" />
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-[var(--surface-muted)]">
+            <X className="w-5 h-5 text-secondary-token" />
           </button>
         </div>
 
@@ -92,21 +92,21 @@ function PlanModal({ type, slot, plan, dateStr, orgId, onClose, onSaved }) {
               className={`w-10 h-6 rounded-full transition-colors ${isSpecial ? 'bg-amber-400' : 'bg-slate-200'}`}
               onClick={() => setIsSpecial((v) => !v)}
             >
-              <div className={`w-5 h-5 bg-white rounded-full shadow mt-0.5 transition-transform ${isSpecial ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+              <div className={`w-5 h-5 bg-[var(--surface)] rounded-full shadow mt-0.5 transition-transform ${isSpecial ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
             </div>
-            <span className="text-sm font-medium text-slate-700 flex items-center gap-1">
+            <span className="text-sm font-medium text-primary-token flex items-center gap-1">
               <Star className="w-4 h-4 text-amber-400" /> Special / Festival
             </span>
           </label>
 
           {/* Items */}
           <div>
-            <p className="text-sm font-semibold text-slate-700 mb-2">Items</p>
+            <p className="text-sm font-semibold text-primary-token mb-2">Items</p>
             <div className="space-y-2">
               {items.map((item, idx) => (
                 <div key={idx} className="flex items-center gap-2">
-                  <span className="flex-1 text-sm text-slate-700 bg-slate-50 rounded-xl px-3 py-2">{item.name}</span>
-                  {item.quantity && <span className="text-xs text-slate-400 whitespace-nowrap">{item.quantity}</span>}
+                  <span className="flex-1 text-sm text-primary-token bg-[var(--surface-muted)] rounded-xl px-3 py-2">{item.name}</span>
+                  {item.quantity && <span className="text-xs text-muted-token whitespace-nowrap">{item.quantity}</span>}
                   <button onClick={() => removeItem(idx)} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg">
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -119,13 +119,13 @@ function PlanModal({ type, slot, plan, dateStr, orgId, onClose, onSaved }) {
                 onChange={(e) => setNewItem(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addItem()}
                 placeholder="Add item…"
-                className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-saffron-400"
+                className="flex-1 text-sm border border-[var(--border-color)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-saffron-400"
               />
               <input
                 value={newQty}
                 onChange={(e) => setNewQty(e.target.value)}
                 placeholder="Qty"
-                className="w-20 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-saffron-400"
+                className="w-20 text-sm border border-[var(--border-color)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-saffron-400"
               />
               <button onClick={addItem} className="px-3 py-2 bg-saffron-100 text-saffron-700 rounded-xl hover:bg-saffron-200">
                 <Plus className="w-4 h-4" />
@@ -135,18 +135,18 @@ function PlanModal({ type, slot, plan, dateStr, orgId, onClose, onSaved }) {
 
           {/* Notes */}
           <div>
-            <p className="text-sm font-semibold text-slate-700 mb-1">Notes</p>
+            <p className="text-sm font-semibold text-primary-token mb-1">Notes</p>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               placeholder="Any notes (e.g. Ekadashi fasting menu)…"
-              className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-saffron-400 resize-none"
+              className="w-full text-sm border border-[var(--border-color)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-saffron-400 resize-none"
             />
           </div>
         </div>
 
-        <div className="flex items-center gap-2 p-5 border-t border-slate-100">
+        <div className="flex items-center gap-2 p-5 border-t border-[var(--border-color)]">
           {plan?.id && (
             <button onClick={deletePlan} disabled={saving} className="p-2 text-red-400 hover:bg-red-50 rounded-xl">
               <Trash2 className="w-4 h-4" />
@@ -203,25 +203,25 @@ export default function ResourcesPage() {
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-slate-800">{label}</h1>
+        <h1 className="text-2xl font-extrabold text-primary-token">{label}</h1>
         <div className="flex items-center gap-2">
-          <button onClick={() => setDate((d) => subDays(d, 1))} className="p-2 rounded-xl text-slate-500 hover:bg-slate-100">
+          <button onClick={() => setDate((d) => subDays(d, 1))} className="p-2 rounded-xl text-secondary-token hover:bg-[var(--surface-muted)]">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <span className="text-sm font-medium text-slate-700 min-w-[110px] text-center">
+          <span className="text-sm font-medium text-primary-token min-w-[110px] text-center">
             {format(date, 'EEE, MMM d')}
           </span>
-          <button onClick={() => setDate((d) => addDays(d, 1))} className="p-2 rounded-xl text-slate-500 hover:bg-slate-100">
+          <button onClick={() => setDate((d) => addDays(d, 1))} className="p-2 rounded-xl text-secondary-token hover:bg-[var(--surface-muted)]">
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {loading && <div className="text-center text-slate-400 py-12">Loading plans…</div>}
+      {loading && <div className="text-center text-muted-token py-12">Loading plans…</div>}
 
       {!loading && plansByType.map((type) => (
         <div key={type.id} className="space-y-3">
-          <h2 className="text-base font-bold text-slate-700">{type.name}</h2>
+          <h2 className="text-base font-bold text-primary-token">{type.name}</h2>
           {(type.slots ?? []).map((slot) => {
             const plan = type.plans.find((p) => p.slot === slot)
             return (
@@ -229,7 +229,7 @@ export default function ResourcesPage() {
                 <CardBody>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-700">{slot}</span>
+                      <span className="font-semibold text-primary-token">{slot}</span>
                       {plan?.is_special && (
                         <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
                           <Star className="w-3 h-3" /> Special
@@ -251,16 +251,16 @@ export default function ResourcesPage() {
                       {(plan.resource_plan_items ?? [])
                         .sort((a, b) => a.sort_order - b.sort_order)
                         .map((item) => (
-                          <li key={item.id} className="flex items-center gap-2 text-sm text-slate-600">
+                          <li key={item.id} className="flex items-center gap-2 text-sm text-secondary-token">
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" />
                             {item.name}
-                            {item.quantity && <span className="text-slate-400">({item.quantity})</span>}
+                            {item.quantity && <span className="text-muted-token">({item.quantity})</span>}
                           </li>
                         ))}
-                      {plan.notes && <p className="text-xs text-slate-400 mt-1 italic">{plan.notes}</p>}
+                      {plan.notes && <p className="text-xs text-muted-token mt-1 italic">{plan.notes}</p>}
                     </ul>
                   ) : (
-                    <p className="text-sm text-slate-400 italic">Not planned yet</p>
+                    <p className="text-sm text-muted-token italic">Not planned yet</p>
                   )}
                 </CardBody>
               </Card>
@@ -271,7 +271,7 @@ export default function ResourcesPage() {
 
       {!loading && plansByType.length === 0 && (
         <Card>
-          <CardBody className="py-12 text-center text-slate-400">
+          <CardBody className="py-12 text-center text-muted-token">
             <UtensilsCrossed className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p>No resource types configured yet.</p>
           </CardBody>

@@ -69,11 +69,11 @@ function MentorshipHome() {
     load()
   }, [profile, isMentorView])
 
-  if (loading) return <div className="p-8 text-center text-slate-400">Loading {pageLabel}…</div>
+  if (loading) return <div className="p-8 text-center text-muted-token">Loading {pageLabel}…</div>
 
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-extrabold text-slate-800">{pageLabel}</h1>
+      <h1 className="text-2xl font-extrabold text-primary-token">{pageLabel}</h1>
 
       <div className="flex flex-wrap gap-3">
         {hasPermission('mentorship.view_own') && (
@@ -87,23 +87,23 @@ function MentorshipHome() {
           </Link>
         )}
         <Can permission="mentorship.manage">
-          <Link to="manage" className="flex-1 min-w-[220px] flex items-center gap-3 px-4 py-3 rounded-2xl bg-white border border-slate-200 hover:border-saffron-300 transition">
+          <Link to="manage" className="flex-1 min-w-[220px] flex items-center gap-3 px-4 py-3 rounded-2xl bg-[var(--surface)] border border-[var(--border-color)] hover:border-saffron-300 transition">
             <ShieldCheck className="w-5 h-5 text-saffron-500" />
             <div className="flex-1">
-              <p className="text-sm font-bold text-slate-800">Counsellor Management</p>
-              <p className="text-xs text-slate-400">Assign counsellors and counsellis</p>
+              <p className="text-sm font-bold text-primary-token">Counsellor Management</p>
+              <p className="text-xs text-muted-token">Assign counsellors and counsellis</p>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-300" />
+            <ChevronRight className="w-4 h-4 text-muted-token" />
           </Link>
         </Can>
       </div>
 
       {isMentorView ? (
         <div className="space-y-4">
-          <h2 className="text-base font-bold text-slate-600">Your {menteeLabel}s</h2>
+          <h2 className="text-base font-bold text-secondary-token">Your {menteeLabel}s</h2>
           {mentees.length === 0 && (
             <Card>
-              <CardBody className="py-10 text-center text-slate-400">
+              <CardBody className="py-10 text-center text-muted-token">
                 <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
                 <p>No {menteeLabel.toLowerCase()}s assigned yet.</p>
               </CardBody>
@@ -115,7 +115,7 @@ function MentorshipHome() {
                 <CardBody className="flex items-center gap-3">
                   <Avatar name={m.spiritual_name} url={m.avatar_url} size="sm" />
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-slate-800 truncate">{m.spiritual_name}</p>
+                    <p className="font-semibold text-primary-token truncate">{m.spiritual_name}</p>
                     <Badge variant="default" className="text-xs">{m.role}</Badge>
                   </div>
                 </CardBody>
@@ -125,20 +125,20 @@ function MentorshipHome() {
         </div>
       ) : (
         <div className="space-y-4">
-          <h2 className="text-base font-bold text-slate-600">Your {mentorLabel}</h2>
+          <h2 className="text-base font-bold text-secondary-token">Your {mentorLabel}</h2>
           {mentor ? (
             <Card>
               <CardBody className="flex items-center gap-4">
                 <Avatar name={mentor.spiritual_name} url={mentor.avatar_url} size="md" />
                 <div>
-                  <p className="font-semibold text-slate-800">{mentor.spiritual_name}</p>
+                  <p className="font-semibold text-primary-token">{mentor.spiritual_name}</p>
                   <Badge variant="saffron" className="text-xs">{mentorLabel}</Badge>
                 </div>
               </CardBody>
             </Card>
           ) : (
             <Card>
-              <CardBody className="py-10 text-center text-slate-400">
+              <CardBody className="py-10 text-center text-muted-token">
                 <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
                 <p>No {mentorLabel.toLowerCase()} assigned yet.</p>
               </CardBody>

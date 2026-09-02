@@ -95,14 +95,14 @@ export default function BroadcastScheduled({ orgId, memberById, categoryByKey })
   }
 
   if (loading) {
-    return <div className="text-center py-12 text-slate-400 text-sm">Loading scheduled broadcasts…</div>
+    return <div className="text-center py-12 text-muted-token text-sm">Loading scheduled broadcasts…</div>
   }
 
   if (groups.length === 0) {
     return (
       <Card>
         <CardBody>
-          <div className="flex flex-col items-center py-10 text-slate-400">
+          <div className="flex flex-col items-center py-10 text-muted-token">
             <Clock className="w-12 h-12 mb-3 opacity-30" />
             <p className="text-sm">No upcoming scheduled broadcasts.</p>
           </div>
@@ -113,7 +113,7 @@ export default function BroadcastScheduled({ orgId, memberById, categoryByKey })
 
   return (
     <div className="space-y-3">
-      <h2 className="text-sm font-semibold text-slate-700">Upcoming ({groups.length})</h2>
+      <h2 className="text-sm font-semibold text-primary-token">Upcoming ({groups.length})</h2>
       {groups.map((g) => {
         const count = g.ids.length
         const single = count === 1 ? memberById[g.profileIds[0]] : null
@@ -125,14 +125,14 @@ export default function BroadcastScheduled({ orgId, memberById, categoryByKey })
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-slate-800 truncate">{g.title}</p>
+                    <p className="font-semibold text-primary-token truncate">{g.title}</p>
                     <Badge variant="saffron">
                       {categoryByKey[g.category_key]?.label ?? g.category_key}
                     </Badge>
                   </div>
-                  {g.body && <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">{g.body}</p>}
+                  {g.body && <p className="text-sm text-secondary-token mt-0.5 line-clamp-2">{g.body}</p>}
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+                    <span className="inline-flex items-center gap-1 text-xs text-secondary-token">
                       <Clock className="w-3.5 h-3.5" />
                       {formatDate(g.send_at)} · {formatClock(g.send_at)}
                     </span>

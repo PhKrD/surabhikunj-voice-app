@@ -8,7 +8,7 @@ import Avatar from '@/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 
 const FIELD_CLS =
-  'w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
+  'w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 
 const AUDIENCE = [
   { key: 'everyone', label: 'Everyone', icon: Users },
@@ -217,7 +217,7 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
       <Card>
         <CardBody className="py-4 space-y-3">
           <label className="block">
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-secondary-token">
               Title<span className="text-red-500 ml-0.5">*</span>
             </span>
             <input
@@ -229,7 +229,7 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
           </label>
 
           <label className="block">
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-secondary-token">
               Message<span className="text-red-500 ml-0.5">*</span>
             </span>
             <textarea
@@ -242,7 +242,7 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
           </label>
 
           <label className="block">
-            <span className="text-xs text-slate-500">Category</span>
+            <span className="text-xs text-secondary-token">Category</span>
             <select value={category} onChange={(e) => setCategory(e.target.value)} className={FIELD_CLS}>
               {groupedCategories.length === 0 && (
                 <option value="announcement.new">Announcements</option>
@@ -260,7 +260,7 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
           </label>
 
           <div className="space-y-2">
-            <span className="text-xs text-slate-500">Send timing</span>
+            <span className="text-xs text-secondary-token">Send timing</span>
             <div className="flex flex-wrap items-center gap-2">
               {TIMING.map((o) => (
                 <button
@@ -271,7 +271,7 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
                     'inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-all',
                     timing === o.key
                       ? 'bg-saffron-500 text-white shadow-sm'
-                      : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'
+                      : 'bg-[var(--surface)] text-secondary-token border border-[var(--border-color)] hover:border-slate-300'
                   )}
                 >
                   <o.icon className="w-3.5 h-3.5" />
@@ -281,7 +281,7 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
             </div>
             {timing === 'later' && (
               <label className="block">
-                <span className="text-xs text-slate-500">Send at</span>
+                <span className="text-xs text-secondary-token">Send at</span>
                 <input
                   type="datetime-local"
                   value={sendAt}
@@ -296,7 +296,7 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
 
       <Card>
         <CardBody className="py-4 space-y-3">
-          <span className="text-xs text-slate-500">Audience</span>
+          <span className="text-xs text-secondary-token">Audience</span>
           <div className="grid grid-cols-3 gap-2">
             {AUDIENCE.map((a) => (
               <button
@@ -307,7 +307,7 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
                   'flex flex-col items-center gap-1.5 px-2 py-3 rounded-2xl border text-xs font-semibold transition-all',
                   audience === a.key
                     ? 'border-saffron-400 bg-saffron-50 text-saffron-700'
-                    : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                    : 'border-[var(--border-color)] bg-[var(--surface)] text-secondary-token hover:border-slate-300'
                 )}
               >
                 <a.icon className="w-4 h-4" />
@@ -318,7 +318,7 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
 
           {audience === 'department' && (
             <label className="block">
-              <span className="text-xs text-slate-500">Department</span>
+              <span className="text-xs text-secondary-token">Department</span>
               <select
                 value={departmentId}
                 onChange={(e) => setDepartmentId(e.target.value)}
@@ -332,7 +332,7 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
                 ))}
               </select>
               {departments.length === 0 && (
-                <p className="text-xs text-slate-400 mt-1">No departments available yet.</p>
+                <p className="text-xs text-muted-token mt-1">No departments available yet.</p>
               )}
             </label>
           )}
@@ -340,7 +340,7 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
           {audience === 'selected' && (
             <div className="space-y-2">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -359,21 +359,21 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
                 <button
                   type="button"
                   onClick={() => setSelectedIds([])}
-                  className="font-semibold text-slate-400 hover:text-slate-600"
+                  className="font-semibold text-muted-token hover:text-secondary-token"
                 >
                   Clear ({selectedIds.length})
                 </button>
               </div>
-              <div className="max-h-64 overflow-y-auto rounded-2xl border border-slate-100 divide-y divide-slate-50">
+              <div className="max-h-64 overflow-y-auto rounded-2xl border border-[var(--border-color)] divide-y divide-[var(--border-color)]">
                 {membersLoading ? (
-                  <p className="px-3 py-6 text-center text-sm text-slate-400">Loading devotees…</p>
+                  <p className="px-3 py-6 text-center text-sm text-muted-token">Loading devotees…</p>
                 ) : filteredMembers.length === 0 ? (
-                  <p className="px-3 py-6 text-center text-sm text-slate-400">No devotees match your search.</p>
+                  <p className="px-3 py-6 text-center text-sm text-muted-token">No devotees match your search.</p>
                 ) : (
                   filteredMembers.map((m) => (
                     <label
                       key={m.id}
-                      className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-slate-50"
+                      className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-[var(--surface-muted)]"
                     >
                       <input
                         type="checkbox"
@@ -383,8 +383,8 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
                       />
                       <Avatar name={memberLabel(m)} url={m.avatar_url} size="sm" />
                       <div className="min-w-0">
-                        <p className="text-sm text-slate-700 truncate">{memberLabel(m)}</p>
-                        {m.email && <p className="text-xs text-slate-400 truncate">{m.email}</p>}
+                        <p className="text-sm text-primary-token truncate">{memberLabel(m)}</p>
+                        {m.email && <p className="text-xs text-muted-token truncate">{m.email}</p>}
                       </div>
                     </label>
                   ))
@@ -395,11 +395,11 @@ export default function BroadcastCompose({ orgId, members, membersLoading, categ
 
           <div className="flex items-center gap-2 pt-1 text-sm">
             <Users className="w-4 h-4 text-saffron-500" />
-            <span className="text-slate-600">Will notify</span>
+            <span className="text-secondary-token">Will notify</span>
             <span className="font-bold text-saffron-600">
               {audience === 'department' && deptMembersLoading ? '…' : recipientIds.length}
             </span>
-            <span className="text-slate-600">{devoteeWord(recipientIds.length)}</span>
+            <span className="text-secondary-token">{devoteeWord(recipientIds.length)}</span>
           </div>
 
           {formError ? (

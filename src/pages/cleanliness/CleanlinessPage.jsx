@@ -15,7 +15,7 @@ import AreasManager from './AreasManager'
 
 const MODULE = 'cleanliness'
 
-const INPUT_CLASS = 'w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
+const INPUT_CLASS = 'w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 
 const PRIORITY_OPTIONS = ['low', 'normal', 'high', 'urgent']
 
@@ -84,7 +84,7 @@ function EmptyState({ icon: Icon, message }) {
   return (
     <Card>
       <CardBody>
-        <div className="flex flex-col items-center py-10 text-slate-400">
+        <div className="flex flex-col items-center py-10 text-muted-token">
           <Icon className="w-12 h-12 mb-3 opacity-30" />
           <p className="text-sm">{message}</p>
         </div>
@@ -118,9 +118,9 @@ function DutyCard({ assignment, busy, onRespond }) {
         <CardBody className="py-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-semibold text-slate-800">{a.title || 'Cleaning duty'}</p>
+              <p className="font-semibold text-primary-token">{a.title || 'Cleaning duty'}</p>
               <AreaLine name={a.area_name} />
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+              <div className="flex items-center gap-1.5 text-xs text-secondary-token mt-1">
                 <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>{formatWhen(a)}</span>
               </div>
@@ -132,7 +132,7 @@ function DutyCard({ assignment, busy, onRespond }) {
           </div>
 
           {a.instructions && (
-            <p className="text-sm text-slate-600 whitespace-pre-wrap bg-slate-50 rounded-xl px-3 py-2">
+            <p className="text-sm text-secondary-token whitespace-pre-wrap bg-[var(--surface-muted)] rounded-xl px-3 py-2">
               {a.instructions}
             </p>
           )}
@@ -154,7 +154,7 @@ function DutyCard({ assignment, busy, onRespond }) {
               </Button>
             )}
             {a.status === 'completed' && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-token">
                 <Clock className="w-3.5 h-3.5" /> Awaiting verification
               </span>
             )}
@@ -192,9 +192,9 @@ function TrackCard({ assignment, members, canVerify, busy, onReassign, onCancel,
       <CardBody className="py-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-semibold text-slate-800">{a.title || 'Cleaning duty'}</p>
+            <p className="font-semibold text-primary-token">{a.title || 'Cleaning duty'}</p>
             <AreaLine name={a.area_name} />
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+            <div className="flex items-center gap-1.5 text-xs text-secondary-token mt-1">
               <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
               <span>{formatWhen(a)}</span>
             </div>
@@ -205,11 +205,11 @@ function TrackCard({ assignment, members, canVerify, busy, onReassign, onCancel,
           </div>
         </div>
 
-        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
+        <div className="flex items-center gap-2 border-t border-[var(--border-color)] pt-3">
           <Avatar name={a.assignee_name} url={a.assignee_avatar} size="sm" />
           <div className="min-w-0">
-            <p className="text-xs text-slate-400">Assigned to</p>
-            <p className="text-sm text-slate-700 truncate">{a.assignee_name ?? 'Unassigned'}</p>
+            <p className="text-xs text-muted-token">Assigned to</p>
+            <p className="text-sm text-primary-token truncate">{a.assignee_name ?? 'Unassigned'}</p>
           </div>
         </div>
 
@@ -340,12 +340,12 @@ function AssignForm({ members, orgId, assignedBy, onCreated }) {
   return (
     <Card>
       <CardBody className="py-4 space-y-3">
-        <p className="text-sm font-semibold text-slate-700">New cleaning duty</p>
+        <p className="text-sm font-semibold text-primary-token">New cleaning duty</p>
 
         {loadingAreas ? (
-          <p className="text-sm text-slate-400 py-4">Loading areas…</p>
+          <p className="text-sm text-muted-token py-4">Loading areas…</p>
         ) : areas.length === 0 ? (
-          <div className="flex flex-col items-center py-8 text-slate-400">
+          <div className="flex flex-col items-center py-8 text-muted-token">
             <MapPin className="w-10 h-10 mb-3 opacity-30" />
             <p className="text-sm">Add a cleaning area first, then assign duties here.</p>
           </div>
@@ -353,14 +353,14 @@ function AssignForm({ members, orgId, assignedBy, onCreated }) {
           <>
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-xs text-slate-500">Area</span>
+                <span className="text-xs text-secondary-token">Area</span>
                 <select value={form.area_id} onChange={(e) => set({ area_id: e.target.value })} className={INPUT_CLASS}>
                   <option value="">Select area…</option>
                   {areas.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                 </select>
               </label>
               <label className="block">
-                <span className="text-xs text-slate-500">Assignee</span>
+                <span className="text-xs text-secondary-token">Assignee</span>
                 <select value={form.user_id} onChange={(e) => set({ user_id: e.target.value })} className={INPUT_CLASS}>
                   <option value="">Select devotee…</option>
                   {members.map((m) => <option key={m.id} value={m.id}>{memberLabel(m)}</option>)}
@@ -369,7 +369,7 @@ function AssignForm({ members, orgId, assignedBy, onCreated }) {
             </div>
 
             <label className="block">
-              <span className="text-xs text-slate-500">Title (optional)</span>
+              <span className="text-xs text-secondary-token">Title (optional)</span>
               <input
                 value={form.title}
                 onChange={(e) => set({ title: e.target.value })}
@@ -380,15 +380,15 @@ function AssignForm({ members, orgId, assignedBy, onCreated }) {
 
             <div className="grid sm:grid-cols-3 gap-3">
               <label className="block">
-                <span className="text-xs text-slate-500">Date</span>
+                <span className="text-xs text-secondary-token">Date</span>
                 <input type="date" value={form.task_date} onChange={(e) => set({ task_date: e.target.value })} className={INPUT_CLASS} />
               </label>
               <label className="block">
-                <span className="text-xs text-slate-500">Time (optional)</span>
+                <span className="text-xs text-secondary-token">Time (optional)</span>
                 <input type="time" value={form.task_time} onChange={(e) => set({ task_time: e.target.value })} className={INPUT_CLASS} />
               </label>
               <label className="block">
-                <span className="text-xs text-slate-500">Priority</span>
+                <span className="text-xs text-secondary-token">Priority</span>
                 <select value={form.priority} onChange={(e) => set({ priority: e.target.value })} className={INPUT_CLASS}>
                   {PRIORITY_OPTIONS.map((p) => <option key={p} value={p}>{capitalize(p)}</option>)}
                 </select>
@@ -396,7 +396,7 @@ function AssignForm({ members, orgId, assignedBy, onCreated }) {
             </div>
 
             <label className="block">
-              <span className="text-xs text-slate-500">Coordinator (verifies completion)</span>
+              <span className="text-xs text-secondary-token">Coordinator (verifies completion)</span>
               <select value={form.coordinator_id} onChange={(e) => set({ coordinator_id: e.target.value })} className={INPUT_CLASS}>
                 <option value="">None</option>
                 {members.map((m) => <option key={m.id} value={m.id}>{memberLabel(m)}</option>)}
@@ -404,7 +404,7 @@ function AssignForm({ members, orgId, assignedBy, onCreated }) {
             </label>
 
             <label className="block">
-              <span className="text-xs text-slate-500">Instructions</span>
+              <span className="text-xs text-secondary-token">Instructions</span>
               <textarea
                 value={form.instructions}
                 onChange={(e) => set({ instructions: e.target.value })}
@@ -420,7 +420,7 @@ function AssignForm({ members, orgId, assignedBy, onCreated }) {
                 onChange={(e) => set({ requires_acceptance: e.target.checked })}
                 className="w-4 h-4 rounded border-slate-300 accent-saffron-500"
               />
-              <span className="text-sm text-slate-600">Requires acceptance by the devotee</span>
+              <span className="text-sm text-secondary-token">Requires acceptance by the devotee</span>
             </label>
 
             {error && (
@@ -593,7 +593,7 @@ export default function CleanlinessPage() {
 
   const activeTab = ['assign', 'areas', 'track'].includes(tab) && !canManage ? 'mine' : tab
 
-  if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading duties…</div>
+  if (loading) return <div className="text-center py-12 text-muted-token text-sm">Loading duties…</div>
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -601,7 +601,7 @@ export default function CleanlinessPage() {
         <div className="w-9 h-9 rounded-2xl grad-tulasi flex items-center justify-center flex-shrink-0">
           <Sparkles className="w-5 h-5 text-white" />
         </div>
-        <h2 className="text-lg font-bold text-slate-800">Cleanliness</h2>
+        <h2 className="text-lg font-bold text-primary-token">Cleanliness</h2>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
@@ -614,7 +614,7 @@ export default function CleanlinessPage() {
               'px-4 py-1.5 rounded-full text-sm font-semibold transition-all',
               activeTab === t.key
                 ? 'bg-saffron-500 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'
+                : 'bg-[var(--surface)] text-secondary-token border border-[var(--border-color)] hover:border-slate-300'
             )}
           >
             {t.label}
@@ -656,7 +656,7 @@ export default function CleanlinessPage() {
 
       {activeTab === 'track' && canManage && (
         <div className="space-y-3">
-          <p className="text-sm font-semibold text-slate-700">All cleaning duties ({allSorted.length})</p>
+          <p className="text-sm font-semibold text-primary-token">All cleaning duties ({allSorted.length})</p>
           {allSorted.length === 0 ? (
             <EmptyState icon={Sparkles} message="No cleaning duties assigned yet." />
           ) : (

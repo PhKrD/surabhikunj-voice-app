@@ -16,9 +16,9 @@ export default function Card({
   ...props
 }) {
   const variants = {
-    solid:   'bg-white border border-slate-100/90 elev-2',
-    glass:   'glass elev-3',
-    outline: 'bg-white/60 border border-slate-200',
+    solid:   'surface border elev-1',
+    glass:   'glass elev-2 dark:bg-[var(--surface-elevated)]/80',
+    outline: 'surface-muted border',
   }
 
   return (
@@ -45,7 +45,7 @@ export function CardHeader({ children, className, border = false }) {
     <div
       className={cn(
         'px-5 pt-5 pb-3',
-        border && 'border-b border-slate-100',
+        border && 'border-b',
         className
       )}
     >
@@ -60,7 +60,7 @@ export function CardBody({ children, className }) {
 
 export function CardFooter({ children, className }) {
   return (
-    <div className={cn('px-5 py-4 bg-slate-50/70 border-t border-slate-100', className)}>
+    <div className={cn('px-5 py-4 surface-muted border-t', className)}>
       {children}
     </div>
   )
@@ -72,11 +72,11 @@ export function CardTitle({ icon: Icon, children, action, className }) {
     <div className={cn('flex items-center justify-between gap-3', className)}>
       <div className="flex items-center gap-2.5 min-w-0">
         {Icon && (
-          <span className="w-8 h-8 rounded-xl bg-saffron-50 flex items-center justify-center flex-shrink-0">
-            <Icon className="w-4 h-4 text-saffron-500" />
+          <span className="w-8 h-8 rounded-xl bg-[var(--color-primary-50)] dark:bg-[var(--color-primary-900)] flex items-center justify-center flex-shrink-0">
+            <Icon className="w-4 h-4 text-[var(--color-primary-600)] dark:text-[var(--color-primary-300)]" />
           </span>
         )}
-        <h3 className="font-bold text-slate-800 truncate">{children}</h3>
+        <h3 className="font-bold text-primary-token truncate">{children}</h3>
       </div>
       {action}
     </div>

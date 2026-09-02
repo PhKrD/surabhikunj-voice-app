@@ -60,8 +60,8 @@ function OrgSettingsTab() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Palette className="w-4 h-4 text-slate-500" />
-            <h3 className="font-semibold text-slate-700">Branding</h3>
+            <Palette className="w-4 h-4 text-secondary-token" />
+            <h3 className="font-semibold text-primary-token">Branding</h3>
           </div>
         </CardHeader>
         <CardBody className="space-y-4">
@@ -75,14 +75,14 @@ function OrgSettingsTab() {
               { key: 'iconName',  label: 'Sidebar Icon (Lucide)', placeholder: 'Flame' },
             ].map(({ key, label, placeholder, type }) => (
               <label key={key} className="block">
-                <span className="text-xs font-medium text-slate-500">{label}</span>
+                <span className="text-xs font-medium text-secondary-token">{label}</span>
                 <div className="flex items-center gap-2 mt-1">
                   {type === 'color' && (
                     <input
                       type="color"
                       value={branding[key] ?? '#f97316'}
                       onChange={(e) => setBranding((b) => ({ ...b, [key]: e.target.value }))}
-                      className="w-10 h-9 rounded-lg border border-slate-200 cursor-pointer p-0.5"
+                      className="w-10 h-9 rounded-lg border border-[var(--border-color)] cursor-pointer p-0.5"
                     />
                   )}
                   <input
@@ -90,7 +90,7 @@ function OrgSettingsTab() {
                     value={branding[key] ?? ''}
                     placeholder={placeholder}
                     onChange={(e) => setBranding((b) => ({ ...b, [key]: e.target.value }))}
-                    className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                    className="flex-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                   />
                 </div>
               </label>
@@ -102,8 +102,8 @@ function OrgSettingsTab() {
       {/* Terminology */}
       <Card>
         <CardHeader>
-          <h3 className="font-semibold text-slate-700">Terminology</h3>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h3 className="font-semibold text-primary-token">Terminology</h3>
+          <p className="text-xs text-muted-token mt-0.5">
             Override module and noun labels for your organization.
           </p>
         </CardHeader>
@@ -111,13 +111,13 @@ function OrgSettingsTab() {
           <div className="grid sm:grid-cols-2 gap-3">
             {TERMS.map(({ key, label, placeholder }) => (
               <label key={key} className="block">
-                <span className="text-xs font-medium text-slate-500">{label}</span>
+                <span className="text-xs font-medium text-secondary-token">{label}</span>
                 <input
                   type="text"
                   value={terminology[key] ?? ''}
                   placeholder={placeholder}
                   onChange={(e) => setTerminology((t) => ({ ...t, [key]: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
             ))}
@@ -154,10 +154,10 @@ function JoinCodeCard({ code }) {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <KeyRound className="w-4 h-4 text-slate-500" />
-          <h3 className="font-semibold text-slate-700">Join Code</h3>
+          <KeyRound className="w-4 h-4 text-secondary-token" />
+          <h3 className="font-semibold text-primary-token">Join Code</h3>
         </div>
-        <p className="text-xs text-slate-400 mt-0.5">
+        <p className="text-xs text-muted-token mt-0.5">
           Share this with people you want to join your organization.
         </p>
       </CardHeader>
@@ -225,13 +225,13 @@ function ModulesTab() {
 
   const categories = [...new Set(modules.map((m) => m.modules?.category).filter(Boolean))]
 
-  if (loading) return <div className="py-12 text-center text-slate-400">Loading modules…</div>
+  if (loading) return <div className="py-12 text-center text-muted-token">Loading modules…</div>
 
   return (
     <div className="space-y-6">
       {categories.map((cat) => (
         <div key={cat}>
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">{cat}</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-muted-token mb-2">{cat}</p>
           <div className="space-y-2">
             {modules
               .filter((m) => m.modules?.category === cat)
@@ -264,7 +264,7 @@ function ModuleRow({ module: m, saving, onToggle, onSaveLabel }) {
           <button
             onClick={() => onToggle(m.module_key, m.enabled, isCore)}
             disabled={isCore || saving[m.module_key]}
-            className="flex-shrink-0 text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed transition-colors"
+            className="flex-shrink-0 text-muted-token hover:text-secondary-token disabled:cursor-not-allowed transition-colors"
             title={isCore ? 'Core module — always on' : (m.enabled ? 'Disable' : 'Enable')}
           >
             {m.enabled
@@ -274,42 +274,42 @@ function ModuleRow({ module: m, saving, onToggle, onSaveLabel }) {
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-medium text-slate-800 text-sm">
+              <p className="font-medium text-primary-token text-sm">
                 {m.label_override ?? m.modules?.name}
               </p>
               {isCore && <Badge variant="default" className="text-[10px] py-0">Core</Badge>}
             </div>
-            <p className="text-xs text-slate-400 truncate">{m.modules?.description}</p>
+            <p className="text-xs text-muted-token truncate">{m.modules?.description}</p>
           </div>
 
           <button
             onClick={() => setOpen((o) => !o)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+            className="p-1.5 rounded-lg text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)]"
           >
             {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
 
         {open && (
-          <div className="mt-3 pt-3 border-t border-slate-100 grid sm:grid-cols-2 gap-3">
+          <div className="mt-3 pt-3 border-t border-[var(--border-color)] grid sm:grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-medium text-slate-500">Custom Label</span>
+              <span className="text-xs font-medium text-secondary-token">Custom Label</span>
               <input
                 type="text"
                 value={label}
                 placeholder={m.modules?.name}
                 onChange={(e) => setLabel(e.target.value)}
-                className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                className="w-full mt-1 px-3 py-2 rounded-xl border border-[var(--border-color)] text-sm"
               />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-500">Custom Icon (Lucide)</span>
+              <span className="text-xs font-medium text-secondary-token">Custom Icon (Lucide)</span>
               <input
                 type="text"
                 value={icon}
                 placeholder={m.modules?.icon}
                 onChange={(e) => setIcon(e.target.value)}
-                className="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                className="w-full mt-1 px-3 py-2 rounded-xl border border-[var(--border-color)] text-sm"
               />
             </label>
             <div className="sm:col-span-2 flex justify-end">
@@ -414,7 +414,7 @@ function RolesTab() {
     setSaving((s) => ({ ...s, [`${roleId}:${permKey}`]: false }))
   }
 
-  if (loading) return <div className="py-12 text-center text-slate-400">Loading roles…</div>
+  if (loading) return <div className="py-12 text-center text-muted-token">Loading roles…</div>
 
   return (
     <div className="space-y-6">
@@ -426,7 +426,7 @@ function RolesTab() {
             value={newRoleName}
             onChange={(e) => setNewRoleName(e.target.value)}
             placeholder="New role name…"
-            className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+            className="flex-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
             onKeyDown={(e) => e.key === 'Enter' && createRole()}
           />
           <Button size="sm" icon={Plus} loading={creating} onClick={createRole}>Create Role</Button>
@@ -456,23 +456,23 @@ function RoleRow({ role, permSet, saving, onTogglePerm, onDelete }) {
         <div className="flex items-center gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-semibold text-slate-800">{role.name}</p>
+              <p className="font-semibold text-primary-token">{role.name}</p>
               {role.is_system && <Badge variant="default" className="text-[10px] py-0">System</Badge>}
             </div>
-            <p className="text-xs text-slate-400">{permSet.size} permission{permSet.size !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-token">{permSet.size} permission{permSet.size !== 1 ? 's' : ''}</p>
           </div>
           <div className="flex items-center gap-1">
             {!role.is_system && (
               <button
                 onClick={() => onDelete(role.id, role.is_system)}
-                className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50"
+                className="p-1.5 rounded-lg text-muted-token hover:text-red-500 hover:bg-red-50"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
             <button
               onClick={() => setOpen((o) => !o)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              className="p-1.5 rounded-lg text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)]"
             >
               {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
@@ -480,10 +480,10 @@ function RoleRow({ role, permSet, saving, onTogglePerm, onDelete }) {
         </div>
 
         {open && (
-          <div className="mt-3 pt-3 border-t border-slate-100 space-y-3">
+          <div className="mt-3 pt-3 border-t border-[var(--border-color)] space-y-3">
             {ALL_PERMISSIONS.map(({ group, keys }) => (
               <div key={group}>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">{group}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-token mb-1.5">{group}</p>
                 <div className="flex flex-wrap gap-2">
                   {keys.map((perm) => {
                     const active = permSet.has(perm)
@@ -497,7 +497,7 @@ function RoleRow({ role, permSet, saving, onTogglePerm, onDelete }) {
                           'text-xs px-2.5 py-1 rounded-full border font-medium transition-all',
                           active
                             ? 'bg-green-50 border-green-300 text-green-700'
-                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-400'
+                            : 'bg-[var(--surface-muted)] border-[var(--border-color)] text-secondary-token hover:border-slate-400'
                         )}
                       >
                         {perm.split('.')[1]}
@@ -552,65 +552,65 @@ function ProfileTab() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader><h3 className="font-semibold text-slate-700">Profile</h3></CardHeader>
+        <CardHeader><h3 className="font-semibold text-primary-token">Profile</h3></CardHeader>
         <CardBody className="space-y-4">
           <div className="flex items-center gap-3">
             <Avatar name={profile.display_name ?? profile.spiritual_name} url={profile.avatar_url} size="lg" />
             <div>
-              <p className="font-semibold text-slate-800">{profile.display_name ?? profile.spiritual_name}</p>
+              <p className="font-semibold text-primary-token">{profile.display_name ?? profile.spiritual_name}</p>
               <Badge variant="default" className="text-xs">{profile.role ?? t('member', 'Member')}</Badge>
             </div>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs text-slate-500 font-medium">Spiritual Name</span>
+              <span className="text-xs text-secondary-token font-medium">Spiritual Name</span>
               <div className="relative mt-1">
-                <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <User className="w-4 h-4 text-muted-token absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   value={form.spiritual_name}
                   onChange={(e) => setForm((f) => ({ ...f, spiritual_name: e.target.value }))}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </div>
             </label>
 
             <label className="block">
-              <span className="text-xs text-slate-500 font-medium">Legal Name</span>
+              <span className="text-xs text-secondary-token font-medium">Legal Name</span>
               <input
                 value={form.legal_name}
                 onChange={(e) => setForm((f) => ({ ...f, legal_name: e.target.value }))}
-                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
               />
             </label>
 
             <label className="block">
-              <span className="text-xs text-slate-500 font-medium">Phone</span>
+              <span className="text-xs text-secondary-token font-medium">Phone</span>
               <div className="relative mt-1">
-                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Phone className="w-4 h-4 text-muted-token absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   value={form.phone}
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </div>
             </label>
 
             <label className="block">
-              <span className="text-xs text-slate-500 font-medium">Room / Unit</span>
+              <span className="text-xs text-secondary-token font-medium">Room / Unit</span>
               <div className="relative mt-1">
-                <Home className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Home className="w-4 h-4 text-muted-token absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   value={form.room_number}
                   onChange={(e) => setForm((f) => ({ ...f, room_number: e.target.value }))}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </div>
             </label>
           </div>
 
           <div className="flex items-center justify-between pt-1">
-            <p className="text-xs text-slate-400">Roles and permissions are managed by your organization admins.</p>
+            <p className="text-xs text-muted-token">Roles and permissions are managed by your organization admins.</p>
             <Button onClick={onSave} icon={Save} loading={saving} disabled={!changed}>
               {saved ? 'Saved ✓' : 'Save'}
             </Button>
@@ -622,8 +622,8 @@ function ProfileTab() {
         <CardBody className="py-4 flex items-start gap-3">
           <ShieldCheck className="w-5 h-5 text-green-500 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-slate-700">Security</p>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-sm font-semibold text-primary-token">Security</p>
+            <p className="text-xs text-secondary-token mt-0.5">
               Authentication is managed by Supabase Auth with permission-based access control per organization.
             </p>
           </div>
@@ -652,12 +652,12 @@ export default function SettingsPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 p-6">
       <div className="flex items-center gap-2">
-        <Settings className="w-5 h-5 text-slate-500" />
-        <h1 className="text-xl font-bold text-slate-800">Settings</h1>
+        <Settings className="w-5 h-5 text-secondary-token" />
+        <h1 className="text-xl font-bold text-primary-token">Settings</h1>
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl w-fit">
+      <div className="flex items-center gap-1 p-1 bg-[var(--surface-muted)] rounded-2xl w-fit">
         {visibleTabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -665,8 +665,8 @@ export default function SettingsPage() {
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all',
               activeKey === key
-                ? 'bg-white text-slate-800 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'bg-[var(--surface)] text-primary-token shadow-sm'
+                : 'text-secondary-token hover:text-primary-token'
             )}
           >
             <Icon className="w-4 h-4" />

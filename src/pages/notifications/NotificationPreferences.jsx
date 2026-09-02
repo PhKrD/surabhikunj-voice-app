@@ -54,8 +54,8 @@ function Toggle({ on, onClick, disabled, busy, color = 'saffron', onLabel = 'On'
       onClick={onClick}
       className={cn(
         'inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all min-w-[70px] sm:min-w-[76px]',
-        on ? activeColors[color] : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300',
-        (disabled || busy) && 'opacity-60 cursor-not-allowed hover:border-slate-200'
+        on ? activeColors[color] : 'bg-[var(--surface)] text-secondary-token border-[var(--border-color)] hover:border-slate-300',
+        (disabled || busy) && 'opacity-60 cursor-not-allowed hover:border-[var(--border-color)]'
       )}
     >
       {busy ? (
@@ -220,7 +220,7 @@ export default function NotificationPreferences() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16 text-slate-400 text-sm gap-2">
+      <div className="flex items-center justify-center py-16 text-muted-token text-sm gap-2">
         <Loader2 className="w-4 h-4 animate-spin" />
         Loading preferences…
       </div>
@@ -228,7 +228,7 @@ export default function NotificationPreferences() {
   }
 
   const inputClass =
-    'w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300 transition disabled:bg-slate-50 disabled:text-slate-400'
+    'w-full px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300 transition disabled:bg-[var(--surface-muted)] disabled:text-muted-token'
 
   return (
     <div className="space-y-5">
@@ -238,15 +238,15 @@ export default function NotificationPreferences() {
             <SlidersHorizontal className="w-4 h-4" />
           </div>
           <div>
-            <p className="font-bold text-slate-800">Global settings</p>
-            <p className="text-xs text-slate-500">Applies to every notification.</p>
+            <p className="font-bold text-primary-token">Global settings</p>
+            <p className="text-xs text-secondary-token">Applies to every notification.</p>
           </div>
         </CardHeader>
         <CardBody className="space-y-5">
           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
-              <p className="font-semibold text-slate-800 text-sm">Mute all push</p>
-              <p className="text-xs text-slate-500 mt-0.5">Silence every push notification on your devices.</p>
+              <p className="font-semibold text-primary-token text-sm">Mute all push</p>
+              <p className="text-xs text-secondary-token mt-0.5">Silence every push notification on your devices.</p>
             </div>
             <Toggle
               on={form.push_muted}
@@ -258,11 +258,11 @@ export default function NotificationPreferences() {
             />
           </div>
 
-          <div className="border-t border-slate-100 pt-4 space-y-3">
+          <div className="border-t border-[var(--border-color)] pt-4 space-y-3">
             <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <p className="font-semibold text-slate-800 text-sm">WhatsApp notifications</p>
-                <p className="text-xs text-slate-500 mt-0.5">Receive selected alerts on WhatsApp.</p>
+                <p className="font-semibold text-primary-token text-sm">WhatsApp notifications</p>
+                <p className="text-xs text-secondary-token mt-0.5">Receive selected alerts on WhatsApp.</p>
               </div>
               <Toggle
                 on={form.whatsapp_opt_in}
@@ -274,7 +274,7 @@ export default function NotificationPreferences() {
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Phone number</label>
+              <label className="text-xs font-medium text-secondary-token mb-1 block">Phone number</label>
               <input
                 type="tel"
                 value={form.phone_e164}
@@ -286,15 +286,15 @@ export default function NotificationPreferences() {
             </div>
           </div>
 
-          <div className="border-t border-slate-100 pt-4">
+          <div className="border-t border-[var(--border-color)] pt-4">
             <div className="flex items-center gap-2 mb-1">
-              <Moon className="w-4 h-4 text-slate-500" />
-              <p className="font-semibold text-slate-800 text-sm">Quiet hours</p>
+              <Moon className="w-4 h-4 text-secondary-token" />
+              <p className="font-semibold text-primary-token text-sm">Quiet hours</p>
             </div>
-            <p className="text-xs text-slate-500 mb-3">No push during these hours.</p>
+            <p className="text-xs text-secondary-token mb-3">No push during these hours.</p>
             <div className="flex items-center gap-3">
               <div className="flex-1">
-                <label className="text-xs font-medium text-slate-500 mb-1 block">From</label>
+                <label className="text-xs font-medium text-secondary-token mb-1 block">From</label>
                 <input
                   type="time"
                   value={form.quiet_start}
@@ -303,7 +303,7 @@ export default function NotificationPreferences() {
                 />
               </div>
               <div className="flex-1">
-                <label className="text-xs font-medium text-slate-500 mb-1 block">To</label>
+                <label className="text-xs font-medium text-secondary-token mb-1 block">To</label>
                 <input
                   type="time"
                   value={form.quiet_end}
@@ -314,8 +314,8 @@ export default function NotificationPreferences() {
             </div>
           </div>
 
-          <div className="border-t border-slate-100 pt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-slate-400">{dirty ? 'You have unsaved changes.' : 'All changes saved.'}</p>
+          <div className="border-t border-[var(--border-color)] pt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-token">{dirty ? 'You have unsaved changes.' : 'All changes saved.'}</p>
             <Button size="sm" icon={Save} loading={savingSettings} disabled={!dirty} onClick={saveSettings}>
               Save settings
             </Button>
@@ -326,27 +326,27 @@ export default function NotificationPreferences() {
       <div className="space-y-4">
         {groupKeys.map((groupKey) => (
           <div key={groupKey}>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400 px-1 mb-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-token px-1 mb-2">
               {GROUP_LABELS[groupKey] ?? groupKey}
             </p>
             <Card>
-              <CardBody className="py-1 divide-y divide-slate-100">
+              <CardBody className="py-1 divide-y divide-[var(--border-color)]">
                 {grouped[groupKey].map((cat) => {
                   const Icon = iconFor(cat)
                   const locked = !cat.user_can_disable
                   return (
                     <div key={cat.key} className="py-3.5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex items-start gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center flex-shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-[var(--surface-muted)] text-secondary-token flex items-center justify-center flex-shrink-0">
                           <Icon className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
-                          <p className="font-semibold text-slate-800 text-sm">{cat.label}</p>
+                          <p className="font-semibold text-primary-token text-sm">{cat.label}</p>
                           {cat.description && (
-                            <p className="text-xs text-slate-500 mt-0.5">{cat.description}</p>
+                            <p className="text-xs text-secondary-token mt-0.5">{cat.description}</p>
                           )}
                           {locked && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 mt-1">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-token mt-1">
                               <Lock className="w-3 h-3" />
                               Always on
                             </span>
@@ -396,7 +396,7 @@ export default function NotificationPreferences() {
         {groupKeys.length === 0 && (
           <Card>
             <CardBody>
-              <div className="flex flex-col items-center py-10 text-slate-400">
+              <div className="flex flex-col items-center py-10 text-muted-token">
                 <Bell className="w-12 h-12 mb-3 opacity-30" />
                 <p className="text-sm">No notification categories configured.</p>
               </div>

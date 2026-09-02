@@ -71,7 +71,7 @@ export default function WebsiteRulesTab({ childId }) {
     }
   }
 
-  if (loading) return <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-8 text-muted-token text-sm">Loading...</div>
 
   return (
     <div className="space-y-4">
@@ -95,20 +95,20 @@ export default function WebsiteRulesTab({ childId }) {
         <Card>
           <CardBody className="py-4 space-y-3">
             <label className="block">
-              <span className="text-xs text-slate-500">Domain</span>
+              <span className="text-xs text-secondary-token">Domain</span>
               <input
                 value={form.domain}
                 onChange={(e) => setForm((f) => ({ ...f, domain: e.target.value }))}
                 placeholder="youtube.com"
-                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-mono"
+                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm font-mono"
               />
             </label>
             <label className="block">
-              <span className="text-xs text-slate-500">Action</span>
+              <span className="text-xs text-secondary-token">Action</span>
               <select
                 value={form.action}
                 onChange={(e) => setForm((f) => ({ ...f, action: e.target.value }))}
-                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
               >
                 <option value="block">Block</option>
                 <option value="allow">Allow (whitelist)</option>
@@ -130,9 +130,9 @@ export default function WebsiteRulesTab({ childId }) {
       <div className="space-y-2">
         {rules.length === 0 && !showForm && (
           <div className="text-center py-10 px-6">
-            <Globe className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm font-medium text-slate-500">No website rules yet</p>
-            <p className="text-xs text-slate-400 mt-1">Add domains to block or allow access.</p>
+            <Globe className="w-8 h-8 text-muted-token mx-auto mb-3" />
+            <p className="text-sm font-medium text-secondary-token">No website rules yet</p>
+            <p className="text-xs text-muted-token mt-1">Add domains to block or allow access.</p>
           </div>
         )}
         {rules.map((rule) => {
@@ -141,17 +141,17 @@ export default function WebsiteRulesTab({ childId }) {
           return (
             <Card key={rule.id}>
               <CardBody className="py-3.5 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                  <Icon className="w-4 h-4 text-slate-600" />
+                <div className="w-8 h-8 rounded-lg bg-[var(--surface-muted)] flex items-center justify-center">
+                  <Icon className="w-4 h-4 text-secondary-token" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-slate-800 truncate">{rule.domain}</p>
-                  <p className="text-xs text-slate-400">{rule.device_id ? 'Device-specific' : 'All devices'}</p>
+                  <p className="font-medium text-primary-token truncate">{rule.domain}</p>
+                  <p className="text-xs text-muted-token">{rule.device_id ? 'Device-specific' : 'All devices'}</p>
                 </div>
                 <Badge variant={meta.variant}>{meta.label}</Badge>
                 <button
                   onClick={() => handleDelete(rule.id)}
-                  className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
+                  className="p-2 rounded-lg text-muted-token hover:text-red-600 hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

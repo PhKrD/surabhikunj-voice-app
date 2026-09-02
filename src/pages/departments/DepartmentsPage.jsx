@@ -184,12 +184,12 @@ export default function DepartmentsPage() {
     }
   }
 
-  if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-12 text-muted-token text-sm">Loading...</div>
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-800">Departments ({departments.length})</h2>
+        <h2 className="text-lg font-bold text-primary-token">Departments ({departments.length})</h2>
         {canManage && (
           <Button
             size="sm"
@@ -207,46 +207,46 @@ export default function DepartmentsPage() {
       {canManage && showForm && (
         <Card>
           <CardBody className="py-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-700">
+            <p className="text-sm font-semibold text-primary-token">
               {editingId ? 'Edit Department' : 'Create Department'}
             </p>
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-xs text-slate-500">Name</span>
+                <span className="text-xs text-secondary-token">Name</span>
                 <input
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="Kitchen"
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
               <label className="block">
-                <span className="text-xs text-slate-500">Icon (emoji/text)</span>
+                <span className="text-xs text-secondary-token">Icon (emoji/text)</span>
                 <input
                   value={form.icon}
                   onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
                   placeholder="🍲"
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
             </div>
             <label className="block">
-              <span className="text-xs text-slate-500">Description</span>
+              <span className="text-xs text-secondary-token">Description</span>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 rows={2}
-                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-none"
+                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm resize-none"
               />
             </label>
             <div className="flex items-center gap-3">
               <label className="block">
-                <span className="text-xs text-slate-500">Color</span>
+                <span className="text-xs text-secondary-token">Color</span>
                 <input
                   type="color"
                   value={form.color}
                   onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
-                  className="w-14 h-10 mt-1 p-1 rounded-xl border border-slate-200"
+                  className="w-14 h-10 mt-1 p-1 rounded-xl border border-[var(--border-color)]"
                 />
               </label>
               <div className="pt-5">
@@ -279,7 +279,7 @@ export default function DepartmentsPage() {
       {departments.length === 0 && (
         <Card>
           <CardBody>
-            <div className="flex flex-col items-center py-10 text-slate-400">
+            <div className="flex flex-col items-center py-10 text-muted-token">
               <Building2 className="w-12 h-12 mb-3 opacity-30" />
               <p className="text-sm">No departments created yet.</p>
             </div>
@@ -309,7 +309,7 @@ export default function DepartmentsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-slate-800 truncate">{dept.name}</p>
+                      <p className="font-semibold text-primary-token truncate">{dept.name}</p>
                       <div className="flex items-center gap-1">
                         {canManage ? (
                           <>
@@ -320,7 +320,7 @@ export default function DepartmentsPage() {
                                 startEdit(dept)
                               }}
                               disabled={archivingId === dept.id}
-                              className="p-1 rounded-md text-slate-400 hover:text-saffron-600 hover:bg-saffron-50"
+                              className="p-1 rounded-md text-muted-token hover:text-saffron-600 hover:bg-saffron-50"
                               title="Edit department"
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -332,24 +332,24 @@ export default function DepartmentsPage() {
                                 removeDepartment(dept)
                               }}
                               disabled={archivingId === dept.id}
-                              className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50"
+                              className="p-1 rounded-md text-muted-token hover:text-red-600 hover:bg-red-50"
                               title="Archive department"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </>
                         ) : null}
-                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 flex-shrink-0 transition-colors" />
+                        <ChevronRight className="w-4 h-4 text-muted-token group-hover:text-secondary-token flex-shrink-0 transition-colors" />
                       </div>
                     </div>
                     {dept.description && (
-                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{dept.description}</p>
+                      <p className="text-xs text-secondary-token mt-0.5 line-clamp-2">{dept.description}</p>
                     )}
                     <div className="flex items-center gap-3 mt-2">
                       {dept.incharge && (
                         <div className="flex items-center gap-1.5">
                           <Avatar name={dept.incharge.spiritual_name} url={dept.incharge.avatar_url} size="sm" />
-                          <p className="text-xs text-slate-600 truncate max-w-28">{dept.incharge.spiritual_name}</p>
+                          <p className="text-xs text-secondary-token truncate max-w-28">{dept.incharge.spiritual_name}</p>
                         </div>
                       )}
                       <Badge variant="default">

@@ -88,7 +88,7 @@ export default function ResidentsPage() {
     <div className="max-w-5xl mx-auto space-y-5">
       <div className="flex items-center gap-2">
         <Users className="w-5 h-5 text-saffron-500" />
-        <h2 className="text-lg font-bold text-slate-800">Residents</h2>
+        <h2 className="text-lg font-bold text-primary-token">Residents</h2>
         <Badge variant="default" className="ml-1">{filtered.length}</Badge>
       </div>
 
@@ -96,20 +96,20 @@ export default function ResidentsPage() {
       <Card>
         <CardBody className="py-4 space-y-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or room..."
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300 focus:border-transparent transition"
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-[var(--border-color)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300 focus:border-transparent transition"
             />
           </div>
           <div className="flex flex-wrap gap-2">
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-saffron-300"
+              className="px-3 py-2 rounded-xl border border-[var(--border-color)] text-sm text-primary-token focus:outline-none focus:ring-2 focus:ring-saffron-300"
             >
               <option value="all">All roles</option>
               {Object.entries(ROLES).map(([value, label]) => (
@@ -119,7 +119,7 @@ export default function ResidentsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-saffron-300"
+              className="px-3 py-2 rounded-xl border border-[var(--border-color)] text-sm text-primary-token focus:outline-none focus:ring-2 focus:ring-saffron-300"
             >
               {STATUS_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -129,7 +129,7 @@ export default function ResidentsPage() {
               <select
                 value={deptFilter}
                 onChange={(e) => setDeptFilter(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-saffron-300"
+                className="px-3 py-2 rounded-xl border border-[var(--border-color)] text-sm text-primary-token focus:outline-none focus:ring-2 focus:ring-saffron-300"
               >
                 <option value="all">All departments</option>
                 {departments.map((d) => (
@@ -143,7 +143,7 @@ export default function ResidentsPage() {
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition ${
                 initiatedOnly
                   ? 'bg-saffron-50 border-saffron-200 text-saffron-700'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  : 'bg-[var(--surface)] border-[var(--border-color)] text-secondary-token hover:bg-[var(--surface-muted)]'
               }`}
             >
               <BadgeCheck className="w-4 h-4" />
@@ -155,11 +155,11 @@ export default function ResidentsPage() {
 
       {/* List */}
       {loading ? (
-        <div className="text-center py-12 text-slate-400 text-sm">Loading residents...</div>
+        <div className="text-center py-12 text-muted-token text-sm">Loading residents...</div>
       ) : filtered.length === 0 ? (
         <Card>
           <CardBody>
-            <div className="flex flex-col items-center py-10 text-slate-400">
+            <div className="flex flex-col items-center py-10 text-muted-token">
               <Users className="w-12 h-12 mb-3 opacity-30" />
               <p className="text-sm">No residents match your filters.</p>
             </div>
@@ -182,23 +182,23 @@ export default function ResidentsPage() {
                   <div className="flex items-center gap-3">
                     <Avatar name={r.spiritual_name} url={r.avatar_url} size="md" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 truncate">{r.spiritual_name}</p>
-                      {r.legal_name && <p className="text-xs text-slate-400 truncate">{r.legal_name}</p>}
+                      <p className="font-semibold text-primary-token truncate">{r.spiritual_name}</p>
+                      {r.legal_name && <p className="text-xs text-muted-token truncate">{r.legal_name}</p>}
                     </div>
-                    <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-muted-token flex-shrink-0" />
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-3">
                     <Badge className={ROLE_COLORS[r.role]}>{ROLES[r.role] ?? r.role}</Badge>
                     {r.initiated && <Badge variant="saffron">Initiated</Badge>}
                     {!r.is_active && <Badge variant="red">Inactive</Badge>}
                     {(deptByProfile[r.id] ?? []).map((d) => (
-                      <span key={d} className="flex items-center gap-1 text-xs text-slate-400">
+                      <span key={d} className="flex items-center gap-1 text-xs text-muted-token">
                         <Building2 className="w-3 h-3" />
                         {d}
                       </span>
                     ))}
                     {r.room_number && (
-                      <span className="flex items-center gap-1 text-xs text-slate-400">
+                      <span className="flex items-center gap-1 text-xs text-muted-token">
                         <MapPin className="w-3 h-3" />
                         Room {r.room_number}
                       </span>

@@ -12,7 +12,7 @@ import { fetchTrackerConfig } from '@/lib/trackerApi'
 import { myMentees, menteePeriodScore, fetchEntriesByDate } from '@/lib/counsellorApi'
 
 function scoreTone(pct) {
-  if (pct == null) return 'text-slate-400'
+  if (pct == null) return 'text-muted-token'
   if (pct >= 80) return 'text-tulasi-600'
   if (pct >= 60) return 'text-saffron-500'
   if (pct >= 40) return 'text-yellow-600'
@@ -116,31 +116,31 @@ export default function CounsellorDashboard() {
     return { total, attention, avg, submitted }
   }, [mentees])
 
-  if (loading) return <div className="p-8 text-center text-slate-400">Loading dashboard…</div>
+  if (loading) return <div className="p-8 text-center text-muted-token">Loading dashboard…</div>
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       <div>
-        <h1 className="text-xl font-extrabold text-slate-800">Counsellor Dashboard</h1>
-        <p className="text-sm text-slate-500">Welcome, {profile?.display_name ?? profile?.spiritual_name}</p>
+        <h1 className="text-xl font-extrabold text-primary-token">Counsellor Dashboard</h1>
+        <p className="text-sm text-secondary-token">Welcome, {profile?.display_name ?? profile?.spiritual_name}</p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card><CardBody className="py-4">
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">My Counsellis</p>
-          <p className="text-2xl font-extrabold text-slate-800 mt-1">{stats.total}</p>
+          <p className="text-[11px] font-bold text-muted-token uppercase tracking-wide">My Counsellis</p>
+          <p className="text-2xl font-extrabold text-primary-token mt-1">{stats.total}</p>
         </CardBody></Card>
         <Card><CardBody className="py-4">
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Sadhana Avg</p>
+          <p className="text-[11px] font-bold text-muted-token uppercase tracking-wide">Sadhana Avg</p>
           <p className={cn('text-2xl font-extrabold mt-1', scoreTone(stats.avg))}>{stats.avg != null ? `${stats.avg.toFixed(1)}%` : '—'}</p>
         </CardBody></Card>
         <Card><CardBody className="py-4">
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Submitted</p>
-          <p className="text-2xl font-extrabold text-slate-800 mt-1">{stats.submitted} / {stats.total}</p>
+          <p className="text-[11px] font-bold text-muted-token uppercase tracking-wide">Submitted</p>
+          <p className="text-2xl font-extrabold text-primary-token mt-1">{stats.submitted} / {stats.total}</p>
         </CardBody></Card>
         <Card><CardBody className="py-4">
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Needs Attention</p>
-          <p className={cn('text-2xl font-extrabold mt-1', stats.attention ? 'text-red-500' : 'text-slate-800')}>{stats.attention}</p>
+          <p className="text-[11px] font-bold text-muted-token uppercase tracking-wide">Needs Attention</p>
+          <p className={cn('text-2xl font-extrabold mt-1', stats.attention ? 'text-red-500' : 'text-primary-token')}>{stats.attention}</p>
         </CardBody></Card>
       </div>
 
@@ -156,10 +156,10 @@ export default function CounsellorDashboard() {
               >
                 <Avatar name={m.name} url={m.avatar_url} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-800">{m.name}</p>
+                  <p className="text-sm font-semibold text-primary-token">{m.name}</p>
                   <p className="text-xs text-red-500">{m.reason}</p>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-300" />
+                <ChevronRight className="w-4 h-4 text-muted-token" />
               </button>
             ))}
           </CardBody>
@@ -168,24 +168,24 @@ export default function CounsellorDashboard() {
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-muted-token absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search counsellis…"
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300 bg-white"
+            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300 bg-[var(--surface)]"
           />
         </div>
         <button
           onClick={() => setOnlyAttention((v) => !v)}
-          className={cn('px-3 py-2.5 rounded-xl text-xs font-semibold border whitespace-nowrap', onlyAttention ? 'bg-red-500 text-white border-red-500' : 'bg-white text-slate-500 border-slate-200')}
+          className={cn('px-3 py-2.5 rounded-xl text-xs font-semibold border whitespace-nowrap', onlyAttention ? 'bg-red-500 text-white border-red-500' : 'bg-[var(--surface)] text-secondary-token border-[var(--border-color)]')}
         >
           Needs Attention
         </button>
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value)}
-          className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white"
+          className="px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-xs font-semibold bg-[var(--surface)]"
         >
           {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
@@ -193,7 +193,7 @@ export default function CounsellorDashboard() {
 
       <div className="space-y-2">
         {filtered.length === 0 && (
-          <Card><CardBody className="py-10 text-center text-slate-400">
+          <Card><CardBody className="py-10 text-center text-muted-token">
             <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
             <p>No counsellis {onlyAttention ? 'need attention right now' : 'assigned yet'}.</p>
           </CardBody></Card>
@@ -203,17 +203,17 @@ export default function CounsellorDashboard() {
             <CardBody className="flex items-center gap-3 cursor-pointer" onClick={() => navigate(`counselli/${m.id}`)}>
               <Avatar name={m.name} url={m.avatar_url} size="md" />
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-slate-800 truncate">{m.name}</p>
-                <p className="text-xs text-slate-400">
+                <p className="font-semibold text-primary-token truncate">{m.name}</p>
+                <p className="text-xs text-muted-token">
                   {m.lastActivity ? `Last activity ${format(new Date(m.lastActivity), 'd MMM')}` : 'No activity yet'}
                 </p>
               </div>
               {m.needsAttention && <Badge variant="danger" className="text-[10px]">Needs Attention</Badge>}
               <div className="text-right">
                 <p className={cn('font-bold text-sm', scoreTone(m.weekPct))}>{m.weekPct != null ? `${m.weekPct.toFixed(0)}%` : '—'}</p>
-                <p className="text-[10px] text-slate-400">this week</p>
+                <p className="text-[10px] text-muted-token">this week</p>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-300" />
+              <ChevronRight className="w-4 h-4 text-muted-token" />
             </CardBody>
           </Card>
         ))}

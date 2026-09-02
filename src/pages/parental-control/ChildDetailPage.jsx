@@ -60,8 +60,8 @@ export default function ChildDetailPage() {
 
   const activeDevices = devices.filter((d) => d.is_active)
 
-  if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
-  if (!child) return <div className="text-center py-12 text-slate-400 text-sm">Child not found.</div>
+  if (loading) return <div className="text-center py-12 text-muted-token text-sm">Loading...</div>
+  if (!child) return <div className="text-center py-12 text-muted-token text-sm">Child not found.</div>
 
   const ActiveComponent = TABS.find((t) => t.key === activeTab)?.Component
 
@@ -70,7 +70,7 @@ export default function ChildDetailPage() {
       {/* Header */}
       <button
         onClick={() => navigate('/parental-control')}
-        className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
+        className="flex items-center gap-1.5 text-sm text-secondary-token hover:text-primary-token"
       >
         <ArrowLeft className="w-4 h-4" /> All children
       </button>
@@ -78,8 +78,8 @@ export default function ChildDetailPage() {
       <div className="flex items-center gap-3">
         <Avatar name={child.display_name} size="lg" />
         <div className="flex-1">
-          <h2 className="text-lg font-bold text-slate-800">{child.display_name}</h2>
-          <p className="text-sm text-slate-400">
+          <h2 className="text-lg font-bold text-primary-token">{child.display_name}</h2>
+          <p className="text-sm text-muted-token">
             {activeDevices.length} active device{activeDevices.length === 1 ? '' : 's'}
           </p>
         </div>
@@ -89,7 +89,7 @@ export default function ChildDetailPage() {
       <CommandCenter devices={devices} />
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-slate-100 overflow-x-auto scrollbar-hide">
+      <div className="flex gap-1 border-b border-[var(--border-color)] overflow-x-auto scrollbar-hide">
         {TABS.map((tab) => {
           const Icon = tab.icon
           return (
@@ -100,7 +100,7 @@ export default function ChildDetailPage() {
                 'flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                 activeTab === tab.key
                   ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  : 'border-transparent text-secondary-token hover:text-primary-token'
               )}
             >
               <Icon className="w-4 h-4" /> {tab.label}

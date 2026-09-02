@@ -106,14 +106,14 @@ export default function LocationTab({ childId }) {
     }
   }
 
-  if (loading) return <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-8 text-muted-token text-sm">Loading...</div>
 
   return (
     <div className="space-y-4">
       {/* Latest location */}
       <Card>
         <CardBody className="py-4">
-          <p className="text-sm font-semibold text-slate-700 mb-2">Last known location</p>
+          <p className="text-sm font-semibold text-primary-token mb-2">Last known location</p>
           {latest ? (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
@@ -128,18 +128,18 @@ export default function LocationTab({ childId }) {
                 >
                   {latest.latitude.toFixed(5)}, {latest.longitude.toFixed(5)}
                 </a>
-                <p className="text-xs text-slate-400">{new Date(latest.recorded_at).toLocaleString()}</p>
+                <p className="text-xs text-muted-token">{new Date(latest.recorded_at).toLocaleString()}</p>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-slate-400">No location reported yet.</p>
+            <p className="text-sm text-muted-token">No location reported yet.</p>
           )}
         </CardBody>
       </Card>
 
       {/* Geofences */}
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-slate-700">Safe zones</p>
+        <p className="text-sm font-semibold text-primary-token">Safe zones</p>
         <Button
           size="sm"
           icon={showForm ? X : Plus}
@@ -156,41 +156,41 @@ export default function LocationTab({ childId }) {
         <Card>
           <CardBody className="py-4 space-y-3">
             <label className="block">
-              <span className="text-xs text-slate-500">Name</span>
+              <span className="text-xs text-secondary-token">Name</span>
               <input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Home"
-                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
               />
             </label>
             <div className="grid sm:grid-cols-3 gap-3">
               <label className="block">
-                <span className="text-xs text-slate-500">Latitude</span>
+                <span className="text-xs text-secondary-token">Latitude</span>
                 <input
                   value={form.latitude}
                   onChange={(e) => setForm((f) => ({ ...f, latitude: e.target.value }))}
                   placeholder="18.5204"
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
               <label className="block">
-                <span className="text-xs text-slate-500">Longitude</span>
+                <span className="text-xs text-secondary-token">Longitude</span>
                 <input
                   value={form.longitude}
                   onChange={(e) => setForm((f) => ({ ...f, longitude: e.target.value }))}
                   placeholder="73.8567"
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
               <label className="block">
-                <span className="text-xs text-slate-500">Radius (m)</span>
+                <span className="text-xs text-secondary-token">Radius (m)</span>
                 <input
                   type="number"
                   min={50}
                   value={form.radiusMeters}
                   onChange={(e) => setForm((f) => ({ ...f, radiusMeters: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
             </div>
@@ -216,20 +216,20 @@ export default function LocationTab({ childId }) {
 
       <div className="space-y-2">
         {geofences.length === 0 && !showForm && (
-          <p className="text-sm text-slate-400 text-center py-4">No safe zones yet.</p>
+          <p className="text-sm text-muted-token text-center py-4">No safe zones yet.</p>
         )}
         {geofences.map((gf) => (
           <Card key={gf.id}>
             <CardBody className="py-3.5 flex items-center gap-3">
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-slate-800 truncate">{gf.name}</p>
-                <p className="text-xs text-slate-400">
+                <p className="font-medium text-primary-token truncate">{gf.name}</p>
+                <p className="text-xs text-muted-token">
                   {gf.latitude.toFixed(5)}, {gf.longitude.toFixed(5)} · {gf.radius_meters}m radius
                 </p>
               </div>
               <button
                 onClick={() => handleDeleteGeofence(gf)}
-                className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
+                className="p-2 rounded-lg text-muted-token hover:text-red-600 hover:bg-red-50"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -241,10 +241,10 @@ export default function LocationTab({ childId }) {
       {/* History */}
       {history.length > 0 && (
         <div>
-          <p className="text-sm font-semibold text-slate-700 mb-2">Recent history</p>
+          <p className="text-sm font-semibold text-primary-token mb-2">Recent history</p>
           <div className="space-y-1.5">
             {history.map((loc) => (
-              <div key={loc.id} className="flex items-center justify-between text-xs text-slate-500 px-2">
+              <div key={loc.id} className="flex items-center justify-between text-xs text-secondary-token px-2">
                 <a
                   href={`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`}
                   target="_blank"

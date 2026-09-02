@@ -7,24 +7,24 @@ import { cn } from '@/lib/utils'
 const variantMap = {
   success: {
     icon: CheckCircle2,
-    card: 'border-tulasi-200 bg-tulasi-50',
-    iconWrap: 'bg-tulasi-100 text-tulasi-700',
-    title: 'text-tulasi-900',
-    desc: 'text-tulasi-700',
+    card: 'border-tulasi-200 bg-tulasi-50 dark:border-tulasi-800 dark:bg-tulasi-950/60',
+    iconWrap: 'bg-tulasi-100 text-tulasi-700 dark:bg-tulasi-900 dark:text-tulasi-300',
+    title: 'text-tulasi-900 dark:text-tulasi-100',
+    desc: 'text-tulasi-700 dark:text-tulasi-300',
   },
   error: {
     icon: AlertCircle,
-    card: 'border-red-200 bg-red-50',
-    iconWrap: 'bg-red-100 text-red-700',
-    title: 'text-red-900',
-    desc: 'text-red-700',
+    card: 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/60',
+    iconWrap: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+    title: 'text-red-900 dark:text-red-100',
+    desc: 'text-red-700 dark:text-red-300',
   },
   info: {
     icon: Info,
-    card: 'border-slate-200 bg-white',
-    iconWrap: 'bg-slate-100 text-slate-700',
-    title: 'text-slate-900',
-    desc: 'text-slate-600',
+    card: 'border surface',
+    iconWrap: 'surface-muted text-secondary-token',
+    title: 'text-primary-token',
+    desc: 'text-secondary-token',
   },
 }
 
@@ -68,7 +68,8 @@ function ToastItem({ toast }) {
           {toast.actionLabel ? (
             <button
               onClick={handleAction}
-              className="mt-1.5 text-xs font-semibold text-saffron-700 hover:text-saffron-800"
+              className="mt-1.5 text-xs font-semibold"
+              style={{ color: 'var(--color-primary)' }}
             >
               {toast.actionLabel}
             </button>
@@ -76,7 +77,7 @@ function ToastItem({ toast }) {
         </div>
         <button
           onClick={() => removeToast(toast.id)}
-          className="p-1 rounded-md text-slate-400 hover:text-slate-600"
+          className="p-1 rounded-md text-muted-token hover:text-primary-token"
         >
           <X className="w-4 h-4" />
         </button>

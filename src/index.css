@@ -1,6 +1,24 @@
 @import "tailwindcss";
 
+/* Class-based dark mode (Tailwind v4 CSS-first config) — toggled by
+   themeStore.js via document.documentElement.classList, independent of
+   OS `prefers-color-scheme` so users get an explicit, persisted choice. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
+  /* ---- VOICE primary: spiritual purple (org branding.primaryColor can
+     still override --color-primary at runtime via orgStore.js) ---- */
+  --color-primary-50: #f4f2ff;
+  --color-primary-100: #ebe6ff;
+  --color-primary-200: #d9d0ff;
+  --color-primary-300: #bcabff;
+  --color-primary-400: #9b7dff;
+  --color-primary-500: #7c5cf5;
+  --color-primary-600: #6845e0;
+  --color-primary-700: #5636bd;
+  --color-primary-800: #472e98;
+  --color-primary-900: #3b2a79;
+
   --color-saffron-50: #fff8f0;
   --color-saffron-100: #ffecd9;
   --color-saffron-200: #ffd4a8;
@@ -38,6 +56,50 @@
   --font-devanagari: 'Noto Serif Devanagari', Georgia, serif;
 }
 
+/* =====================================================================
+   VOICE SEMANTIC SURFACE TOKENS
+   Runtime CSS variables (not @theme) so they can be swapped per-org
+   (orgStore.js applyBranding) and per-theme (.dark class) without a
+   Tailwind rebuild. Components should prefer `bg-[var(--surface)]`-style
+   utilities or the .surface/.surface-elevated helpers below over raw
+   Tailwind slate/white classes when redesigning a screen.
+   ===================================================================== */
+:root {
+  --color-primary: var(--color-primary-600);
+  --color-accent: var(--color-saffron-500);
+
+  --surface-app: #f7f6fb;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-muted: #f1f0f8;
+  --text-primary: #1e1b2e;
+  --text-secondary: #56526b;
+  --text-muted: #8a8699;
+  --border-color: #e9e7f2;
+  --color-success: #16a34a;
+  --color-warning: #ea6c0a;
+  --color-danger: #e11d48;
+  --color-info: #2563eb;
+}
+
+.dark {
+  --color-primary: var(--color-primary-400);
+  --color-accent: var(--color-saffron-400);
+
+  --surface-app: #16141f;
+  --surface: #1e1c2a;
+  --surface-elevated: #262433;
+  --surface-muted: #2a2839;
+  --text-primary: #f2f1f7;
+  --text-secondary: #b5b1c6;
+  --text-muted: #837f96;
+  --border-color: #34324a;
+  --color-success: #4ade80;
+  --color-warning: #ffb870;
+  --color-danger: #fb7185;
+  --color-info: #60a5fa;
+}
+
 * {
   box-sizing: border-box;
   /* Prevent tap-highlight flash which makes taps feel laggy on iOS */
@@ -60,6 +122,9 @@ body {
   letter-spacing: -0.011em;
   /* Lock body so the only scroll root is the main container */
   overflow: hidden;
+  background-color: var(--surface-app);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* =====================================================================
@@ -109,9 +174,9 @@ body {
     width: 100%;
     padding: 0.7rem 0.95rem;
     border-radius: 1rem;
-    border: 1.5px solid #e8ebf1;
-    background-color: #fbfcfe;
-    color: #1e293b;
+    border: 1.5px solid var(--border-color);
+    background-color: var(--surface);
+    color: var(--text-primary);
     font-size: 0.9rem;
     font-family: inherit;
     font-weight: 500;
@@ -123,7 +188,7 @@ body {
 
   input::placeholder,
   textarea::placeholder {
-    color: #a4aec0;
+    color: var(--text-muted);
     font-weight: 400;
   }
 
@@ -138,8 +203,8 @@ body {
   input[type="datetime-local"]:hover,
   textarea:hover,
   select:hover {
-    border-color: #d6dced;
-    background-color: #fff;
+    border-color: var(--color-primary-200);
+    background-color: var(--surface);
   }
 
   input[type="text"]:focus,
@@ -154,15 +219,15 @@ body {
   input[type="datetime-local"]:focus,
   textarea:focus,
   select:focus {
-    border-color: #ff9638;
-    background-color: #fff;
-    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.13),
-                0 4px 14px -6px rgba(249, 115, 22, 0.35);
+    border-color: var(--color-primary);
+    background-color: var(--surface);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 16%, transparent),
+                0 4px 14px -6px color-mix(in srgb, var(--color-primary) 35%, transparent);
   }
 
   input:disabled, textarea:disabled, select:disabled {
-    background-color: #f1f3f7;
-    color: #94a3b8;
+    background-color: var(--surface-muted);
+    color: var(--text-muted);
     cursor: not-allowed;
   }
 
@@ -212,8 +277,8 @@ body {
     width: 1.3rem;
     height: 1.3rem;
     flex-shrink: 0;
-    border: 2px solid #cbd5e1;
-    background-color: #fff;
+    border: 2px solid var(--border-color);
+    background-color: var(--surface);
     cursor: pointer;
     position: relative;
     transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -222,13 +287,14 @@ body {
   input[type="radio"]    { border-radius: 50%; }
 
   input[type="checkbox"]:hover,
-  input[type="radio"]:hover { border-color: #ff9638; }
+  input[type="radio"]:hover { border-color: var(--color-primary); }
 
   input[type="checkbox"]:checked,
   input[type="radio"]:checked {
-    background-image: linear-gradient(135deg, #ff9638 0%, #f97316 100%);
+    background-color: var(--color-primary);
+    background-image: none;
     border-color: transparent;
-    box-shadow: 0 4px 12px -3px rgba(249, 115, 22, 0.5);
+    box-shadow: 0 4px 12px -3px color-mix(in srgb, var(--color-primary) 50%, transparent);
   }
 
   input[type="checkbox"]:checked::after {
@@ -253,7 +319,7 @@ body {
 
   input[type="checkbox"]:focus-visible,
   input[type="radio"]:focus-visible {
-    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.2);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 20%, transparent);
   }
 
   /* ---- Range slider ---- */
@@ -263,7 +329,7 @@ body {
     width: 100%;
     height: 0.4rem;
     border-radius: 999px;
-    background: #e8ebf1;
+    background: var(--border-color);
     outline: none;
   }
   input[type="range"]::-webkit-slider-thumb {
@@ -271,8 +337,8 @@ body {
     width: 1.25rem;
     height: 1.25rem;
     border-radius: 50%;
-    background: linear-gradient(135deg, #ff9638, #f97316);
-    box-shadow: 0 3px 10px -2px rgba(249, 115, 22, 0.6);
+    background: var(--color-primary);
+    box-shadow: 0 3px 10px -2px color-mix(in srgb, var(--color-primary) 60%, transparent);
     cursor: pointer;
     transition: transform 0.15s ease;
   }
@@ -281,7 +347,7 @@ body {
   /* ---- Labels ---- */
   label {
     font-weight: 600;
-    color: #475569;
+    color: var(--text-secondary);
     letter-spacing: -0.005em;
   }
 
@@ -307,15 +373,15 @@ body {
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: #d3dae5;
+    background: var(--border-color);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: content-box;
   }
-  ::-webkit-scrollbar-thumb:hover { background: #b6c0d0; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); background-clip: content-box; }
 
   /* ---- Text selection ---- */
-  ::selection { background: rgba(249, 115, 22, 0.22); color: #7c3a10; }
+  ::selection { background: color-mix(in srgb, var(--color-primary) 25%, transparent); color: var(--color-primary-900); }
 }
 
 #root {
@@ -346,15 +412,35 @@ body {
 .grad-emerald  { background-image: linear-gradient(135deg, #34d399 0%, #10b981 50%, #059669 100%); }
 .grad-violet   { background-image: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 50%, #7c3aed 100%); }
 
-/* Soft radial app background */
+/* App shell background — a very subtle wash, not a competing rainbow.
+   Kept intentionally quiet so cards/content provide the visual hierarchy. */
 .app-bg {
-  background-color: #f6f7fb;
+  background-color: var(--surface-app);
   background-image:
-    radial-gradient(at 0% 0%, rgba(249, 115, 22, 0.10) 0px, transparent 45%),
-    radial-gradient(at 100% 0%, rgba(217, 70, 239, 0.08) 0px, transparent 45%),
-    radial-gradient(at 100% 100%, rgba(34, 197, 94, 0.08) 0px, transparent 45%),
-    radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.08) 0px, transparent 45%);
+    radial-gradient(at 0% 0%, rgba(124, 92, 245, 0.06) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(249, 115, 22, 0.05) 0px, transparent 50%);
 }
+
+/* =====================================================================
+   VOICE SURFACE PRIMITIVES
+   Prefer these over ad-hoc bg-white/border-slate-100 in new/redesigned
+   screens so light + dark mode stay correct for free.
+   ===================================================================== */
+.surface {
+  background-color: var(--surface);
+  border-color: var(--border-color);
+}
+.surface-elevated {
+  background-color: var(--surface-elevated);
+  border-color: var(--border-color);
+}
+.surface-muted {
+  background-color: var(--surface-muted);
+  border-color: var(--border-color);
+}
+.text-primary-token { color: var(--text-primary); }
+.text-secondary-token { color: var(--text-secondary); }
+.text-muted-token { color: var(--text-muted); }
 
 /* Colored glow shadows */
 .glow-saffron { box-shadow: 0 12px 30px -8px rgba(249, 115, 22, 0.45); }

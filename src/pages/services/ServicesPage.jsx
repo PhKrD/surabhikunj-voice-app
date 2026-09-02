@@ -19,7 +19,7 @@ import { shareToWhatsApp } from '@/lib/whatsapp'
 
 const MODULE = 'service'
 
-const INPUT_CLASS = 'w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
+const INPUT_CLASS = 'w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 
 const PRIORITY_OPTIONS = ['low', 'normal', 'high', 'urgent']
 
@@ -110,7 +110,7 @@ function EmptyState({ icon: Icon, message }) {
   return (
     <Card>
       <CardBody>
-        <div className="flex flex-col items-center py-10 text-slate-400">
+        <div className="flex flex-col items-center py-10 text-muted-token">
           <Icon className="w-12 h-12 mb-3 opacity-30" />
           <p className="text-sm">{message}</p>
         </div>
@@ -136,13 +136,13 @@ function ServiceCard({ assignment, busy, onRespond }) {
         <CardBody className="py-4 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-semibold text-slate-800">{a.title}</p>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+              <p className="font-semibold text-primary-token">{a.title}</p>
+              <div className="flex items-center gap-1.5 text-xs text-secondary-token mt-1">
                 <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>{formatWhen(a)}</span>
               </div>
               {a.area_name && (
-                <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+                <div className="flex items-center gap-1.5 text-xs text-secondary-token mt-1">
                   <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
                   <span className="truncate">{a.area_name}</span>
                 </div>
@@ -165,7 +165,7 @@ function ServiceCard({ assignment, busy, onRespond }) {
                 {showInstructions ? 'Hide instructions' : 'View instructions'}
               </button>
               {showInstructions && (
-                <p className="mt-2 text-sm text-slate-600 whitespace-pre-wrap bg-slate-50 rounded-xl px-3 py-2">
+                <p className="mt-2 text-sm text-secondary-token whitespace-pre-wrap bg-[var(--surface-muted)] rounded-xl px-3 py-2">
                   {a.instructions}
                 </p>
               )}
@@ -173,12 +173,12 @@ function ServiceCard({ assignment, busy, onRespond }) {
           )}
 
           {a.coordinator_name && (
-            <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
+            <div className="flex items-center justify-between gap-2 border-t border-[var(--border-color)] pt-3">
               <div className="flex items-center gap-2 min-w-0">
                 <Avatar name={a.coordinator_name} size="sm" />
                 <div className="min-w-0">
-                  <p className="text-xs text-slate-400">Coordinator</p>
-                  <p className="text-sm text-slate-700 truncate">{a.coordinator_name}</p>
+                  <p className="text-xs text-muted-token">Coordinator</p>
+                  <p className="text-sm text-primary-token truncate">{a.coordinator_name}</p>
                 </div>
               </div>
               {hasContact && (
@@ -211,7 +211,7 @@ function ServiceCard({ assignment, busy, onRespond }) {
               </Button>
             )}
             {a.status === 'completed' && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-token">
                 <Clock className="w-3.5 h-3.5" /> Awaiting verification
               </span>
             )}
@@ -249,13 +249,13 @@ function ManageCard({ assignment, members, canVerify, busy, onReassign, onCancel
       <CardBody className="py-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-semibold text-slate-800">{a.title}</p>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+            <p className="font-semibold text-primary-token">{a.title}</p>
+            <div className="flex items-center gap-1.5 text-xs text-secondary-token mt-1">
               <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
               <span>{formatWhen(a)}</span>
             </div>
             {a.area_name && (
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+              <div className="flex items-center gap-1.5 text-xs text-secondary-token mt-1">
                 <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
                 <span className="truncate">{a.area_name}</span>
               </div>
@@ -267,11 +267,11 @@ function ManageCard({ assignment, members, canVerify, busy, onReassign, onCancel
           </div>
         </div>
 
-        <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
+        <div className="flex items-center gap-2 border-t border-[var(--border-color)] pt-3">
           <Avatar name={a.assignee_name} url={a.assignee_avatar} size="sm" />
           <div className="min-w-0">
-            <p className="text-xs text-slate-400">Assigned to</p>
-            <p className="text-sm text-slate-700 truncate">{a.assignee_name ?? 'Unassigned'}</p>
+            <p className="text-xs text-muted-token">Assigned to</p>
+            <p className="text-sm text-primary-token truncate">{a.assignee_name ?? 'Unassigned'}</p>
           </div>
         </div>
 
@@ -402,10 +402,10 @@ function NewServiceForm({ members, orgId, assignedBy, onCreated }) {
   return (
     <Card>
       <CardBody className="py-4 space-y-3">
-        <p className="text-sm font-semibold text-slate-700">New Service</p>
+        <p className="text-sm font-semibold text-primary-token">New Service</p>
 
         <label className="block">
-          <span className="text-xs text-slate-500">Title</span>
+          <span className="text-xs text-secondary-token">Title</span>
           <input
             value={form.title}
             onChange={(e) => set({ title: e.target.value })}
@@ -416,14 +416,14 @@ function NewServiceForm({ members, orgId, assignedBy, onCreated }) {
 
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-xs text-slate-500">Assignee</span>
+            <span className="text-xs text-secondary-token">Assignee</span>
             <select value={form.user_id} onChange={(e) => set({ user_id: e.target.value })} className={INPUT_CLASS}>
               <option value="">Select devotee…</option>
               {members.map((m) => <option key={m.id} value={m.id}>{memberLabel(m)}</option>)}
             </select>
           </label>
           <label className="block">
-            <span className="text-xs text-slate-500">Coordinator (optional)</span>
+            <span className="text-xs text-secondary-token">Coordinator (optional)</span>
             <select value={form.coordinator_id} onChange={(e) => set({ coordinator_id: e.target.value })} className={INPUT_CLASS}>
               <option value="">None</option>
               {members.map((m) => <option key={m.id} value={m.id}>{memberLabel(m)}</option>)}
@@ -433,7 +433,7 @@ function NewServiceForm({ members, orgId, assignedBy, onCreated }) {
 
         <div className="grid sm:grid-cols-3 gap-3">
           <label className="block">
-            <span className="text-xs text-slate-500">{form.repeat ? 'Date (single, unused)' : 'Date'}</span>
+            <span className="text-xs text-secondary-token">{form.repeat ? 'Date (single, unused)' : 'Date'}</span>
             <input
               type="date"
               value={form.task_date}
@@ -443,11 +443,11 @@ function NewServiceForm({ members, orgId, assignedBy, onCreated }) {
             />
           </label>
           <label className="block">
-            <span className="text-xs text-slate-500">Time (optional)</span>
+            <span className="text-xs text-secondary-token">Time (optional)</span>
             <input type="time" value={form.task_time} onChange={(e) => set({ task_time: e.target.value })} className={INPUT_CLASS} />
           </label>
           <label className="block">
-            <span className="text-xs text-slate-500">Priority</span>
+            <span className="text-xs text-secondary-token">Priority</span>
             <select value={form.priority} onChange={(e) => set({ priority: e.target.value })} className={INPUT_CLASS}>
               {PRIORITY_OPTIONS.map((p) => <option key={p} value={p}>{capitalize(p)}</option>)}
             </select>
@@ -455,7 +455,7 @@ function NewServiceForm({ members, orgId, assignedBy, onCreated }) {
         </div>
 
         <label className="block">
-          <span className="text-xs text-slate-500">Instructions</span>
+          <span className="text-xs text-secondary-token">Instructions</span>
           <textarea
             value={form.instructions}
             onChange={(e) => set({ instructions: e.target.value })}
@@ -471,7 +471,7 @@ function NewServiceForm({ members, orgId, assignedBy, onCreated }) {
             onChange={(e) => set({ requires_acceptance: e.target.checked })}
             className="w-4 h-4 rounded border-slate-300 accent-saffron-500"
           />
-          <span className="text-sm text-slate-600">Requires acceptance by the devotee</span>
+          <span className="text-sm text-secondary-token">Requires acceptance by the devotee</span>
         </label>
 
         <label className="flex items-center gap-2 cursor-pointer">
@@ -481,7 +481,7 @@ function NewServiceForm({ members, orgId, assignedBy, onCreated }) {
             onChange={(e) => set({ repeat: e.target.checked })}
             className="w-4 h-4 rounded border-slate-300 accent-saffron-500"
           />
-          <span className="text-sm text-slate-600 inline-flex items-center gap-1">
+          <span className="text-sm text-secondary-token inline-flex items-center gap-1">
             <Repeat className="w-3.5 h-3.5" /> Repeat on a schedule
           </span>
         </label>
@@ -489,15 +489,15 @@ function NewServiceForm({ members, orgId, assignedBy, onCreated }) {
         {form.repeat && (
           <div className="grid sm:grid-cols-3 gap-3 rounded-2xl bg-saffron-50 p-3">
             <label className="block">
-              <span className="text-xs text-slate-500">From</span>
+              <span className="text-xs text-secondary-token">From</span>
               <input type="date" value={form.from_date} onChange={(e) => set({ from_date: e.target.value })} className={INPUT_CLASS} />
             </label>
             <label className="block">
-              <span className="text-xs text-slate-500">To</span>
+              <span className="text-xs text-secondary-token">To</span>
               <input type="date" value={form.to_date} onChange={(e) => set({ to_date: e.target.value })} className={INPUT_CLASS} />
             </label>
             <label className="block">
-              <span className="text-xs text-slate-500">Recurrence</span>
+              <span className="text-xs text-secondary-token">Recurrence</span>
               <select value={form.recurrence} onChange={(e) => set({ recurrence: e.target.value })} className={INPUT_CLASS}>
                 {RECURRENCE_OPTIONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
@@ -672,7 +672,7 @@ export default function ServicesPage() {
 
   const activeTab = tab === 'manage' && !canManage ? 'upcoming' : tab
 
-  if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading services…</div>
+  if (loading) return <div className="text-center py-12 text-muted-token text-sm">Loading services…</div>
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -681,7 +681,7 @@ export default function ServicesPage() {
           <div className="w-9 h-9 rounded-2xl grad-saffron flex items-center justify-center flex-shrink-0">
             <HeartHandshake className="w-5 h-5 text-white" />
           </div>
-          <h2 className="text-lg font-bold text-slate-800">IM Services</h2>
+          <h2 className="text-lg font-bold text-primary-token">IM Services</h2>
         </div>
         {canManage && activeTab === 'manage' && (
           <Button size="sm" icon={showForm ? X : Plus} onClick={() => setShowForm((v) => !v)}>
@@ -700,7 +700,7 @@ export default function ServicesPage() {
               'px-4 py-1.5 rounded-full text-sm font-semibold transition-all',
               activeTab === t.key
                 ? 'bg-saffron-500 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'
+                : 'bg-[var(--surface)] text-secondary-token border border-[var(--border-color)] hover:border-slate-300'
             )}
           >
             {t.label}
@@ -744,7 +744,7 @@ export default function ServicesPage() {
           )}
 
           <div className="space-y-3">
-            <p className="text-sm font-semibold text-slate-700">All services ({allSorted.length})</p>
+            <p className="text-sm font-semibold text-primary-token">All services ({allSorted.length})</p>
             {allSorted.length === 0 ? (
               <EmptyState icon={Inbox} message="No services assigned yet." />
             ) : (

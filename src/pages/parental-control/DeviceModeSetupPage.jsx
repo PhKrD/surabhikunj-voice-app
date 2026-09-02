@@ -30,8 +30,8 @@ export default function DeviceModeSetupPage() {
         <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto">
           <ShieldCheck className="w-7 h-7 text-indigo-600" />
         </div>
-        <h2 className="text-lg font-bold text-slate-800">How are you using Parental Control?</h2>
-        <p className="text-sm text-slate-500">
+        <h2 className="text-lg font-bold text-primary-token">How are you using Parental Control?</h2>
+        <p className="text-sm text-secondary-token">
           This only configures THIS device — VOICE stays one app either way.
         </p>
       </div>
@@ -43,8 +43,8 @@ export default function DeviceModeSetupPage() {
               <UserRound className="w-5.5 h-5.5 text-tulasi-600" />
             </div>
             <div>
-              <p className="font-semibold text-slate-800">I am a Parent</p>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="font-semibold text-primary-token">I am a Parent</p>
+              <p className="text-xs text-secondary-token mt-0.5">
                 Manage children, devices, rules and screen time from this device.
               </p>
             </div>
@@ -57,8 +57,8 @@ export default function DeviceModeSetupPage() {
               <Baby className="w-5.5 h-5.5 text-saffron-600" />
             </div>
             <div>
-              <p className="font-semibold text-slate-800">This is my child's device</p>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="font-semibold text-primary-token">This is my child's device</p>
+              <p className="text-xs text-secondary-token mt-0.5">
                 Set THIS device up to be supervised. It will ask for a pairing code from a
                 parent's device next, and will stop showing the regular VOICE login.
               </p>
@@ -67,7 +67,7 @@ export default function DeviceModeSetupPage() {
         </Card>
       </div>
 
-      <p className="flex items-start gap-2 text-xs text-slate-400 px-1">
+      <p className="flex items-start gap-2 text-xs text-muted-token px-1">
         <Smartphone className="w-3.5 h-3.5 mt-0.5 shrink-0" />
         You can change this later from Settings, which requires re-authenticating for security.
       </p>

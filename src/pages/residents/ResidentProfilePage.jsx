@@ -12,17 +12,17 @@ import { ROLES, ROLE_COLORS, formatDate, scoreBg, isAdmin } from '@/lib/utils'
 
 const PROFILE_SELECT = '*, counsellor:counsellor_id(id, spiritual_name, avatar_url, role)'
 const inputCls =
-  'w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-saffron-300 focus:border-transparent transition'
+  'w-full px-3 py-2 rounded-xl border border-[var(--border-color)] text-sm text-primary-token focus:outline-none focus:ring-2 focus:ring-saffron-300 focus:border-transparent transition'
 
 function DetailRow({ icon: Icon, label, value }) {
   return (
     <div className="flex items-center gap-3 py-1.5">
-      <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0">
-        <Icon className="w-4 h-4 text-slate-400" />
+      <div className="w-8 h-8 rounded-lg bg-[var(--surface-muted)] flex items-center justify-center flex-shrink-0">
+        <Icon className="w-4 h-4 text-muted-token" />
       </div>
       <div className="flex-1 flex items-center justify-between gap-3">
-        <span className="text-sm text-slate-500">{label}</span>
-        <span className="text-sm font-medium text-slate-800 text-right">{value || '—'}</span>
+        <span className="text-sm text-secondary-token">{label}</span>
+        <span className="text-sm font-medium text-primary-token text-right">{value || '—'}</span>
       </div>
     </div>
   )
@@ -31,7 +31,7 @@ function DetailRow({ icon: Icon, label, value }) {
 function Field({ label, children }) {
   return (
     <div>
-      <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">{label}</label>
+      <label className="text-xs font-semibold text-secondary-token uppercase tracking-wide block mb-1.5">{label}</label>
       {children}
     </div>
   )
@@ -43,11 +43,11 @@ function ToggleField({ label, value, onChange }) {
       type="button"
       onClick={() => onChange(!value)}
       className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition ${
-        value ? 'bg-tulasi-50 border-tulasi-200 text-tulasi-700' : 'bg-slate-50 border-slate-200 text-slate-500'
+        value ? 'bg-tulasi-50 border-tulasi-200 text-tulasi-700' : 'bg-[var(--surface-muted)] border-[var(--border-color)] text-secondary-token'
       }`}
     >
       <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${value ? 'border-tulasi-500 bg-tulasi-500' : 'border-slate-300'}`}>
-        {value && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+        {value && <div className="w-1.5 h-1.5 rounded-full bg-[var(--surface)]" />}
       </div>
       {label}
     </button>
@@ -132,17 +132,17 @@ export default function ResidentProfilePage() {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
-  if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-12 text-muted-token text-sm">Loading...</div>
 
   if (!resident) {
     return (
       <div className="max-w-2xl mx-auto space-y-4">
-        <button onClick={() => navigate('/residents')} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+        <button onClick={() => navigate('/residents')} className="flex items-center gap-1 text-sm text-secondary-token hover:text-primary-token">
           <ArrowLeft className="w-4 h-4" /> Back to Residents
         </button>
         <Card>
           <CardBody>
-            <div className="py-10 text-center text-slate-400 text-sm">Resident not found or not in your VOICE.</div>
+            <div className="py-10 text-center text-muted-token text-sm">Resident not found or not in your VOICE.</div>
           </CardBody>
         </Card>
       </div>
@@ -154,7 +154,7 @@ export default function ResidentProfilePage() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
-        <button onClick={() => navigate('/residents')} className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+        <button onClick={() => navigate('/residents')} className="flex items-center gap-1 text-sm text-secondary-token hover:text-primary-token">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
         {canEdit && !editing && (
@@ -168,8 +168,8 @@ export default function ResidentProfilePage() {
           <div className="flex items-center gap-4">
             <Avatar name={resident.spiritual_name} url={resident.avatar_url} size="xl" />
             <div className="min-w-0">
-              <h2 className="text-xl font-bold text-slate-800 truncate">{resident.spiritual_name}</h2>
-              {resident.legal_name && <p className="text-sm text-slate-500">{resident.legal_name}</p>}
+              <h2 className="text-xl font-bold text-primary-token truncate">{resident.spiritual_name}</h2>
+              {resident.legal_name && <p className="text-sm text-secondary-token">{resident.legal_name}</p>}
               <div className="flex flex-wrap gap-2 mt-2">
                 <Badge className={ROLE_COLORS[resident.role]}>{ROLES[resident.role] ?? resident.role}</Badge>
                 {resident.initiated && <Badge variant="saffron">Initiated</Badge>}
@@ -182,7 +182,7 @@ export default function ResidentProfilePage() {
 
       {editing ? (
         <Card>
-          <CardHeader><h3 className="font-semibold text-slate-700">Edit Resident</h3></CardHeader>
+          <CardHeader><h3 className="font-semibold text-primary-token">Edit Resident</h3></CardHeader>
           <CardBody className="space-y-3">
             <Field label="Legal Name">
               <input value={form.legal_name} onChange={(e) => set('legal_name', e.target.value)} className={inputCls} />
@@ -218,7 +218,7 @@ export default function ResidentProfilePage() {
       ) : (
         <>
           <Card>
-            <CardHeader><h3 className="font-semibold text-slate-700">Details</h3></CardHeader>
+            <CardHeader><h3 className="font-semibold text-primary-token">Details</h3></CardHeader>
             <CardBody>
               <DetailRow icon={Phone} label="Phone" value={resident.phone} />
               <DetailRow icon={MapPin} label="Room" value={resident.room_number} />
@@ -229,12 +229,12 @@ export default function ResidentProfilePage() {
 
           {counsellor && (
             <Card>
-              <CardHeader><h3 className="font-semibold text-slate-700">Counsellor</h3></CardHeader>
+              <CardHeader><h3 className="font-semibold text-primary-token">Counsellor</h3></CardHeader>
               <CardBody>
                 <div className="flex items-center gap-3">
                   <Avatar name={counsellor.spiritual_name} url={counsellor.avatar_url} size="md" />
                   <div>
-                    <p className="font-semibold text-slate-800">{counsellor.spiritual_name}</p>
+                    <p className="font-semibold text-primary-token">{counsellor.spiritual_name}</p>
                     <Badge className={ROLE_COLORS[counsellor.role]}>{ROLES[counsellor.role] ?? counsellor.role}</Badge>
                   </div>
                 </div>
@@ -246,17 +246,17 @@ export default function ResidentProfilePage() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-lotus-500" />
-                <h3 className="font-semibold text-slate-700">Recent Sadhana</h3>
+                <h3 className="font-semibold text-primary-token">Recent Sadhana</h3>
               </div>
             </CardHeader>
             <CardBody>
               {reports.length === 0 ? (
-                <p className="text-sm text-slate-400 py-2">No sadhana reports visible.</p>
+                <p className="text-sm text-muted-token py-2">No sadhana reports visible.</p>
               ) : (
-                <div className="divide-y divide-slate-50">
+                <div className="divide-y divide-[var(--border-color)]">
                   {reports.map((r) => (
                     <div key={r.id} className="flex items-center justify-between py-2">
-                      <span className="text-sm text-slate-600">{formatDate(r.week_start)}</span>
+                      <span className="text-sm text-secondary-token">{formatDate(r.week_start)}</span>
                       <span className={`px-2.5 py-1 rounded-lg text-sm font-bold ${scoreBg(r.total_score ?? 0)}`}>
                         {(r.total_score ?? 0).toFixed(1)}
                       </span>

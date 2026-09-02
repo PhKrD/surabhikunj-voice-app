@@ -24,7 +24,7 @@ function MiniBarChart({ data, color = '#f97316', height = 80 }) {
               style={{ height: `${Math.max(pct, 2)}%`, backgroundColor: d.value ? color : '#e2e8f0' }}
             />
             {d.label && (
-              <span className="absolute -bottom-4 text-[9px] text-slate-400 w-full text-center truncate">
+              <span className="absolute -bottom-4 text-[9px] text-muted-token w-full text-center truncate">
                 {d.label}
               </span>
             )}
@@ -43,8 +43,8 @@ function StatPill({ label, value, sub, color = 'text-saffron-600' }) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className={cn('text-2xl font-extrabold', color)}>{value}</span>
-      <span className="text-xs font-medium text-slate-600">{label}</span>
-      {sub && <span className="text-xs text-slate-400">{sub}</span>}
+      <span className="text-xs font-medium text-secondary-token">{label}</span>
+      {sub && <span className="text-xs text-muted-token">{sub}</span>}
     </div>
   )
 }
@@ -100,14 +100,14 @@ function TrackerTrendSection({ profile, orgId }) {
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-slate-500" />
-            <h3 className="font-semibold text-slate-700">Tracker — 30-day Trend</h3>
+            <BookOpen className="w-4 h-4 text-secondary-token" />
+            <h3 className="font-semibold text-primary-token">Tracker — 30-day Trend</h3>
           </div>
           {trackers.length > 1 && (
             <select
               value={selected ?? ''}
               onChange={(e) => setSelected(e.target.value)}
-              className="text-sm border border-slate-200 rounded-lg px-2 py-1 text-slate-700 focus:outline-none"
+              className="text-sm border border-[var(--border-color)] rounded-lg px-2 py-1 text-primary-token focus:outline-none"
             >
               {trackers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
@@ -121,7 +121,7 @@ function TrackerTrendSection({ profile, orgId }) {
           <StatPill label="Streak" value={`${calcStreak(entries)}d`} sub="consecutive" color="text-tulasi-600" />
         </div>
         {loading
-          ? <div className="h-20 bg-slate-50 rounded-xl animate-pulse" />
+          ? <div className="h-20 bg-[var(--surface-muted)] rounded-xl animate-pulse" />
           : <div className="pb-5"><MiniBarChart data={chartData} color={tracker?.color ?? '#f97316'} height={80} /></div>
         }
       </CardBody>
@@ -185,8 +185,8 @@ function TaskCompletionSection({ profile }) {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <ListChecks className="w-4 h-4 text-slate-500" />
-          <h3 className="font-semibold text-slate-700">Task Completion — 14 Days</h3>
+          <ListChecks className="w-4 h-4 text-secondary-token" />
+          <h3 className="font-semibold text-primary-token">Task Completion — 14 Days</h3>
         </div>
       </CardHeader>
       <CardBody>
@@ -195,7 +195,7 @@ function TaskCompletionSection({ profile }) {
           <StatPill label="Days with Tasks" value={data.filter((d) => d.value > 0).length} color="text-blue-600" />
         </div>
         {loading
-          ? <div className="h-20 bg-slate-50 rounded-xl animate-pulse" />
+          ? <div className="h-20 bg-[var(--surface-muted)] rounded-xl animate-pulse" />
           : <div className="pb-5"><MiniBarChart data={data} color="#6366f1" height={80} /></div>
         }
       </CardBody>
@@ -232,7 +232,7 @@ function OrgStatsSection({ orgId }) {
 
   useEffect(() => { load() }, [load])
 
-  if (loading) return <div className="h-28 bg-slate-50 rounded-2xl animate-pulse" />
+  if (loading) return <div className="h-28 bg-[var(--surface-muted)] rounded-2xl animate-pulse" />
 
   const pct = stats.members ? Math.round((stats.submitters / stats.members) * 100) : 0
   const taskPct = stats.totalLogs ? Math.round((stats.done / stats.totalLogs) * 100) : 0
@@ -241,13 +241,13 @@ function OrgStatsSection({ orgId }) {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-slate-500" />
-          <h3 className="font-semibold text-slate-700">Org Overview — Last 7 Days</h3>
+          <Users className="w-4 h-4 text-secondary-token" />
+          <h3 className="font-semibold text-primary-token">Org Overview — Last 7 Days</h3>
         </div>
       </CardHeader>
       <CardBody>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-          <StatPill label="Active Members" value={stats.members} color="text-slate-700" />
+          <StatPill label="Active Members" value={stats.members} color="text-primary-token" />
           <StatPill label="Tracker Submissions" value={stats.submitters} sub={`${pct}% of members`} color="text-lotus-600" />
           <StatPill label="Task Logs" value={stats.totalLogs} color="text-saffron-600" />
           <StatPill label="Completion Rate" value={`${taskPct}%`} sub={`${stats.done} done`} color="text-tulasi-600" />
@@ -255,20 +255,20 @@ function OrgStatsSection({ orgId }) {
         {/* Progress bars */}
         <div className="mt-5 space-y-3">
           <div>
-            <div className="flex justify-between text-xs text-slate-500 mb-1">
+            <div className="flex justify-between text-xs text-secondary-token mb-1">
               <span>Tracker participation</span>
               <span>{pct}%</span>
             </div>
-            <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-2 rounded-full bg-[var(--surface-muted)] overflow-hidden">
               <div className="h-full rounded-full bg-lotus-400 transition-all" style={{ width: `${pct}%` }} />
             </div>
           </div>
           <div>
-            <div className="flex justify-between text-xs text-slate-500 mb-1">
+            <div className="flex justify-between text-xs text-secondary-token mb-1">
               <span>Task completion</span>
               <span>{taskPct}%</span>
             </div>
-            <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-2 rounded-full bg-[var(--surface-muted)] overflow-hidden">
               <div className="h-full rounded-full bg-tulasi-400 transition-all" style={{ width: `${taskPct}%` }} />
             </div>
           </div>
@@ -293,7 +293,7 @@ export default function ReportsPage() {
       <div className="p-6 space-y-6 max-w-3xl mx-auto">
         <div className="flex items-center gap-3">
           <BarChart3 className="w-6 h-6 text-saffron-500" />
-          <h1 className="text-2xl font-extrabold text-slate-800">Reports</h1>
+          <h1 className="text-2xl font-extrabold text-primary-token">Reports</h1>
         </div>
 
         <TrackerTrendSection profile={profile} orgId={org?.id} />

@@ -56,7 +56,7 @@ export default function RequestsTab({ childId }) {
     }
   }
 
-  if (loading) return <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-8 text-muted-token text-sm">Loading...</div>
 
   const pendingCount = requests.filter((r) => r.status === 'pending').length
 
@@ -64,12 +64,12 @@ export default function RequestsTab({ childId }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-slate-700">Child requests</h3>
+          <h3 className="text-sm font-semibold text-primary-token">Child requests</h3>
           {pendingCount > 0 && <Badge variant="red">{pendingCount} pending</Badge>}
         </div>
         <button
           onClick={refresh}
-          className="p-2 rounded-xl text-slate-400 hover:text-saffron-500 hover:bg-saffron-50 transition-colors"
+          className="p-2 rounded-xl text-muted-token hover:text-saffron-500 hover:bg-saffron-50 transition-colors"
           title="Refresh"
         >
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -78,9 +78,9 @@ export default function RequestsTab({ childId }) {
 
       {requests.length === 0 ? (
         <div className="text-center py-10 px-6">
-          <Send className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm font-medium text-slate-500">No requests yet</p>
-          <p className="text-xs text-slate-400 mt-1">When your child asks for something, it will appear here.</p>
+          <Send className="w-8 h-8 text-muted-token mx-auto mb-3" />
+          <p className="text-sm font-medium text-secondary-token">No requests yet</p>
+          <p className="text-xs text-muted-token mt-1">When your child asks for something, it will appear here.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -91,21 +91,21 @@ export default function RequestsTab({ childId }) {
               <Card key={request.id}>
                 <CardBody className="py-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-5 h-5 text-slate-600" />
+                    <div className="w-10 h-10 rounded-xl bg-[var(--surface-muted)] flex items-center justify-center flex-shrink-0">
+                      <Icon className="w-5 h-5 text-secondary-token" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-slate-800">{iconInfo.label}</p>
+                        <p className="font-medium text-primary-token">{iconInfo.label}</p>
                         <Badge variant={request.status === 'approved' ? 'tulasi' : request.status === 'denied' ? 'red' : 'yellow'}>
                           {request.status}
                         </Badge>
                       </div>
-                      {request.reason && <p className="text-sm text-slate-600 mt-0.5">{request.reason}</p>}
+                      {request.reason && <p className="text-sm text-secondary-token mt-0.5">{request.reason}</p>}
                       {request.metadata?.minutes && (
-                        <p className="text-xs text-slate-500 mt-0.5">Requested: {request.metadata.minutes} minutes</p>
+                        <p className="text-xs text-secondary-token mt-0.5">Requested: {request.metadata.minutes} minutes</p>
                       )}
-                      <p className="text-xs text-slate-400 mt-1">{new Date(request.created_at).toLocaleString()}</p>
+                      <p className="text-xs text-muted-token mt-1">{new Date(request.created_at).toLocaleString()}</p>
                     </div>
                     {request.status === 'pending' && (
                       <div className="flex gap-2">

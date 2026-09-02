@@ -75,7 +75,7 @@ export default function BroadcastPage() {
       <div className="max-w-3xl mx-auto">
         <Card>
           <CardBody>
-            <div className="flex flex-col items-center py-12 text-slate-400">
+            <div className="flex flex-col items-center py-12 text-muted-token">
               <Megaphone className="w-12 h-12 mb-3 opacity-30" />
               <p className="text-sm">You do not have access to broadcasts.</p>
             </div>
@@ -92,8 +92,8 @@ export default function BroadcastPage() {
           <Megaphone className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-slate-800">Broadcasts</h1>
-          <p className="text-xs text-slate-400">Send announcements and reminders to devotees</p>
+          <h1 className="text-lg font-bold text-primary-token">Broadcasts</h1>
+          <p className="text-xs text-muted-token">Send announcements and reminders to devotees</p>
         </div>
       </div>
 
@@ -107,7 +107,7 @@ export default function BroadcastPage() {
               'inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-semibold transition-all',
               tab === t.key
                 ? 'bg-saffron-500 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'
+                : 'bg-[var(--surface)] text-secondary-token border border-[var(--border-color)] hover:border-slate-300'
             )}
           >
             <t.icon className="w-3.5 h-3.5" />

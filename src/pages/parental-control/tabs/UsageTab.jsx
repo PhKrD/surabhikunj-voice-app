@@ -73,7 +73,7 @@ export default function UsageTab({ childId }) {
     }
   }
 
-  if (loading) return <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-8 text-muted-token text-sm">Loading...</div>
 
   const totalMs = usage.reduce((sum, u) => sum + (u.total_foreground_ms || 0), 0)
   const maxMs = usage.length ? usage[0].total_foreground_ms || 1 : 1
@@ -91,13 +91,13 @@ export default function UsageTab({ childId }) {
               <Clock className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="text-xs text-slate-500">Screen time today</p>
-              <p className="text-2xl font-extrabold text-slate-800">{formatDuration(totalMs)}</p>
+              <p className="text-xs text-secondary-token">Screen time today</p>
+              <p className="text-2xl font-extrabold text-primary-token">{formatDuration(totalMs)}</p>
             </div>
           </div>
           <button
             onClick={refresh}
-            className="p-2 rounded-xl text-slate-400 hover:text-saffron-500 hover:bg-saffron-50 transition-colors"
+            className="p-2 rounded-xl text-muted-token hover:text-saffron-500 hover:bg-saffron-50 transition-colors"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -106,12 +106,12 @@ export default function UsageTab({ childId }) {
         {limitMs > 0 && (
           <div className="px-5 pb-4">
             <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className={overLimit ? 'text-red-600 font-semibold' : 'text-slate-500'}>
+              <span className={overLimit ? 'text-red-600 font-semibold' : 'text-secondary-token'}>
                 {overLimit ? 'Limit exceeded' : `${progress}% of daily limit`}
               </span>
-              <span className="text-slate-400">{formatDuration(limitMs)}</span>
+              <span className="text-muted-token">{formatDuration(limitMs)}</span>
             </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-2 w-full bg-[var(--surface-muted)] rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full ${overLimit ? 'bg-red-500' : 'bg-saffron-500'}`}
                 style={{ width: `${progress}%` }}
@@ -124,7 +124,7 @@ export default function UsageTab({ childId }) {
       {/* Daily limit editor */}
       <Card>
         <CardBody className="py-4 space-y-3">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <div className="flex items-center gap-2 text-sm font-semibold text-primary-token">
             <ShieldAlert className="w-4 h-4 text-saffron-500" />
             Daily screen-time limit
           </div>
@@ -135,9 +135,9 @@ export default function UsageTab({ childId }) {
               max={1440}
               value={limit}
               onChange={(e) => setLimit(e.target.value)}
-              className="w-24 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300"
+              className="w-24 px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300"
             />
-            <span className="text-sm text-slate-500">minutes</span>
+            <span className="text-sm text-secondary-token">minutes</span>
             <button
               onClick={saveLimit}
               disabled={saving}
@@ -152,9 +152,9 @@ export default function UsageTab({ childId }) {
       {/* Per-app breakdown */}
       {usage.length === 0 ? (
         <div className="text-center py-10 px-6">
-          <Smartphone className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm font-medium text-slate-500">No usage data yet</p>
-          <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+          <Smartphone className="w-8 h-8 text-muted-token mx-auto mb-3" />
+          <p className="text-sm font-medium text-secondary-token">No usage data yet</p>
+          <p className="text-xs text-muted-token mt-1 max-w-xs mx-auto">
             Usage appears once the child's device reports it. Make sure
             <span className="font-medium"> Usage access </span>
             is enabled on the device (VOICE Kids app → tap "enable screen time tracking").
@@ -169,14 +169,14 @@ export default function UsageTab({ childId }) {
                 <CardBody className="py-3">
                   <div className="flex items-center justify-between gap-3 mb-2">
                     <div className="min-w-0">
-                      <p className="font-medium text-slate-800 truncate">{app.app_name || app.package_name}</p>
-                      <p className="text-xs text-slate-400 truncate font-mono">{app.package_name}</p>
+                      <p className="font-medium text-primary-token truncate">{app.app_name || app.package_name}</p>
+                      <p className="text-xs text-muted-token truncate font-mono">{app.package_name}</p>
                     </div>
-                    <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+                    <span className="text-sm font-semibold text-primary-token whitespace-nowrap">
                       {formatDuration(app.total_foreground_ms)}
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-[var(--surface-muted)] rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${BAR_COLORS[i % BAR_COLORS.length]}`}
                       style={{ width: `${pct}%` }}

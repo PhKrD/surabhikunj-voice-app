@@ -43,14 +43,14 @@ export default function BonusTab({ childId }) {
     }
   }
 
-  if (loading) return <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-8 text-muted-token text-sm">Loading...</div>
 
   if (requests.length === 0) {
     return (
       <Card>
         <CardBody className="py-10 text-center">
-          <Gift className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-500">No bonus time requests yet.</p>
+          <Gift className="w-10 h-10 text-muted-token mx-auto mb-3" />
+          <p className="text-sm text-secondary-token">No bonus time requests yet.</p>
         </CardBody>
       </Card>
     )
@@ -62,19 +62,19 @@ export default function BonusTab({ childId }) {
         <Card key={req.id}>
           <CardBody className="py-3.5 flex items-center gap-3">
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-slate-800">
+              <p className="font-medium text-primary-token">
                 +{req.requested_min} minutes
                 {req.status === 'approved' && req.approved_min !== req.requested_min ? ` (granted ${req.approved_min})` : ''}
               </p>
-              {req.reason && <p className="text-sm text-slate-500 truncate">"{req.reason}"</p>}
-              <p className="text-xs text-slate-400 mt-0.5">{new Date(req.requested_at).toLocaleString()}</p>
+              {req.reason && <p className="text-sm text-secondary-token truncate">"{req.reason}"</p>}
+              <p className="text-xs text-muted-token mt-0.5">{new Date(req.requested_at).toLocaleString()}</p>
             </div>
             {req.status === 'pending' ? (
               <div className="flex gap-1.5">
                 <button
                   disabled={resolvingId === req.id}
                   onClick={() => handleResolve(req, false)}
-                  className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
+                  className="p-2 rounded-lg text-muted-token hover:text-red-600 hover:bg-red-50"
                 >
                   <XIcon className="w-4 h-4" />
                 </button>

@@ -12,7 +12,7 @@ import useOrgStore from '@/store/orgStore'
 import { formatDate, isAdmin } from '@/lib/utils'
 
 const inputCls =
-  'w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300 focus:border-transparent transition'
+  'w-full px-3 py-2 rounded-xl border border-[var(--border-color)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300 focus:border-transparent transition'
 
 export default function AnnouncementsPage() {
   const { profile } = useAuthStore()
@@ -98,7 +98,7 @@ export default function AnnouncementsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Megaphone className="w-5 h-5 text-saffron-500" />
-          <h2 className="text-lg font-bold text-slate-800">Announcements</h2>
+          <h2 className="text-lg font-bold text-primary-token">Announcements</h2>
         </div>
         {canPost && !showForm && (
           <Button size="sm" icon={Plus} onClick={() => setShowForm(true)}>New</Button>
@@ -107,7 +107,7 @@ export default function AnnouncementsPage() {
 
       {canPost && showForm && (
         <Card>
-          <CardHeader><h3 className="font-semibold text-slate-700">New Announcement</h3></CardHeader>
+          <CardHeader><h3 className="font-semibold text-primary-token">New Announcement</h3></CardHeader>
           <CardBody className="space-y-3">
             <input
               value={title}
@@ -126,11 +126,11 @@ export default function AnnouncementsPage() {
               type="button"
               onClick={() => setPinned((v) => !v)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition ${
-                pinned ? 'bg-saffron-50 border-saffron-200 text-saffron-700' : 'bg-slate-50 border-slate-200 text-slate-500'
+                pinned ? 'bg-saffron-50 border-saffron-200 text-saffron-700' : 'bg-[var(--surface-muted)] border-[var(--border-color)] text-secondary-token'
               }`}
             >
               <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${pinned ? 'border-saffron-500 bg-saffron-500' : 'border-slate-300'}`}>
-                {pinned && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                {pinned && <div className="w-1.5 h-1.5 rounded-full bg-[var(--surface)]" />}
               </div>
               Pin to top
             </button>
@@ -143,11 +143,11 @@ export default function AnnouncementsPage() {
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-slate-400 text-sm">Loading announcements...</div>
+        <div className="text-center py-12 text-muted-token text-sm">Loading announcements...</div>
       ) : items.length === 0 ? (
         <Card>
           <CardBody>
-            <div className="flex flex-col items-center py-10 text-slate-400">
+            <div className="flex flex-col items-center py-10 text-muted-token">
               <Megaphone className="w-12 h-12 mb-3 opacity-30" />
               <p className="text-sm">No announcements yet.</p>
             </div>
@@ -162,11 +162,11 @@ export default function AnnouncementsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold text-slate-800">{item.title}</p>
+                        <p className="font-semibold text-primary-token">{item.title}</p>
                         {item.is_pinned && <Badge variant="saffron">Pinned</Badge>}
                       </div>
-                      {item.body && <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{item.body}</p>}
-                      <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
+                      {item.body && <p className="text-sm text-secondary-token mt-1 whitespace-pre-wrap">{item.body}</p>}
+                      <div className="flex items-center gap-2 mt-2 text-xs text-muted-token">
                         {item.author && <Avatar name={item.author.spiritual_name} url={item.author.avatar_url} size="sm" />}
                         <span>{item.author?.spiritual_name ?? 'Unknown'}</span>
                         <span>·</span>
@@ -177,7 +177,7 @@ export default function AnnouncementsPage() {
                       <button
                         onClick={() => remove(item.id)}
                         disabled={deletingId === item.id}
-                        className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 transition flex-shrink-0"
+                        className="p-2 rounded-lg text-muted-token hover:bg-red-50 hover:text-red-600 transition flex-shrink-0"
                         title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />

@@ -112,7 +112,7 @@ export default function CommandCenter({ devices }) {
 
   if (activeDevices.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-400">
+      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] p-4 text-center text-sm text-muted-token">
         No active devices. Add a device from the Devices tab to send commands.
       </div>
     )
@@ -150,7 +150,7 @@ export default function CommandCenter({ devices }) {
               onClick={() => fire(action)}
               title={supported ? action.label : `${action.label} not supported on this device`}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm font-medium text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed',
+                'flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-sm font-medium text-secondary-token disabled:opacity-50 disabled:cursor-not-allowed',
                 action.hover,
               )}
             >
@@ -160,7 +160,7 @@ export default function CommandCenter({ devices }) {
         })}
         <button
           onClick={loadCommands}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-sm font-medium text-slate-400 hover:text-slate-600"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-sm font-medium text-muted-token hover:text-secondary-token"
           title="Refresh command status"
         >
           <RefreshCw className="w-4 h-4" />
@@ -169,8 +169,8 @@ export default function CommandCenter({ devices }) {
 
       {/* Live command status feed */}
       {commands.length > 0 && (
-        <div className="rounded-2xl border border-slate-100 bg-white divide-y divide-slate-50">
-          <p className="px-4 pt-3 pb-1 text-xs font-bold uppercase tracking-wide text-slate-400">
+        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] divide-y divide-[var(--border-color)]">
+          <p className="px-4 pt-3 pb-1 text-xs font-bold uppercase tracking-wide text-muted-token">
             Recent commands
           </p>
           {commands.map((cmd) => {
@@ -180,13 +180,13 @@ export default function CommandCenter({ devices }) {
             const pending = !isTerminalState(state)
             return (
               <div key={cmd.id} className="px-4 py-2.5 flex items-center gap-3">
-                <Smartphone className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                <Smartphone className="w-4 h-4 text-muted-token flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-700 truncate">
+                  <p className="text-sm font-medium text-primary-token truncate">
                     {commandTypeLabel(cmd.command_type)}
-                    <span className="text-slate-400 font-normal"> · {dev?.device_name || 'device'}</span>
+                    <span className="text-muted-token font-normal"> · {dev?.device_name || 'device'}</span>
                   </p>
-                  <p className="text-[11px] text-slate-400 truncate">
+                  <p className="text-[11px] text-muted-token truncate">
                     {timeAgo(cmd.created_at)}
                     {state === 'failed' && cmd.error_message ? ` · ${cmd.error_message}` : ''}
                   </p>
@@ -211,7 +211,7 @@ function TargetChip({ active, onClick, label, online }) {
         'flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border transition-colors',
         active
           ? 'bg-indigo-500 text-white border-indigo-500'
-          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300',
+          : 'bg-[var(--surface)] text-secondary-token border-[var(--border-color)] hover:border-slate-300',
       )}
     >
       {online != null && (

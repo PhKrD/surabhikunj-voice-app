@@ -198,14 +198,14 @@ export default function HierarchyPage() {
     }))
     .filter((g) => g.items.length > 0)
 
-  if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-12 text-muted-token text-sm">Loading...</div>
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <GitBranch className="w-5 h-5 text-saffron-500" />
-          <h2 className="text-lg font-bold text-slate-800">Organizational Structure</h2>
+          <h2 className="text-lg font-bold text-primary-token">Organizational Structure</h2>
         </div>
         {canManage && (
           <Button
@@ -224,25 +224,25 @@ export default function HierarchyPage() {
       {canManage && showForm && (
         <Card>
           <CardBody className="py-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-700">
+            <p className="text-sm font-semibold text-primary-token">
               {editingId ? 'Edit Position' : 'Create Position'}
             </p>
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-xs text-slate-500">Title</span>
+                <span className="text-xs text-secondary-token">Title</span>
                 <input
                   value={form.title}
                   onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                   placeholder="Temple President"
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
               <label className="block">
-                <span className="text-xs text-slate-500">Level</span>
+                <span className="text-xs text-secondary-token">Level</span>
                 <select
                   value={form.level}
                   onChange={(e) => setForm((f) => ({ ...f, level: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm bg-[var(--surface)]"
                 >
                   {levelOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -250,11 +250,11 @@ export default function HierarchyPage() {
                 </select>
               </label>
               <label className="block">
-                <span className="text-xs text-slate-500">Assign Member</span>
+                <span className="text-xs text-secondary-token">Assign Member</span>
                 <select
                   value={form.profile_id}
                   onChange={(e) => setForm((f) => ({ ...f, profile_id: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm bg-[var(--surface)]"
                 >
                   <option value="">— Vacant —</option>
                   {members.map((m) => (
@@ -263,22 +263,22 @@ export default function HierarchyPage() {
                 </select>
               </label>
               <label className="block">
-                <span className="text-xs text-slate-500">Sort Order</span>
+                <span className="text-xs text-secondary-token">Sort Order</span>
                 <input
                   type="number"
                   value={form.sort_order}
                   onChange={(e) => setForm((f) => ({ ...f, sort_order: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
             </div>
             <label className="block">
-              <span className="text-xs text-slate-500">Description</span>
+              <span className="text-xs text-secondary-token">Description</span>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 rows={2}
-                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-none"
+                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm resize-none"
               />
             </label>
             <div className="flex items-center gap-3">
@@ -308,7 +308,7 @@ export default function HierarchyPage() {
       {positions.length === 0 && (
         <Card>
           <CardBody>
-            <div className="flex flex-col items-center py-10 text-slate-400">
+            <div className="flex flex-col items-center py-10 text-muted-token">
               <GitBranch className="w-12 h-12 mb-3 opacity-30" />
               <p className="text-sm">No hierarchy configured yet.</p>
               {canManage && !showForm && (
@@ -345,14 +345,14 @@ export default function HierarchyPage() {
 
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{cfg.label}</p>
+                      <p className="text-xs font-bold text-secondary-token uppercase tracking-wide">{cfg.label}</p>
                       <Badge variant="default">{items.length}</Badge>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {items.map((pos) => (
                         <div
                           key={pos.id}
-                          className="flex items-center gap-2 bg-white border border-slate-100 rounded-xl px-3 py-2 shadow-sm"
+                          className="flex items-center gap-2 bg-[var(--surface)] border border-[var(--border-color)] rounded-xl px-3 py-2 shadow-sm"
                         >
                           {pos.profile ? (
                             <>
@@ -362,16 +362,16 @@ export default function HierarchyPage() {
                                 size="sm"
                               />
                               <div>
-                                <p className="text-sm font-semibold text-slate-800 leading-tight">
+                                <p className="text-sm font-semibold text-primary-token leading-tight">
                                   {pos.profile.spiritual_name}
                                 </p>
-                                <p className="text-xs text-slate-400">{pos.title}</p>
+                                <p className="text-xs text-muted-token">{pos.title}</p>
                               </div>
                             </>
                           ) : (
                             <div>
-                              <p className="text-sm font-semibold text-slate-500">{pos.title}</p>
-                              <p className="text-xs text-slate-400 italic">Vacant</p>
+                              <p className="text-sm font-semibold text-secondary-token">{pos.title}</p>
+                              <p className="text-xs text-muted-token italic">Vacant</p>
                             </div>
                           )}
                           {canManage ? (
@@ -379,7 +379,7 @@ export default function HierarchyPage() {
                               <button
                                 onClick={() => startEdit(pos)}
                                 disabled={deletingId === pos.id}
-                                className="p-1 rounded-md text-slate-400 hover:text-saffron-600 hover:bg-saffron-50"
+                                className="p-1 rounded-md text-muted-token hover:text-saffron-600 hover:bg-saffron-50"
                                 title="Edit position"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
@@ -387,7 +387,7 @@ export default function HierarchyPage() {
                               <button
                                 onClick={() => removePosition(pos)}
                                 disabled={deletingId === pos.id}
-                                className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                className="p-1 rounded-md text-muted-token hover:text-red-600 hover:bg-red-50"
                                 title="Delete position"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />

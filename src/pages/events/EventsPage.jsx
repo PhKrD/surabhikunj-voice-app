@@ -17,7 +17,7 @@ const eventTypeColors = {
   program: 'bg-blue-50 border-blue-100 text-blue-700',
   festival: 'bg-saffron-50 border-saffron-100 text-saffron-700',
   service: 'bg-tulasi-50 border-tulasi-100 text-tulasi-700',
-  meeting: 'bg-slate-50 border-slate-100 text-slate-700',
+  meeting: 'bg-[var(--surface-muted)] border-[var(--border-color)] text-primary-token',
   other: 'bg-lotus-50 border-lotus-100 text-lotus-700',
 }
 
@@ -25,7 +25,7 @@ function getDateLabel(dateStr) {
   const d = new Date(dateStr)
   if (isToday(d)) return { label: 'Today', color: 'bg-saffron-500 text-white' }
   if (isTomorrow(d)) return { label: 'Tomorrow', color: 'bg-tulasi-500 text-white' }
-  return { label: format(d, 'dd MMM'), color: 'bg-slate-100 text-slate-600' }
+  return { label: format(d, 'dd MMM'), color: 'bg-[var(--surface-muted)] text-secondary-token' }
 }
 
 export default function EventsPage() {
@@ -270,12 +270,12 @@ export default function EventsPage() {
     }
   }
 
-  if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-12 text-muted-token text-sm">Loading...</div>
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-800">Events & Festivals</h2>
+        <h2 className="text-lg font-bold text-primary-token">Events & Festivals</h2>
         {canManage && (
           <Button
             size="sm"
@@ -293,25 +293,25 @@ export default function EventsPage() {
       {canManage && showForm && (
         <Card>
           <CardBody className="py-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-700">
+            <p className="text-sm font-semibold text-primary-token">
               {editingId ? 'Edit Event' : 'Create Event'}
             </p>
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="block sm:col-span-2">
-                <span className="text-xs text-slate-500">Title</span>
+                <span className="text-xs text-secondary-token">Title</span>
                 <input
                   value={form.title}
                   onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
 
               <label className="block">
-                <span className="text-xs text-slate-500">Event Type</span>
+                <span className="text-xs text-secondary-token">Event Type</span>
                 <select
                   value={form.event_type}
                   onChange={(e) => setForm((f) => ({ ...f, event_type: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 >
                   <option value="program">Program</option>
                   <option value="festival">Festival</option>
@@ -322,66 +322,66 @@ export default function EventsPage() {
               </label>
 
               <label className="block">
-                <span className="text-xs text-slate-500">Venue</span>
+                <span className="text-xs text-secondary-token">Venue</span>
                 <input
                   value={form.venue}
                   onChange={(e) => setForm((f) => ({ ...f, venue: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
 
               <label className="block">
-                <span className="text-xs text-slate-500">Start Date</span>
+                <span className="text-xs text-secondary-token">Start Date</span>
                 <input
                   type="date"
                   value={form.start_date ?? ''}
                   onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
 
               <label className="block">
-                <span className="text-xs text-slate-500">Start Time</span>
+                <span className="text-xs text-secondary-token">Start Time</span>
                 <input
                   type="time"
                   value={form.start_time ?? ''}
                   onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
 
               <label className="block">
-                <span className="text-xs text-slate-500">End Date</span>
+                <span className="text-xs text-secondary-token">End Date</span>
                 <input
                   type="date"
                   value={form.end_date ?? ''}
                   onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
 
               <label className="block">
-                <span className="text-xs text-slate-500">End Time</span>
+                <span className="text-xs text-secondary-token">End Time</span>
                 <input
                   type="time"
                   value={form.end_time ?? ''}
                   onChange={(e) => setForm((f) => ({ ...f, end_time: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
             </div>
 
             <label className="block">
-              <span className="text-xs text-slate-500">Description</span>
+              <span className="text-xs text-secondary-token">Description</span>
               <textarea
                 rows={2}
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-none"
+                className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm resize-none"
               />
             </label>
 
-            <div className="flex flex-wrap gap-4 text-sm text-slate-600">
+            <div className="flex flex-wrap gap-4 text-sm text-secondary-token">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -427,7 +427,7 @@ export default function EventsPage() {
       {events.length === 0 && (
         <Card>
           <CardBody>
-            <div className="flex flex-col items-center py-10 text-slate-400">
+            <div className="flex flex-col items-center py-10 text-muted-token">
               <CalendarDays className="w-12 h-12 mb-3 opacity-30" />
               <p className="text-sm">No upcoming events.</p>
             </div>
@@ -462,13 +462,13 @@ export default function EventsPage() {
                       <div className={cn('px-2 py-1 rounded-lg text-xs font-bold', dateLabel.color)}>
                         {dateLabel.label}
                       </div>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-muted-token">
                         {format(new Date(event.start_datetime), 'h:mm a')}
                       </p>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="font-semibold text-slate-800">{event.title}</p>
+                        <p className="font-semibold text-primary-token">{event.title}</p>
                         <div className="flex gap-1.5 flex-shrink-0 items-center">
                           {event.is_mandatory && <Badge variant="saffron">Mandatory</Badge>}
                           <Badge className={eventTypeColors[event.event_type]}>{event.event_type}</Badge>
@@ -477,7 +477,7 @@ export default function EventsPage() {
                               <button
                                 onClick={() => startEdit(event)}
                                 disabled={archivingId === event.id}
-                                className="p-1 rounded-md text-slate-400 hover:text-saffron-600 hover:bg-saffron-50"
+                                className="p-1 rounded-md text-muted-token hover:text-saffron-600 hover:bg-saffron-50"
                                 title="Edit event"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
@@ -485,7 +485,7 @@ export default function EventsPage() {
                               <button
                                 onClick={() => archiveEvent(event)}
                                 disabled={archivingId === event.id}
-                                className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                className="p-1 rounded-md text-muted-token hover:text-red-600 hover:bg-red-50"
                                 title="Delete event"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -495,16 +495,16 @@ export default function EventsPage() {
                         </div>
                       </div>
                       {event.description && (
-                        <p className="text-sm text-slate-500 mt-1 line-clamp-2">{event.description}</p>
+                        <p className="text-sm text-secondary-token mt-1 line-clamp-2">{event.description}</p>
                       )}
                       {event.venue && (
-                        <div className="flex items-center gap-1 mt-1.5 text-xs text-slate-400">
+                        <div className="flex items-center gap-1 mt-1.5 text-xs text-muted-token">
                           <MapPin className="w-3 h-3" />
                           {event.venue}
                         </div>
                       )}
                       {event.end_datetime && (
-                        <div className="flex items-center gap-1 mt-0.5 text-xs text-slate-400">
+                        <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-token">
                           <Clock className="w-3 h-3" />
                           Ends {format(new Date(event.end_datetime), 'h:mm a')}
                         </div>

@@ -1,14 +1,16 @@
 import { cn } from '@/lib/utils'
 import { Loader2 } from 'lucide-react'
 
+// Calmer, single-tone premium buttons — solid colors instead of full
+// gradients, with a soft matching shadow rather than a heavy colored glow.
 const variants = {
-  primary:   'grad-saffron text-white glow-saffron sheen hover:brightness-[1.07]',
-  tulasi:    'grad-tulasi text-white glow-tulasi sheen hover:brightness-[1.07]',
-  danger:    'grad-rose text-white shadow-[0_10px_26px_-8px_rgba(244,63,94,0.55)] sheen hover:brightness-[1.07]',
-  blue:      'grad-blue text-white glow-blue sheen hover:brightness-[1.07]',
-  secondary: 'bg-white text-slate-700 border border-slate-200 elev-1 hover:border-slate-300 hover:bg-slate-50 hover:elev-2',
-  ghost:     'text-slate-600 hover:bg-slate-100/80 hover:text-slate-800',
-  soft:      'bg-saffron-50 text-saffron-700 border border-saffron-100 hover:bg-saffron-100',
+  primary:   'bg-[var(--color-primary)] text-white shadow-[0_6px_16px_-6px_var(--color-primary)] hover:brightness-110',
+  tulasi:    'bg-tulasi-600 text-white shadow-[0_6px_16px_-6px_rgba(22,163,74,0.5)] hover:bg-tulasi-700',
+  danger:    'bg-[var(--color-danger)] text-white shadow-[0_6px_16px_-6px_var(--color-danger)] hover:brightness-110',
+  blue:      'bg-blue-600 text-white shadow-[0_6px_16px_-6px_rgba(37,99,235,0.5)] hover:bg-blue-700',
+  secondary: 'surface text-primary-token border hover:bg-[var(--surface-muted)]',
+  ghost:     'text-secondary-token hover:bg-[var(--surface-muted)] hover:text-primary-token',
+  soft:      'bg-[var(--color-primary-50)] text-[var(--color-primary-700)] border border-[var(--color-primary-100)] hover:bg-[var(--color-primary-100)] dark:bg-[var(--color-primary-900)] dark:text-[var(--color-primary-200)] dark:border-transparent',
 }
 
 const sizes = {
@@ -39,7 +41,7 @@ export default function Button({
       className={cn(
         'relative inline-flex items-center justify-center font-semibold whitespace-nowrap',
         'transition-all duration-200 press',
-        'focus:outline-none focus-visible:ring-4 focus-visible:ring-saffron-400/35',
+        'focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--color-primary)]/30',
         'disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none',
         variants[variant],
         sizes[size],

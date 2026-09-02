@@ -6,7 +6,7 @@ import useToastStore from '@/store/toastStore'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 
-const INPUT_CLASS = 'w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
+const INPUT_CLASS = 'w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 
 const emptyForm = { name: '', location: '', description: '' }
 
@@ -135,12 +135,12 @@ export default function AreasManager({ orgId, canManage }) {
     }
   }
 
-  if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading areas…</div>
+  if (loading) return <div className="text-center py-12 text-muted-token text-sm">Loading areas…</div>
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-slate-700">Cleaning areas ({areas.length})</p>
+        <p className="text-sm font-semibold text-primary-token">Cleaning areas ({areas.length})</p>
         {canManage && (
           <Button
             size="sm"
@@ -158,10 +158,10 @@ export default function AreasManager({ orgId, canManage }) {
       {canManage && showForm && (
         <Card>
           <CardBody className="py-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-700">{editingId ? 'Edit Area' : 'New Area'}</p>
+            <p className="text-sm font-semibold text-primary-token">{editingId ? 'Edit Area' : 'New Area'}</p>
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-xs text-slate-500">Name</span>
+                <span className="text-xs text-secondary-token">Name</span>
                 <input
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -170,7 +170,7 @@ export default function AreasManager({ orgId, canManage }) {
                 />
               </label>
               <label className="block">
-                <span className="text-xs text-slate-500">Location</span>
+                <span className="text-xs text-secondary-token">Location</span>
                 <input
                   value={form.location}
                   onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
@@ -180,7 +180,7 @@ export default function AreasManager({ orgId, canManage }) {
               </label>
             </div>
             <label className="block">
-              <span className="text-xs text-slate-500">Description</span>
+              <span className="text-xs text-secondary-token">Description</span>
               <textarea
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -215,7 +215,7 @@ export default function AreasManager({ orgId, canManage }) {
       {areas.length === 0 && (
         <Card>
           <CardBody>
-            <div className="flex flex-col items-center py-10 text-slate-400">
+            <div className="flex flex-col items-center py-10 text-muted-token">
               <MapPin className="w-12 h-12 mb-3 opacity-30" />
               <p className="text-sm">No cleaning areas yet.</p>
             </div>
@@ -234,13 +234,13 @@ export default function AreasManager({ orgId, canManage }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-slate-800 truncate">{area.name}</p>
+                      <p className="font-semibold text-primary-token truncate">{area.name}</p>
                       {canManage && (
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <button
                             onClick={() => startEdit(area)}
                             disabled={busyId === area.id}
-                            className="p-1 rounded-md text-slate-400 hover:text-saffron-600 hover:bg-saffron-50"
+                            className="p-1 rounded-md text-muted-token hover:text-saffron-600 hover:bg-saffron-50"
                             title="Edit area"
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -248,7 +248,7 @@ export default function AreasManager({ orgId, canManage }) {
                           <button
                             onClick={() => remove(area)}
                             disabled={busyId === area.id}
-                            className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50"
+                            className="p-1 rounded-md text-muted-token hover:text-red-600 hover:bg-red-50"
                             title="Remove area"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -256,8 +256,8 @@ export default function AreasManager({ orgId, canManage }) {
                         </div>
                       )}
                     </div>
-                    {area.location && <p className="text-xs text-slate-500 mt-0.5">{area.location}</p>}
-                    {area.description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{area.description}</p>}
+                    {area.location && <p className="text-xs text-secondary-token mt-0.5">{area.location}</p>}
+                    {area.description && <p className="text-xs text-secondary-token mt-1 line-clamp-2">{area.description}</p>}
                   </div>
                 </div>
               </CardBody>

@@ -2,6 +2,7 @@ import { Component, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { MotionConfig } from 'framer-motion'
 import useAuthStore from '@/store/authStore'
+import useThemeStore from '@/store/themeStore'
 import ProtectedRoute, { RequireAuth } from '@/components/ProtectedRoute'
 // Imported for its module-level side effect only (starts the singleton
 // HealthMonitor's 30s polling loop on app boot) — no named binding needed.
@@ -80,17 +81,17 @@ class ErrorBoundary extends Component {
     if (this.state.error) {
       return (
         <div className="min-h-screen flex items-center justify-center p-6 app-bg">
-          <div className="w-full max-w-md bg-white/90 glass elev-3 rounded-3xl p-6 text-center space-y-4">
-            <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto">
+          <div className="w-full max-w-md glass elev-2 rounded-3xl p-6 text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-950/40 flex items-center justify-center mx-auto">
               <span className="text-2xl">💥</span>
             </div>
             <div>
-              <h2 className="text-lg font-extrabold text-slate-800">Something went wrong</h2>
-              <p className="text-sm text-slate-500 mt-1">
+              <h2 className="text-lg font-extrabold text-primary-token">Something went wrong</h2>
+              <p className="text-sm text-secondary-token mt-1">
                 The app crashed. This can happen on iOS PWAs when cached files get out of sync.
               </p>
             </div>
-            <div className="text-left rounded-2xl bg-slate-50 p-3 text-xs font-mono text-slate-600 overflow-auto max-h-40">
+            <div className="text-left rounded-2xl surface-muted p-3 text-xs font-mono text-secondary-token overflow-auto max-h-40">
               {this.state.error?.message || String(this.state.error)}
             </div>
             <div className="flex flex-col gap-2">
@@ -111,10 +112,10 @@ class ErrorBoundary extends Component {
 
 function PageFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+    <div className="min-h-screen flex items-center justify-center app-bg">
       <div className="text-center">
-        <div className="w-8 h-8 border-2 border-saffron-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-        <p className="text-sm text-slate-500">Loading page...</p>
+        <div className="w-8 h-8 border-2 rounded-full animate-spin mx-auto mb-2" style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+        <p className="text-sm text-secondary-token">Loading page...</p>
       </div>
     </div>
   )
@@ -123,6 +124,10 @@ function PageFallback() {
 function AppBootstrap() {
   const { initialize, initialized } = useAuthStore()
   const deviceMode = useDeviceModeStore((s) => s.mode)
+
+  useEffect(() => {
+    useThemeStore.getState().init()
+  }, [])
 
   useEffect(() => {
     // A child-mode device's Supabase session belongs to its own device

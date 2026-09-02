@@ -86,7 +86,7 @@ export default function AlertsTab({ childId }) {
     load()
   }
 
-  if (loading) return <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-8 text-muted-token text-sm">Loading...</div>
 
   const unreadCount = alerts.filter((a) => !a.is_read).length
 
@@ -94,7 +94,7 @@ export default function AlertsTab({ childId }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-slate-700">Alerts</h3>
+          <h3 className="text-sm font-semibold text-primary-token">Alerts</h3>
           {unreadCount > 0 && <Badge variant="red">{unreadCount} unread</Badge>}
         </div>
         <div className="flex gap-2">
@@ -105,7 +105,7 @@ export default function AlertsTab({ childId }) {
           )}
           <button
             onClick={refresh}
-            className="p-2 rounded-xl text-slate-400 hover:text-saffron-500 hover:bg-saffron-50 transition-colors"
+            className="p-2 rounded-xl text-muted-token hover:text-saffron-500 hover:bg-saffron-50 transition-colors"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -116,9 +116,9 @@ export default function AlertsTab({ childId }) {
       {alerts.length === 0 ? (
         <Card>
           <CardBody className="py-10 text-center">
-            <CheckCircle className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm text-slate-500">No alerts</p>
-            <p className="text-xs text-slate-400 mt-1">Everything is running smoothly.</p>
+            <CheckCircle className="w-10 h-10 text-muted-token mx-auto mb-3" />
+            <p className="text-sm text-secondary-token">No alerts</p>
+            <p className="text-xs text-muted-token mt-1">Everything is running smoothly.</p>
           </CardBody>
         </Card>
       ) : (
@@ -134,21 +134,21 @@ export default function AlertsTab({ childId }) {
                 className={alert.is_read ? 'opacity-60' : ''}
               >
                 <CardBody className="py-3.5 flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0">
-                    <Icon className="w-4.5 h-4.5 text-slate-500" />
+                  <div className="w-9 h-9 rounded-xl bg-[var(--surface-muted)] flex items-center justify-center flex-shrink-0">
+                    <Icon className="w-4.5 h-4.5 text-secondary-token" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-slate-800 truncate">{alert.title}</p>
+                      <p className="font-medium text-primary-token truncate">{alert.title}</p>
                       {!alert.is_read && <span className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />}
                     </div>
-                    {alert.body && <p className="text-sm text-slate-500 mt-0.5">{alert.body}</p>}
+                    {alert.body && <p className="text-sm text-secondary-token mt-0.5">{alert.body}</p>}
                     {suggestion && !alert.is_read && (
                       <p className="text-xs text-indigo-600 mt-1.5 bg-indigo-50 px-2 py-1 rounded-md inline-block">
                         💡 {suggestion}
                       </p>
                     )}
-                    <p className="text-xs text-slate-400 mt-1">{new Date(alert.occurred_at).toLocaleString()}</p>
+                    <p className="text-xs text-muted-token mt-1">{new Date(alert.occurred_at).toLocaleString()}</p>
                   </div>
                   <Badge variant={SEVERITY_VARIANT[alert.severity] ?? 'default'}>{alert.severity}</Badge>
                 </CardBody>

@@ -91,14 +91,14 @@ export default function BroadcastDelivery({ orgId, memberById, categoryByKey }) 
   const unreadCount = notifs.length - readCount
 
   if (loading) {
-    return <div className="text-center py-12 text-slate-400 text-sm">Loading delivery status…</div>
+    return <div className="text-center py-12 text-muted-token text-sm">Loading delivery status…</div>
   }
 
   if (notifs.length === 0 && deliveries.length === 0) {
     return (
       <Card>
         <CardBody>
-          <div className="flex flex-col items-center py-10 text-slate-400">
+          <div className="flex flex-col items-center py-10 text-muted-token">
             <AlertCircle className="w-12 h-12 mb-3 opacity-30" />
             <p className="text-sm">No notifications sent yet.</p>
           </div>
@@ -113,19 +113,19 @@ export default function BroadcastDelivery({ orgId, memberById, categoryByKey }) 
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <div className="flex items-center gap-2 text-sm font-semibold text-primary-token">
             <CheckCircle2 className="w-4 h-4 text-saffron-500" />
             Delivery summary
           </div>
         </CardHeader>
         <CardBody className="space-y-3">
           {channels.length === 0 ? (
-            <p className="text-sm text-slate-400">No delivery records in the recent window.</p>
+            <p className="text-sm text-muted-token">No delivery records in the recent window.</p>
           ) : (
             <div className="space-y-2">
               {channels.map((channel) => (
                 <div key={channel} className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-slate-600 capitalize w-16">{channel}</span>
+                  <span className="text-sm font-medium text-secondary-token capitalize w-16">{channel}</span>
                   {sortStatuses(Object.entries(channelAgg[channel])).map(([status, count]) => (
                     <Badge key={status} variant={statusVariant(status)}>
                       {status} {count}
@@ -135,8 +135,8 @@ export default function BroadcastDelivery({ orgId, memberById, categoryByKey }) 
               ))}
             </div>
           )}
-          <div className="pt-3 mt-1 border-t border-slate-100 flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-slate-600 w-16">Read</span>
+          <div className="pt-3 mt-1 border-t border-[var(--border-color)] flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-secondary-token w-16">Read</span>
             <Badge variant="tulasi">
               <CheckCircle2 className="w-3 h-3 mr-1" />
               {readCount} read
@@ -148,11 +148,11 @@ export default function BroadcastDelivery({ orgId, memberById, categoryByKey }) 
 
       <Card>
         <CardHeader>
-          <div className="text-sm font-semibold text-slate-700">Recent notifications ({notifs.length})</div>
+          <div className="text-sm font-semibold text-primary-token">Recent notifications ({notifs.length})</div>
         </CardHeader>
-        <CardBody className="divide-y divide-slate-100">
+        <CardBody className="divide-y divide-[var(--border-color)]">
           {notifs.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-400">No recent notifications visible.</p>
+            <p className="py-6 text-center text-sm text-muted-token">No recent notifications visible.</p>
           ) : (
             notifs.map((n) => {
               const dels = deliveriesByNotif.get(n.id) ?? []
@@ -161,14 +161,14 @@ export default function BroadcastDelivery({ orgId, memberById, categoryByKey }) 
                 <div key={n.id} className="py-3 flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-slate-700 truncate">{n.title}</p>
+                      <p className="font-medium text-primary-token truncate">{n.title}</p>
                       {n.category_key && (
                         <Badge variant="saffron">
                           {categoryByKey[n.category_key]?.label ?? n.category_key}
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-muted-token mt-0.5">
                       {formatDate(n.created_at)}
                       {recipient ? ` · ${memberLabel(recipient)}` : ''}
                     </p>

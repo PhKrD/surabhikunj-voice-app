@@ -130,12 +130,12 @@ export default function SchedulesTab({ childId }) {
     }))
   }
 
-  if (loading) return <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-8 text-muted-token text-sm">Loading...</div>
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-700">Time-based schedules</h3>
+        <h3 className="text-sm font-semibold text-primary-token">Time-based schedules</h3>
         <Button size="sm" onClick={() => openForm()}>
           <Plus className="w-4 h-4 mr-1.5" /> Add schedule
         </Button>
@@ -143,9 +143,9 @@ export default function SchedulesTab({ childId }) {
 
       {schedules.length === 0 ? (
         <div className="text-center py-10 px-6">
-          <Clock className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm font-medium text-slate-500">No schedules yet</p>
-          <p className="text-xs text-slate-400 mt-1">Create time windows to automatically block apps or internet.</p>
+          <Clock className="w-8 h-8 text-muted-token mx-auto mb-3" />
+          <p className="text-sm font-medium text-secondary-token">No schedules yet</p>
+          <p className="text-xs text-muted-token mt-1">Create time windows to automatically block apps or internet.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -161,18 +161,18 @@ export default function SchedulesTab({ childId }) {
                         <Icon className="w-4 h-4 text-indigo-600" />
                       </div>
                       <div>
-                        <p className="font-medium text-slate-800">{sched.name}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="font-medium text-primary-token">{sched.name}</p>
+                        <p className="text-xs text-secondary-token mt-0.5">
                           {DAYS.filter((_, i) => sched.days_of_week.includes(i)).join(', ')} · {formatTime(sched.start_time)} – {formatTime(sched.end_time)}
                         </p>
-                        <p className="text-xs text-slate-400 mt-0.5">{actionDef?.desc}</p>
+                        <p className="text-xs text-muted-token mt-0.5">{actionDef?.desc}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => openForm(sched)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50">
+                      <button onClick={() => openForm(sched)} className="p-1.5 rounded-lg text-muted-token hover:text-indigo-600 hover:bg-indigo-50">
                         <ShieldAlert className="w-4 h-4" />
                       </button>
-                      <button onClick={() => remove(sched.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50">
+                      <button onClick={() => remove(sched.id)} className="p-1.5 rounded-lg text-muted-token hover:text-red-600 hover:bg-red-50">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -188,21 +188,21 @@ export default function SchedulesTab({ childId }) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <CardBody className="p-5 space-y-4">
-              <h3 className="text-lg font-semibold text-slate-800">{editing ? 'Edit schedule' : 'New schedule'}</h3>
+              <h3 className="text-lg font-semibold text-primary-token">{editing ? 'Edit schedule' : 'New schedule'}</h3>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">Name</label>
+                <label className="block text-xs font-medium text-primary-token mb-1.5">Name</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="e.g. Bedtime"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">Days</label>
+                <label className="block text-xs font-medium text-primary-token mb-1.5">Days</label>
                 <div className="flex gap-1.5 flex-wrap">
                   {DAYS.map((day, i) => (
                     <button
@@ -210,7 +210,7 @@ export default function SchedulesTab({ childId }) {
                       type="button"
                       onClick={() => toggleDay(i)}
                       className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
-                        form.daysOfWeek.includes(i) ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        form.daysOfWeek.includes(i) ? 'bg-indigo-500 text-white' : 'bg-[var(--surface-muted)] text-secondary-token hover:bg-slate-200'
                       }`}
                     >
                       {day}
@@ -221,27 +221,27 @@ export default function SchedulesTab({ childId }) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1.5">Start time</label>
+                  <label className="block text-xs font-medium text-primary-token mb-1.5">Start time</label>
                   <input
                     type="time"
                     value={form.startTime}
                     onChange={(e) => setForm((prev) => ({ ...prev, startTime: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1.5">End time</label>
+                  <label className="block text-xs font-medium text-primary-token mb-1.5">End time</label>
                   <input
                     type="time"
                     value={form.endTime}
                     onChange={(e) => setForm((prev) => ({ ...prev, endTime: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">Action</label>
+                <label className="block text-xs font-medium text-primary-token mb-1.5">Action</label>
                 <div className="grid grid-cols-1 gap-2">
                   {ACTIONS.map((act) => {
                     const Icon = act.icon
@@ -253,7 +253,7 @@ export default function SchedulesTab({ childId }) {
                         className={`flex items-center gap-2 p-2.5 rounded-lg border text-left text-sm transition-colors ${
                           form.action === act.value
                             ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                            : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                            : 'border-[var(--border-color)] hover:border-slate-300 text-primary-token'
                         }`}
                       >
                         <Icon className="w-4 h-4" />
@@ -269,15 +269,15 @@ export default function SchedulesTab({ childId }) {
 
               {form.action === 'block_all' || form.action === 'allow_list_only' ? (
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1.5">Always-allowed packages (optional)</label>
+                  <label className="block text-xs font-medium text-primary-token mb-1.5">Always-allowed packages (optional)</label>
                   <input
                     type="text"
                     value={form.alwaysAllowedPackages}
                     onChange={(e) => setForm((prev) => ({ ...prev, alwaysAllowedPackages: e.target.value }))}
                     placeholder="com.android.phone, com.google.android.dialer"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   />
-                  <p className="text-xs text-slate-400 mt-1">Comma-separated Android package names to always allow.</p>
+                  <p className="text-xs text-muted-token mt-1">Comma-separated Android package names to always allow.</p>
                 </div>
               ) : null}
 

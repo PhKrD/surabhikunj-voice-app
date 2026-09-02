@@ -5,10 +5,10 @@ import { Loader2 } from 'lucide-react'
 
 function Spinner({ label = 'Loading...' }) {
   return (
-    <div className="flex items-center justify-center h-screen bg-slate-50">
+    <div className="flex items-center justify-center h-screen bg-[var(--surface-muted)]">
       <div className="text-center">
         <Loader2 className="w-8 h-8 text-saffron-500 animate-spin mx-auto mb-3" />
-        <p className="text-sm text-slate-500">{label}</p>
+        <p className="text-sm text-secondary-token">{label}</p>
       </div>
     </div>
   )

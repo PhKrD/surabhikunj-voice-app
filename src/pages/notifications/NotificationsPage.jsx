@@ -130,13 +130,13 @@ export default function NotificationsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-lg font-bold text-slate-800">Notifications</h2>
-        <div className="inline-flex items-center gap-1 p-1 rounded-full bg-slate-100 w-full sm:w-auto">
+        <h2 className="text-lg font-bold text-primary-token">Notifications</h2>
+        <div className="inline-flex items-center gap-1 p-1 rounded-full bg-[var(--surface-muted)] w-full sm:w-auto">
           <button
             onClick={() => setTab('inbox')}
             className={cn(
               'inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all flex-1 sm:flex-none',
-              tab === 'inbox' ? 'bg-white text-saffron-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              tab === 'inbox' ? 'bg-[var(--surface)] text-saffron-600 shadow-sm' : 'text-secondary-token hover:text-primary-token'
             )}
           >
             <Inbox className="w-4 h-4" />
@@ -146,7 +146,7 @@ export default function NotificationsPage() {
             onClick={() => setTab('prefs')}
             className={cn(
               'inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all flex-1 sm:flex-none',
-              tab === 'prefs' ? 'bg-white text-saffron-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              tab === 'prefs' ? 'bg-[var(--surface)] text-saffron-600 shadow-sm' : 'text-secondary-token hover:text-primary-token'
             )}
           >
             <SlidersHorizontal className="w-4 h-4" />
@@ -161,12 +161,12 @@ export default function NotificationsPage() {
         <>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search notifications…"
-                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300 transition"
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300 transition"
               />
             </div>
             <Button
@@ -193,7 +193,7 @@ export default function NotificationsPage() {
                     'flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border transition-colors',
                     active
                       ? 'bg-saffron-500 text-white border-saffron-500'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                      : 'bg-[var(--surface)] text-secondary-token border-[var(--border-color)] hover:border-slate-300'
                   )}
                 >
                   {label}
@@ -213,11 +213,11 @@ export default function NotificationsPage() {
           </div>
 
           {loading ? (
-            <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
+            <div className="text-center py-12 text-muted-token text-sm">Loading...</div>
           ) : filtered.length === 0 ? (
             <Card>
               <CardBody>
-                <div className="flex flex-col items-center py-10 text-slate-400">
+                <div className="flex flex-col items-center py-10 text-muted-token">
                   <Bell className="w-12 h-12 mb-3 opacity-30" />
                   <p className="text-sm">
                     {items.length === 0 ? 'No notifications yet.' : 'No notifications match your search.'}
@@ -240,21 +240,21 @@ export default function NotificationsPage() {
                         <div
                           className={cn(
                             'w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0',
-                            item.is_read ? 'bg-slate-100 text-slate-500' : 'bg-saffron-50 text-saffron-600'
+                            item.is_read ? 'bg-[var(--surface-muted)] text-secondary-token' : 'bg-saffron-50 text-saffron-600'
                           )}
                         >
                           <Icon className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="font-semibold text-slate-800 text-sm">{item.title}</p>
+                            <p className="font-semibold text-primary-token text-sm">{item.title}</p>
                             {!item.is_read && <Badge variant="saffron">New</Badge>}
                           </div>
                           {cat?.label && (
                             <p className="text-[11px] font-semibold text-saffron-600 mt-0.5">{cat.label}</p>
                           )}
-                          {item.body && <p className="text-sm text-slate-500 mt-0.5">{item.body}</p>}
-                          <p className="text-xs text-slate-400 mt-1.5">{formatDate(item.created_at)}</p>
+                          {item.body && <p className="text-sm text-secondary-token mt-0.5">{item.body}</p>}
+                          <p className="text-xs text-muted-token mt-1.5">{formatDate(item.created_at)}</p>
                         </div>
                       </button>
                     </CardBody>

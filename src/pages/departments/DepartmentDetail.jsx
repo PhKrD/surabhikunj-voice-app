@@ -159,14 +159,14 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
                   : <span>{department.icon ?? '🏛️'}</span>}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-slate-800 truncate">{department.name}</p>
+                <p className="font-semibold text-primary-token truncate">{department.name}</p>
                 {department.description && (
-                  <p className="text-xs text-slate-500 mt-0.5">{department.description}</p>
+                  <p className="text-xs text-secondary-token mt-0.5">{department.description}</p>
                 )}
               </div>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex-shrink-0"
+                className="p-1.5 rounded-lg text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)] flex-shrink-0"
                 title="Close"
               >
                 <X className="w-4 h-4" />
@@ -174,15 +174,15 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
             </div>
 
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Leadership</p>
+              <p className="text-xs font-semibold text-secondary-token uppercase tracking-wide">Leadership</p>
               {canManage ? (
                 <div className="grid sm:grid-cols-2 gap-3">
                   <label className="block">
-                    <span className="text-xs text-slate-500">Incharge</span>
+                    <span className="text-xs text-secondary-token">Incharge</span>
                     <select
                       value={inchargeId}
                       onChange={(e) => setInchargeId(e.target.value)}
-                      className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                      className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                     >
                       <option value="">— None —</option>
                       {orgMembers.map((m) => (
@@ -191,11 +191,11 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
                     </select>
                   </label>
                   <label className="block">
-                    <span className="text-xs text-slate-500">Sub-incharge</span>
+                    <span className="text-xs text-secondary-token">Sub-incharge</span>
                     <select
                       value={subInchargeId}
                       onChange={(e) => setSubInchargeId(e.target.value)}
-                      className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                      className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                     >
                       <option value="">— None —</option>
                       {orgMembers.map((m) => (
@@ -217,7 +217,7 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
                       url={department.incharge?.avatar_url}
                       size="sm"
                     />
-                    <p className="text-xs text-slate-600">
+                    <p className="text-xs text-secondary-token">
                       {department.incharge?.spiritual_name ?? 'No incharge'}
                     </p>
                   </div>
@@ -227,7 +227,7 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
                       url={department.sub_incharge?.avatar_url}
                       size="sm"
                     />
-                    <p className="text-xs text-slate-600">
+                    <p className="text-xs text-secondary-token">
                       {department.sub_incharge?.spiritual_name ?? 'No sub-incharge'}
                     </p>
                   </div>
@@ -236,20 +236,20 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
             </div>
 
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              <p className="text-xs font-semibold text-secondary-token uppercase tracking-wide">
                 Members ({members.length})
               </p>
 
               {loadingMembers ? (
-                <p className="text-xs text-slate-400 py-2">Loading members...</p>
+                <p className="text-xs text-muted-token py-2">Loading members...</p>
               ) : members.length === 0 ? (
-                <p className="text-xs text-slate-400 py-2">No members yet.</p>
+                <p className="text-xs text-muted-token py-2">No members yet.</p>
               ) : (
                 <div className="space-y-1.5">
                   {members.map((m) => (
                     <div
                       key={m.id}
-                      className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl hover:bg-slate-50"
+                      className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl hover:bg-[var(--surface-muted)]"
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <Avatar
@@ -258,9 +258,9 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
                           size="sm"
                         />
                         <div className="min-w-0">
-                          <p className="text-sm text-slate-700 truncate">{memberLabel(m.profile ?? {})}</p>
+                          <p className="text-sm text-primary-token truncate">{memberLabel(m.profile ?? {})}</p>
                           {m.joined_at && (
-                            <p className="text-[11px] text-slate-400">
+                            <p className="text-[11px] text-muted-token">
                               Joined {new Date(m.joined_at).toLocaleDateString()}
                             </p>
                           )}
@@ -270,7 +270,7 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
                         <button
                           onClick={() => removeMember(m)}
                           disabled={removingId === m.id}
-                          className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 flex-shrink-0"
+                          className="p-1 rounded-md text-muted-token hover:text-red-600 hover:bg-red-50 flex-shrink-0"
                           title="Remove member"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -286,7 +286,7 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
                   <select
                     value={addSelectId}
                     onChange={(e) => setAddSelectId(e.target.value)}
-                    className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                    className="flex-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                   >
                     <option value="">Select a member to add...</option>
                     {availableMembers.map((m) => (

@@ -22,6 +22,21 @@ function isOnline(lastSeenAt) {
   return diff < 2 * 60 * 1000 // 2 minutes
 }
 
+// Real, honest protection status derived from device_owner_mode (same field
+// DevicesTab uses) — never a fabricated "Protected" flag. See PLATFORM_LIMITATIONS.md.
+function protectionMeta(devices) {
+  if (devices.some((d) => d.device_owner_mode === 'device_owner')) {
+    return { label: 'Protected', variant: 'tulasi' }
+  }
+  if (devices.some((d) => d.device_owner_mode === 'device_admin')) {
+    return { label: 'Limited protection', variant: 'yellow' }
+  }
+  if (devices.length > 0) {
+    return { label: 'Setup needed', variant: 'saffron' }
+  }
+  return null
+}
+
 export default function ParentalControlDashboardPage() {
   const navigate = useNavigate()
   const toast = useToastStore()
@@ -63,7 +78,7 @@ export default function ParentalControlDashboardPage() {
     return () => clearTimeout(id)
   }, [load])
 
-  if (loading) return <div className="text-center py-12 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-12 text-muted-token text-sm">Loading...</div>
 
   const totalChildren = children.length
   const totalAlerts = Object.values(childData).reduce((sum, d) => sum + d.unreadAlerts, 0)
@@ -73,8 +88,8 @@ export default function ParentalControlDashboardPage() {
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Parental Control Dashboard</h1>
-        <p className="text-sm text-slate-500 mt-1">Overview of all children and their devices</p>
+        <h1 className="text-2xl font-bold text-primary-token">Parental Control Dashboard</h1>
+        <p className="text-sm text-secondary-token mt-1">Overview of all children and their devices</p>
       </div>
 
       {/* Summary cards */}
@@ -86,8 +101,8 @@ export default function ParentalControlDashboardPage() {
                 <Activity className="w-5 h-5 text-indigo-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-800">{totalChildren}</p>
-                <p className="text-xs text-slate-500">Children</p>
+                <p className="text-2xl font-bold text-primary-token">{totalChildren}</p>
+                <p className="text-xs text-secondary-token">Children</p>
               </div>
             </div>
           </CardBody>
@@ -100,8 +115,8 @@ export default function ParentalControlDashboardPage() {
                 <Smartphone className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-800">{totalOnline}</p>
-                <p className="text-xs text-slate-500">Online devices</p>
+                <p className="text-2xl font-bold text-primary-token">{totalOnline}</p>
+                <p className="text-xs text-secondary-token">Online devices</p>
               </div>
             </div>
           </CardBody>
@@ -114,8 +129,8 @@ export default function ParentalControlDashboardPage() {
                 <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-800">{totalAlerts}</p>
-                <p className="text-xs text-slate-500">Unread alerts</p>
+                <p className="text-2xl font-bold text-primary-token">{totalAlerts}</p>
+                <p className="text-xs text-secondary-token">Unread alerts</p>
               </div>
             </div>
           </CardBody>
@@ -128,10 +143,10 @@ export default function ParentalControlDashboardPage() {
                 <Clock className="w-5 h-5 text-saffron-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-800">
+                <p className="text-2xl font-bold text-primary-token">
                   {formatDuration(Object.values(childData).reduce((sum, d) => sum + d.totalMs, 0))}
                 </p>
-                <p className="text-xs text-slate-500">Total screen time</p>
+                <p className="text-xs text-secondary-token">Total screen time</p>
               </div>
             </div>
           </CardBody>
@@ -142,24 +157,26 @@ export default function ParentalControlDashboardPage() {
       <div className="space-y-4">
         {children.length === 0 ? (
           <div className="text-center py-10 px-6">
-            <ShieldCheck className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm font-medium text-slate-500">No children yet</p>
-            <p className="text-xs text-slate-400 mt-1">Add a child to start monitoring their devices.</p>
+            <ShieldCheck className="w-8 h-8 text-muted-token mx-auto mb-3" />
+            <p className="text-sm font-medium text-secondary-token">No children yet</p>
+            <p className="text-xs text-muted-token mt-1">Add a child to start monitoring their devices.</p>
           </div>
         ) : (
           children.map((child) => {
             const data = childData[child.id] || { usage: [], alerts: [], devices: [], totalMs: 0, unreadAlerts: 0, onlineDevices: 0 }
+            const protection = protectionMeta(data.devices)
             return (
               <Card key={child.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/parental-control/${child.id}`)}>
                 <CardBody className="py-4">
                   <div className="flex items-start gap-4">
                     <Avatar name={child.display_name} size="lg" />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-slate-800">{child.display_name}</h3>
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="font-semibold text-primary-token">{child.display_name}</h3>
                         {data.onlineDevices > 0 && <Badge variant="tulasi" className="text-xs">Online</Badge>}
+                        {protection && <Badge variant={protection.variant} className="text-xs">{protection.label}</Badge>}
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-slate-500">
+                      <div className="flex items-center gap-4 text-sm text-secondary-token">
                         <span className="flex items-center gap-1">
                           <Smartphone className="w-3.5 h-3.5" />
                           {data.devices.length} device{data.devices.length !== 1 ? 's' : ''}
@@ -176,11 +193,11 @@ export default function ParentalControlDashboardPage() {
                         )}
                       </div>
                       {data.alerts.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-slate-100">
-                          <p className="text-xs text-slate-400 mb-1.5">Recent alerts</p>
+                        <div className="mt-3 pt-3 border-t border-[var(--border-color)]">
+                          <p className="text-xs text-muted-token mb-1.5">Recent alerts</p>
                           <div className="space-y-1">
                             {data.alerts.slice(0, 2).map((alert) => (
-                              <p key={alert.id} className="text-xs text-slate-600 truncate">
+                              <p key={alert.id} className="text-xs text-secondary-token truncate">
                                 {alert.title}
                               </p>
                             ))}
@@ -188,7 +205,7 @@ export default function ParentalControlDashboardPage() {
                         </div>
                       )}
                     </div>
-                    <ArrowRight className="w-5 h-5 text-slate-400" />
+                    <ArrowRight className="w-5 h-5 text-muted-token" />
                   </div>
                 </CardBody>
               </Card>

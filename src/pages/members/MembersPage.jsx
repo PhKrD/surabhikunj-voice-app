@@ -206,7 +206,7 @@ export default function MembersPage() {
   }
 
   if (!isAdmin) {
-    return <div className="text-center py-12 text-slate-400 text-sm">Admins only.</div>
+    return <div className="text-center py-12 text-muted-token text-sm">Admins only.</div>
   }
 
   return (
@@ -214,10 +214,10 @@ export default function MembersPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+          <h2 className="text-xl font-extrabold text-primary-token flex items-center gap-2">
             <UserCog className="w-5 h-5 text-saffron-500" /> Assign Members
           </h2>
-          <p className="text-sm text-slate-500 mt-0.5">Approve devotees and assign their role.</p>
+          <p className="text-sm text-secondary-token mt-0.5">Approve devotees and assign their role.</p>
         </div>
         <div className="flex items-center gap-2">
           {pendingCount > 0 && (
@@ -234,7 +234,7 @@ export default function MembersPage() {
         <Card>
           <CardBody className="py-4">
             <form onSubmit={handleCreateMember} className="space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <div className="flex items-center gap-2 text-sm font-semibold text-primary-token">
                 <UserPlus className="w-4 h-4 text-saffron-500" /> Create a new profile
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -243,32 +243,32 @@ export default function MembersPage() {
                   placeholder="Full name"
                   value={newMember.legal_name}
                   onChange={(e) => setNew({ legal_name: e.target.value })}
-                  className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300"
+                  className="px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300"
                 />
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token" />
                   <input
                     type="email"
                     placeholder="Email address"
                     value={newMember.email}
                     onChange={(e) => setNew({ email: e.target.value })}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300"
                   />
                 </div>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token" />
                   <input
                     type="tel"
                     placeholder="Mobile (becomes first password)"
                     value={newMember.phone}
                     onChange={(e) => setNew({ phone: e.target.value })}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300"
                   />
                 </div>
                 <select
                   value={newMember.role_id}
                   onChange={(e) => setNew({ role_id: e.target.value })}
-                  className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-saffron-300"
+                  className="px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token focus:outline-none focus:ring-2 focus:ring-saffron-300"
                 >
                   {orgRoles.map((r) => (
                     <option key={r.id} value={r.id}>{r.name}</option>
@@ -277,9 +277,9 @@ export default function MembersPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Button type="submit" icon={UserPlus} loading={creating}>Create profile</Button>
-                <button type="button" onClick={() => setShowAdd(false)} className="text-sm text-slate-500 px-3 py-2">Cancel</button>
+                <button type="button" onClick={() => setShowAdd(false)} className="text-sm text-secondary-token px-3 py-2">Cancel</button>
               </div>
-              <p className="text-[11px] text-slate-400">The devotee signs in with their email and mobile number as the initial password, then changes it in Settings.</p>
+              <p className="text-[11px] text-muted-token">The devotee signs in with their email and mobile number as the initial password, then changes it in Settings.</p>
             </form>
           </CardBody>
         </Card>
@@ -290,13 +290,13 @@ export default function MembersPage() {
         <CardBody className="py-4">
           <form onSubmit={handleFindByEmail} className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1 group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-saffron-500 transition-colors" />
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token group-focus-within:text-saffron-500 transition-colors" />
               <input
                 type="email"
                 placeholder="Find devotee by email address…"
                 value={emailQuery}
                 onChange={(e) => setEmailQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-slate-50/60 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-400/60 focus:border-saffron-300 focus:bg-white transition-all"
+                className="w-full pl-11 pr-4 py-3 rounded-2xl border border-[var(--border-color)] bg-slate-50/60 text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-400/60 focus:border-saffron-300 focus:bg-[var(--surface)] transition-all"
               />
             </div>
             <Button type="submit" icon={Search} className="sm:w-auto w-full">Find</Button>
@@ -306,23 +306,23 @@ export default function MembersPage() {
 
       {/* Search box */}
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token" />
         <input
           type="text"
           placeholder="Search all members by name or email…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-400/60 focus:border-saffron-300 transition-all"
+          className="w-full pl-11 pr-4 py-3 rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-400/60 focus:border-saffron-300 transition-all"
         />
       </div>
 
       {/* Members list */}
       {loading ? (
-        <div className="text-center py-12 text-slate-400 text-sm">Loading members…</div>
+        <div className="text-center py-12 text-muted-token text-sm">Loading members…</div>
       ) : filtered.length === 0 ? (
         <Card>
           <CardBody>
-            <div className="flex flex-col items-center py-10 text-slate-400">
+            <div className="flex flex-col items-center py-10 text-muted-token">
               <UserCog className="w-12 h-12 mb-3 opacity-30" />
               <p className="text-sm">No members found.</p>
             </div>
@@ -342,7 +342,7 @@ export default function MembersPage() {
                       <Avatar name={m.spiritual_name} url={m.avatar_url} size="md" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-slate-800 truncate">{m.spiritual_name}</p>
+                          <p className="font-semibold text-primary-token truncate">{m.spiritual_name}</p>
                           {m.is_approved ? (
                             <Badge variant="tulasi" className="flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Approved</Badge>
                           ) : (
@@ -350,7 +350,7 @@ export default function MembersPage() {
                           )}
                           {self && <Badge variant="blue">You</Badge>}
                         </div>
-                        {m.email && <p className="text-xs text-slate-400 mt-0.5 truncate">{m.email}</p>}
+                        {m.email && <p className="text-xs text-muted-token mt-0.5 truncate">{m.email}</p>}
 
                         {/* Controls */}
                         <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -358,7 +358,7 @@ export default function MembersPage() {
                             value={d.role_id ?? ''}
                             onChange={(e) => setDraft(m.id, { role_id: e.target.value })}
                             disabled={self}
-                            className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-saffron-300 disabled:opacity-60"
+                            className="px-3 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token focus:outline-none focus:ring-2 focus:ring-saffron-300 disabled:opacity-60"
                           >
                             {!d.role_id && <option value="">Select a role…</option>}
                             {orgRoles.map((r) => (
@@ -374,7 +374,7 @@ export default function MembersPage() {
                               'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-60',
                               d.is_approved
                                 ? 'grad-tulasi text-white shadow-[0_6px_16px_-6px_rgba(34,197,94,0.5)]'
-                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                : 'bg-[var(--surface-muted)] text-secondary-token hover:bg-slate-200'
                             )}
                           >
                             {d.is_approved ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
@@ -392,7 +392,7 @@ export default function MembersPage() {
                             Save
                           </Button>
                         </div>
-                        {self && <p className="text-[11px] text-slate-400 mt-2">You can't change your own role or approval.</p>}
+                        {self && <p className="text-[11px] text-muted-token mt-2">You can't change your own role or approval.</p>}
                       </div>
                     </div>
                   </CardBody>

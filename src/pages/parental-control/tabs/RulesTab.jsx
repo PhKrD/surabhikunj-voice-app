@@ -131,7 +131,7 @@ export default function RulesTab({ childId }) {
     }
   }
 
-  if (loading) return <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-8 text-muted-token text-sm">Loading...</div>
 
   return (
     <div className="space-y-4">
@@ -152,31 +152,31 @@ export default function RulesTab({ childId }) {
         <Card>
           <CardBody className="py-4 space-y-3">
             <label className="block">
-              <span className="text-xs text-slate-500">Select app</span>
+              <span className="text-xs text-secondary-token">Select app</span>
               <div className="relative mt-1">
                 <input
                   value={form.appName || searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search for an app..."
-                  className="w-full px-3 py-2.5 pl-10 rounded-xl border border-slate-200 text-sm"
+                  className="w-full px-3 py-2.5 pl-10 rounded-xl border border-[var(--border-color)] text-sm"
                 />
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token" />
               </div>
             </label>
 
             {searchQuery && filteredApps.length > 0 && (
-              <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl">
+              <div className="max-h-48 overflow-y-auto border border-[var(--border-color)] rounded-xl">
                 {filteredApps.map((app) => (
                   <button
                     key={app.id}
                     type="button"
                     onClick={() => selectApp(app)}
-                    className="w-full px-3 py-2.5 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0 flex items-center gap-2"
+                    className="w-full px-3 py-2.5 text-left hover:bg-[var(--surface-muted)] border-b border-[var(--border-color)] last:border-0 flex items-center gap-2"
                   >
-                    <SmartphoneIcon className="w-4 h-4 text-slate-400" />
+                    <SmartphoneIcon className="w-4 h-4 text-muted-token" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{app.app_name}</p>
-                      <p className="text-xs text-slate-400 truncate font-mono">{app.package_name}</p>
+                      <p className="text-sm font-medium text-primary-token truncate">{app.app_name}</p>
+                      <p className="text-xs text-muted-token truncate font-mono">{app.package_name}</p>
                     </div>
                   </button>
                 ))}
@@ -184,29 +184,29 @@ export default function RulesTab({ childId }) {
             )}
 
             {form.packageName && (
-              <div className="bg-slate-50 rounded-xl px-3 py-2 flex items-center gap-2">
-                <SmartphoneIcon className="w-4 h-4 text-slate-500" />
+              <div className="bg-[var(--surface-muted)] rounded-xl px-3 py-2 flex items-center gap-2">
+                <SmartphoneIcon className="w-4 h-4 text-secondary-token" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate">{form.appName}</p>
-                  <p className="text-xs text-slate-400 truncate font-mono">{form.packageName}</p>
+                  <p className="text-sm font-medium text-primary-token truncate">{form.appName}</p>
+                  <p className="text-xs text-muted-token truncate font-mono">{form.packageName}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => { setForm((f) => ({ ...f, packageName: '', appName: '' })); setSearchQuery('') }}
                   className="p-1 rounded hover:bg-slate-200"
                 >
-                  <X className="w-4 h-4 text-slate-400" />
+                  <X className="w-4 h-4 text-muted-token" />
                 </button>
               </div>
             )}
 
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-xs text-slate-500">Action</span>
+                <span className="text-xs text-secondary-token">Action</span>
                 <select
                   value={form.action}
                   onChange={(e) => setForm((f) => ({ ...f, action: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 >
                   <option value="block">Block completely</option>
                   <option value="time_limit">Daily time limit</option>
@@ -215,7 +215,7 @@ export default function RulesTab({ childId }) {
               </label>
               {form.action === 'time_limit' && (
                 <label className="block">
-                  <span className="text-xs text-slate-500">Daily limit (minutes)</span>
+                  <span className="text-xs text-secondary-token">Daily limit (minutes)</span>
                   <div className="flex gap-2 mt-1">
                     <input
                       type="number"
@@ -223,7 +223,7 @@ export default function RulesTab({ childId }) {
                       max={1440}
                       value={form.dailyLimitMin}
                       onChange={(e) => setForm((f) => ({ ...f, dailyLimitMin: e.target.value }))}
-                      className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                      className="flex-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                       placeholder="e.g., 30"
                     />
                   </div>
@@ -233,13 +233,13 @@ export default function RulesTab({ childId }) {
                         key={preset}
                         type="button"
                         onClick={() => setForm((f) => ({ ...f, dailyLimitMin: preset }))}
-                        className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"
+                        className="px-3 py-1.5 text-xs rounded-lg border border-[var(--border-color)] hover:bg-[var(--surface-muted)] text-secondary-token"
                       >
                         {preset}m
                       </button>
                     ))}
                   </div>
-                  <p className="text-xs text-slate-400 mt-2">
+                  <p className="text-xs text-muted-token mt-2">
                     <Clock className="w-3 h-3 inline mr-1" />
                     App will be blocked after this daily usage time
                   </p>
@@ -262,9 +262,9 @@ export default function RulesTab({ childId }) {
       <div className="space-y-2">
         {rules.length === 0 && !showForm && (
           <div className="text-center py-10 px-6">
-            <SmartphoneIcon className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm font-medium text-slate-500">No app rules yet.</p>
-            <p className="text-xs text-slate-400 mt-1">
+            <SmartphoneIcon className="w-8 h-8 text-muted-token mx-auto mb-3" />
+            <p className="text-sm font-medium text-secondary-token">No app rules yet.</p>
+            <p className="text-xs text-muted-token mt-1">
               {installedApps.length === 0 
                 ? 'Apps will appear here once the child\'s device reports them.'
                 : 'Click "Add Rule" to create your first app rule.'}
@@ -283,21 +283,21 @@ export default function RulesTab({ childId }) {
           return (
             <Card key={rule.id}>
               <CardBody className="py-3.5 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                  <Icon className="w-4 h-4 text-slate-600" />
+                <div className="w-8 h-8 rounded-full bg-[var(--surface-muted)] flex items-center justify-center">
+                  <Icon className="w-4 h-4 text-secondary-token" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-slate-800 truncate">{rule.app_name || rule.package_name}</p>
-                  <p className="text-xs text-slate-400 truncate font-mono">{rule.package_name}</p>
+                  <p className="font-medium text-primary-token truncate">{rule.app_name || rule.package_name}</p>
+                  <p className="text-xs text-muted-token truncate font-mono">{rule.package_name}</p>
                   
                   {rule.action === 'time_limit' && rule.daily_limit_min && (
                     <div className="mt-1.5">
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="text-slate-600">
+                        <span className="text-secondary-token">
                           {usedMinutes}m / {rule.daily_limit_min}m used
                         </span>
                         {remainingMinutes !== null && (
-                          <span className={`font-medium ${remainingMinutes <= 5 ? 'text-red-600' : 'text-slate-500'}`}>
+                          <span className={`font-medium ${remainingMinutes <= 5 ? 'text-red-600' : 'text-secondary-token'}`}>
                             ({remainingMinutes}m remaining)
                           </span>
                         )}
@@ -325,7 +325,7 @@ export default function RulesTab({ childId }) {
                 </Badge>
                 <button
                   onClick={() => handleDelete(rule)}
-                  className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
+                  className="p-2 rounded-lg text-muted-token hover:text-red-600 hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

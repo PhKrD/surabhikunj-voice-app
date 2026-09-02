@@ -12,7 +12,7 @@ import { useTerm } from '@/hooks/usePermission'
 import { cn } from '@/lib/utils'
 
 const STATUS_CONFIG = {
-  pending:  { label: 'Pending',  color: 'bg-slate-100 text-slate-600',    icon: null },
+  pending:  { label: 'Pending',  color: 'bg-[var(--surface-muted)] text-secondary-token',    icon: null },
   done:     { label: 'Done',     color: 'bg-green-100 text-green-700',    icon: CheckCircle2 },
   partial:  { label: 'Partial',  color: 'bg-yellow-100 text-yellow-700',  icon: MinusCircle },
   missed:   { label: 'Missed',   color: 'bg-red-100 text-red-600',        icon: XCircle },
@@ -88,33 +88,33 @@ export default function TasksPage() {
 
   const isToday = date === new Date().toISOString().split('T')[0]
 
-  if (loading) return <div className="p-8 text-center text-slate-400">Loading {label}…</div>
+  if (loading) return <div className="p-8 text-center text-muted-token">Loading {label}…</div>
 
   return (
     <div className="p-6 space-y-5 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-slate-800">{label}</h1>
+        <h1 className="text-2xl font-extrabold text-primary-token">{label}</h1>
         <Can permission="tasks.assign">
           <Button size="sm" icon={Plus}>Assign</Button>
         </Can>
       </div>
 
       {/* Date navigator */}
-      <div className="flex items-center justify-between bg-white border border-slate-100 rounded-2xl px-4 py-2.5 shadow-sm">
+      <div className="flex items-center justify-between bg-[var(--surface)] border border-[var(--border-color)] rounded-2xl px-4 py-2.5 shadow-sm">
         <button
           onClick={() => setDate(subDays(parseISO(date), 1).toISOString().split('T')[0])}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+          className="p-1.5 rounded-lg text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)]"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
-        <span className="text-sm font-semibold text-slate-700">
+        <span className="text-sm font-semibold text-primary-token">
           {isToday ? 'Today' : format(parseISO(date), 'EEEE, dd MMM')}
         </span>
         <button
           onClick={() => setDate(addDays(parseISO(date), 1).toISOString().split('T')[0])}
           disabled={isToday}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-30"
+          className="p-1.5 rounded-lg text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)] disabled:opacity-30"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -122,7 +122,7 @@ export default function TasksPage() {
 
       {assignments.length === 0 && (
         <Card>
-          <CardBody className="py-12 text-center text-slate-400">
+          <CardBody className="py-12 text-center text-muted-token">
             <ListChecks className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p>No tasks assigned for this day.</p>
           </CardBody>
@@ -144,20 +144,20 @@ export default function TasksPage() {
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-slate-800">
+                      <p className="font-semibold text-primary-token">
                         {a.task_templates?.name ?? 'Task'}
                       </p>
                       {a.task_templates?.task_categories?.name && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-muted)] text-secondary-token">
                           {a.task_templates.task_categories.name}
                         </span>
                       )}
                     </div>
                     {a.task_time && (
-                      <p className="text-xs text-slate-400 mt-0.5">{a.task_time}</p>
+                      <p className="text-xs text-muted-token mt-0.5">{a.task_time}</p>
                     )}
                     {log?.notes && (
-                      <p className="text-xs text-slate-500 italic mt-1">{log.notes}</p>
+                      <p className="text-xs text-secondary-token italic mt-1">{log.notes}</p>
                     )}
                   </div>
                   <span className={cn('flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0', cfg.color)}>
@@ -181,7 +181,7 @@ export default function TasksPage() {
                         className={cn(
                           'text-xs font-medium px-3 py-1.5 rounded-xl border transition-all disabled:opacity-50',
                           status === s
-                            ? 'bg-slate-100 text-slate-400 border-slate-100 cursor-default'
+                            ? 'bg-[var(--surface-muted)] text-muted-token border-[var(--border-color)] cursor-default'
                             : STATUS_CONFIG[s].color + ' border-transparent hover:opacity-80'
                         )}
                       >
@@ -199,7 +199,7 @@ export default function TasksPage() {
                       placeholder="Optional notes…"
                       value={notesDraft}
                       onChange={(e) => setNotesDraft(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300 resize-none"
+                      className="w-full px-3 py-2 rounded-xl border border-[var(--border-color)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300 resize-none"
                     />
                     <div className="flex gap-2">
                       {['partial', 'missed', 'excused'].map((s) => (
@@ -212,7 +212,7 @@ export default function TasksPage() {
                           {STATUS_CONFIG[s].label}
                         </Button>
                       ))}
-                      <button onClick={() => setExpanded(null)} className="text-xs text-slate-400 px-2">Cancel</button>
+                      <button onClick={() => setExpanded(null)} className="text-xs text-muted-token px-2">Cancel</button>
                     </div>
                   </div>
                 )}

@@ -116,13 +116,43 @@ export async function generatePairingCode({ childId, deviceName }) {
 }
 
 export async function removeDevice(deviceId) {
+  const { data: device } = await supabase
+    .from('pc_devices')
+    .select('child_id, device_name')
+    .eq('id', deviceId)
+    .maybeSingle()
+
   const { error } = await supabase.from('pc_devices').delete().eq('id', deviceId)
   if (error) throw error
+
+  if (device) {
+    await recordAudit({
+      childId: device.child_id,
+      deviceId,
+      action: 'remove_device',
+      target: `device:${device.device_name || deviceId}`,
+    })
+  }
 }
 
 export async function renameDevice(deviceId, deviceName) {
+  const { data: device } = await supabase
+    .from('pc_devices')
+    .select('child_id')
+    .eq('id', deviceId)
+    .maybeSingle()
+
   const { error } = await supabase.from('pc_devices').update({ device_name: deviceName }).eq('id', deviceId)
   if (error) throw error
+
+  if (device) {
+    await recordAudit({
+      childId: device.child_id,
+      deviceId,
+      action: 'rename_device',
+      target: `device:${deviceName}`,
+    })
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -237,12 +267,36 @@ export async function createWebsiteRule({ childId, deviceId, domain, action }) {
     .select()
     .single()
   if (error) throw error
+
+  await recordAudit({
+    childId,
+    deviceId,
+    action: 'create_website_rule',
+    target: `website:${data.domain}`,
+    metadata: { action },
+  })
+
   return data
 }
 
 export async function deleteWebsiteRule(ruleId) {
+  const { data: rule } = await supabase
+    .from('pc_website_rules')
+    .select('child_id, device_id, domain')
+    .eq('id', ruleId)
+    .maybeSingle()
+
   const { error } = await supabase.from('pc_website_rules').delete().eq('id', ruleId)
   if (error) throw error
+
+  if (rule) {
+    await recordAudit({
+      childId: rule.child_id,
+      deviceId: rule.device_id,
+      action: 'delete_website_rule',
+      target: `website:${rule.domain}`,
+    })
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -259,6 +313,19 @@ export async function listChildRequests(childId) {
   return data ?? []
 }
 
+/**
+ * Resolves a generic child request (pc_child_requests).
+ *
+ * IMPORTANT — only `bonus_time` actually changes anything on the device:
+ * it sends a real `grant_bonus_time` command, mirroring resolveBonusRequest().
+ * `app_unblock` / `website_access` / `schedule_exception` requests are
+ * freeform text on the child side (RequestPage.jsx never captures a
+ * structured package name or domain), so approving them can only update
+ * the request's status — there is nothing to safely automate without
+ * guessing intent from free text. The UI (RequestsTab.jsx) discloses this
+ * so parents don't think approval alone changes the device; they still
+ * need to go make the matching change in Rules / Website Rules.
+ */
 export async function resolveChildRequest(requestId, { approve, expiresAt }) {
   const { data: userData } = await supabase.auth.getUser()
   const patch = {
@@ -269,8 +336,30 @@ export async function resolveChildRequest(requestId, { approve, expiresAt }) {
   if (approve && expiresAt) {
     patch.expires_at = expiresAt
   }
-  const { data, error } = await supabase.from('pc_child_requests').update(patch).eq('id', requestId).select().single()
+  const { data, error } = await supabase
+    .from('pc_child_requests')
+    .update(patch)
+    .eq('id', requestId)
+    .select()
+    .single()
   if (error) throw error
+
+  if (approve && data.request_type === 'bonus_time' && data.device_id && expiresAt) {
+    await sendDeviceCommand({
+      deviceId: data.device_id,
+      commandType: 'grant_bonus_time',
+      payload: { expires_at: expiresAt },
+    })
+  }
+
+  await recordAudit({
+    childId: data.child_id,
+    deviceId: data.device_id,
+    action: approve ? 'approve_child_request' : 'deny_child_request',
+    target: `request:${data.request_type}`,
+    metadata: { request_type: data.request_type, reason: data.reason },
+  })
+
   return data
 }
 
@@ -330,13 +419,41 @@ export async function createSchedule({ childId, name, daysOfWeek, startTime, end
 }
 
 export async function updateSchedule(scheduleId, patch) {
-  const { error } = await supabase.from('pc_schedules').update(patch).eq('id', scheduleId)
+  const { data: schedule, error } = await supabase
+    .from('pc_schedules')
+    .update(patch)
+    .eq('id', scheduleId)
+    .select('child_id, device_id, name')
+    .single()
   if (error) throw error
+
+  await recordAudit({
+    childId: schedule.child_id,
+    deviceId: schedule.device_id,
+    action: 'update_schedule',
+    target: `schedule:${schedule.name}`,
+    metadata: patch,
+  })
 }
 
 export async function deleteSchedule(scheduleId) {
+  const { data: schedule } = await supabase
+    .from('pc_schedules')
+    .select('child_id, device_id, name')
+    .eq('id', scheduleId)
+    .maybeSingle()
+
   const { error } = await supabase.from('pc_schedules').delete().eq('id', scheduleId)
   if (error) throw error
+
+  if (schedule) {
+    await recordAudit({
+      childId: schedule.child_id,
+      deviceId: schedule.device_id,
+      action: 'delete_schedule',
+      target: `schedule:${schedule.name}`,
+    })
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -385,9 +502,23 @@ export async function updateAppRule(ruleId, patch) {
 }
 
 export async function deleteAppRule(ruleId) {
+  const { data: rule } = await supabase
+    .from('pc_app_rules')
+    .select('child_id, device_id, package_name')
+    .eq('id', ruleId)
+    .maybeSingle()
+
   const { error } = await supabase.from('pc_app_rules').delete().eq('id', ruleId)
   if (error) throw error
-  // Audit logging would need childId; skip for now (could fetch first)
+
+  if (rule) {
+    await recordAudit({
+      childId: rule.child_id,
+      deviceId: rule.device_id,
+      action: 'delete_app_rule',
+      target: `app:${rule.package_name}`,
+    })
+  }
 }
 
 // Get today's app usage for a child to help parents set time limits
@@ -601,6 +732,13 @@ export async function reassignDevice(deviceId, newChildId) {
     .update({ child_id: newChildId })
     .eq('id', deviceId)
   if (error) throw error
+
+  await recordAudit({
+    childId: newChildId,
+    deviceId,
+    action: 'reassign_device',
+    target: `device:${deviceId}`,
+  })
 }
 
 // ---------------------------------------------------------------------
@@ -638,5 +776,14 @@ export async function resolveBonusRequest(requestId, { approve, approvedMin }) {
       payload: { expires_at: patch.expires_at },
     })
   }
+
+  await recordAudit({
+    childId: data.child_id,
+    deviceId: data.device_id,
+    action: approve ? 'approve_bonus_time' : 'deny_bonus_time',
+    target: `bonus:${requestId}`,
+    metadata: { approved_min: approve ? approvedMin : null },
+  })
+
   return data
 }

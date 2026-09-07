@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { WifiOff, Wifi, Lock, LockOpen, Smartphone, RefreshCw } from 'lucide-react'
+import { WifiOff, Wifi, Lock, LockOpen, Smartphone, RefreshCw, Info } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
@@ -166,6 +166,17 @@ export default function CommandCenter({ devices }) {
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Real Android constraint, surfaced here rather than only in a doc no
+          parent will read: "Unlock now" turns the screen on but cannot bypass
+          an existing PIN/pattern/password — that's an OS restriction, not a
+          bug. If the child's phone has no lock-screen credential set, both
+          Lock and Unlock work as expected. */}
+      <p className="flex items-start gap-1.5 text-xs text-muted-token">
+        <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+        "Unlock now" turns the screen on, but can't remove an existing PIN/pattern/password on the
+        child's device — that's an Android restriction, not a bug here.
+      </p>
 
       {/* Live command status feed */}
       {commands.length > 0 && (

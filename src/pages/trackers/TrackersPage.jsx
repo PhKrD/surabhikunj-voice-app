@@ -65,8 +65,8 @@ function TimeInput({ value, onChange }) {
       className={cn(
         'px-3 py-1.5 rounded-2xl text-xs font-semibold border transition-all active:scale-95',
         value === t
-          ? 'bg-gradient-to-r from-saffron-500 to-orange-400 text-white border-transparent shadow-sm shadow-orange-200'
-          : 'bg-white/80 text-slate-600 border-slate-200 hover:border-saffron-300 hover:text-saffron-600 hover:bg-saffron-50'
+          ? 'bg-saffron-500 text-white border-transparent shadow-sm'
+          : 'surface text-secondary-token border-[var(--border-color)] hover:border-saffron-300 hover:text-saffron-600 hover:bg-saffron-50 dark:hover:bg-saffron-950/40'
       )}
     >
       {toDisplayStr(t)}
@@ -74,11 +74,11 @@ function TimeInput({ value, onChange }) {
   )
 
   return (
-    <div className="rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden">
+    <div className="rounded-2xl surface-muted border border-[var(--border-color)] overflow-hidden">
       {/* Big time display */}
       <div className={cn(
         'flex items-center justify-between px-5 py-4',
-        d ? 'bg-gradient-to-r from-saffron-500 to-orange-400' : 'bg-gradient-to-r from-slate-200 to-slate-100'
+        d ? 'bg-saffron-500' : 'surface-muted'
       )}>
         {d ? (
           <div className="flex items-baseline gap-1.5">
@@ -86,7 +86,7 @@ function TimeInput({ value, onChange }) {
             <span className="text-lg font-semibold text-white/80">{d.ampm}</span>
           </div>
         ) : (
-          <span className="text-base font-medium text-slate-400">Not set</span>
+          <span className="text-base font-medium text-muted-token">Not set</span>
         )}
         <div className="flex items-center gap-2">
           {d && (
@@ -108,7 +108,7 @@ function TimeInput({ value, onChange }) {
             onClick={() => { setShowCustom(true); setTimeout(() => nativeRef.current?.showPicker?.(), 50) }}
             className={cn(
               'w-9 h-9 rounded-2xl flex items-center justify-center transition active:scale-95',
-              d ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:text-saffron-500'
+              d ? 'bg-white/20 hover:bg-white/30 text-white' : 'surface border border-[var(--border-color)] text-secondary-token hover:text-saffron-500'
             )}
             title="Pick custom time"
           >
@@ -132,13 +132,13 @@ function TimeInput({ value, onChange }) {
       {/* Preset rows */}
       <div className="p-3 space-y-2.5">
         <div>
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5 px-0.5">Morning</p>
+          <p className="text-[10px] font-semibold text-muted-token uppercase tracking-widest mb-1.5 px-0.5">Morning</p>
           <div className="flex flex-wrap gap-1.5">
             {TIME_PRESETS_AM.map((t) => <Chip key={t} t={t} />)}
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1.5 px-0.5">Evening · Night</p>
+          <p className="text-[10px] font-semibold text-muted-token uppercase tracking-widest mb-1.5 px-0.5">Evening · Night</p>
           <div className="flex flex-wrap gap-1.5">
             {TIME_PRESETS_PM.map((t) => <Chip key={t} t={t} />)}
           </div>
@@ -162,9 +162,9 @@ function DurationInput({ value, onChange, unit = 'min' }) {
   }
 
   return (
-    <div className="rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden">
+    <div className="rounded-2xl surface-muted border border-[var(--border-color)] overflow-hidden">
       {/* Display + stepper */}
-      <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-blue-500 to-violet-500">
+      <div className="flex items-center justify-between px-5 py-3 bg-blue-600">
         <div className="flex items-baseline gap-1">
           <span className="text-3xl font-extrabold text-white">{num}</span>
           <span className="text-sm font-semibold text-white/70">{unit}</span>
@@ -192,8 +192,8 @@ function DurationInput({ value, onChange, unit = 'min' }) {
             className={cn(
               'px-3 py-1.5 rounded-2xl text-xs font-semibold border transition-all active:scale-95',
               num === p
-                ? 'bg-gradient-to-r from-blue-500 to-violet-500 text-white border-transparent shadow-sm shadow-violet-200'
-                : 'bg-white/80 text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50'
+                ? 'bg-blue-600 text-white border-transparent shadow-sm'
+                : 'surface text-secondary-token border-[var(--border-color)] hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40'
             )}>
             {p === 0 ? 'None' : `${p}m`}
           </button>
@@ -212,8 +212,8 @@ function CountInput({ value, onChange, unit = '', presets = [4, 8, 12, 16, 20, 2
   const adjust = (delta) => onChange(String(Math.max(0, num + delta)))
 
   return (
-    <div className="rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-tulasi-500 to-emerald-500">
+    <div className="rounded-2xl surface-muted border border-[var(--border-color)] overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 bg-tulasi-600">
         <div className="flex items-baseline gap-1">
           <span className="text-3xl font-extrabold text-white">{num}</span>
           {unit && <span className="text-sm font-semibold text-white/70 ml-1">{unit}</span>}
@@ -231,8 +231,8 @@ function CountInput({ value, onChange, unit = '', presets = [4, 8, 12, 16, 20, 2
             className={cn(
               'px-3 py-1.5 rounded-2xl text-xs font-semibold border transition-all active:scale-95',
               num === p
-                ? 'bg-gradient-to-r from-tulasi-500 to-emerald-500 text-white border-transparent shadow-sm shadow-emerald-200'
-                : 'bg-white/80 text-slate-600 border-slate-200 hover:border-tulasi-300 hover:text-tulasi-600 hover:bg-tulasi-50'
+                ? 'bg-tulasi-600 text-white border-transparent shadow-sm'
+                : 'surface text-secondary-token border-[var(--border-color)] hover:border-tulasi-300 hover:text-tulasi-600 hover:bg-tulasi-50 dark:hover:bg-tulasi-950/40'
             )}>
             {p}
           </button>
@@ -246,7 +246,7 @@ function CountInput({ value, onChange, unit = '', presets = [4, 8, 12, 16, 20, 2
 // Field input renderer
 // ---------------------------------------------------------------------------
 function FieldInput({ field, value, onChange }) {
-  const base = 'w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
+  const base = 'w-full px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 
   if (field.field_type === 'boolean') {
     return (
@@ -256,13 +256,13 @@ function FieldInput({ field, value, onChange }) {
         className={cn(
           'inline-flex items-center gap-3 px-5 py-3 rounded-2xl text-sm font-semibold border transition-all active:scale-[0.97]',
           value
-            ? 'bg-gradient-to-r from-tulasi-500 to-emerald-500 text-white border-transparent shadow-sm shadow-emerald-200'
-            : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
+            ? 'bg-tulasi-600 text-white border-transparent shadow-sm'
+            : 'surface text-muted-token border-[var(--border-color)] hover:border-slate-300'
         )}
       >
         <span className={cn(
           'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
-          value ? 'bg-white/30 border-white' : 'border-slate-300'
+          value ? 'bg-white/30 border-white' : 'border-[var(--border-color)]'
         )}>
           {value && <span className="w-2 h-2 rounded-full bg-white block" />}
         </span>
@@ -322,7 +322,7 @@ function FieldInput({ field, value, onChange }) {
         className={base}
       />
       {field.unit && (
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">{field.unit}</span>
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-token">{field.unit}</span>
       )}
     </div>
   )
@@ -349,42 +349,30 @@ function TrackerCard({ t, onOpen, onSettings }) {
   return (
     <div
       onClick={onOpen}
-      className="group relative rounded-3xl overflow-hidden cursor-pointer press hover-lift elev-2"
+      className="group relative rounded-2xl overflow-hidden cursor-pointer press surface border elev-1 hover:elev-2 transition-shadow"
     >
-      {/* Gradient background */}
-      <div className={cn('absolute inset-0 bg-gradient-to-br', grad)} />
-
-      {/* Decorative orbs */}
-      <div className="pointer-events-none absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/15 blur-2xl" />
-      <div className="pointer-events-none absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-black/10 blur-2xl" />
-
-      {/* Faint inner grid pattern */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.06]"
-        style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '22px 22px' }}
-      />
+      {/* Accent top edge in the tracker's own color — identity without a full-bleed banner */}
+      <div className={cn('h-1.5 bg-gradient-to-r', grad)} />
 
       <div className="relative p-5">
         {/* Top row */}
         <div className="flex items-start justify-between mb-4">
-          <div className="w-12 h-12 rounded-2xl bg-white/25 backdrop-blur-sm ring-1 ring-white/40 flex items-center justify-center flex-shrink-0">
+          <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br', grad)}>
             <BookOpen className="w-6 h-6 text-white" />
           </div>
           <div className="flex items-center gap-2">
             {t.has_scoring && (
-              <span className="flex items-center gap-1 px-2 py-1 rounded-xl bg-white/20 text-white/90 text-[11px] font-semibold backdrop-blur-sm">
+              <Badge variant="saffron" className="text-[11px]">
                 <Zap className="w-3 h-3" /> Scored
-              </span>
+              </Badge>
             )}
-            <span className="px-2.5 py-1 rounded-xl bg-black/15 text-white/90 text-[11px] font-semibold capitalize backdrop-blur-sm">
-              {t.cadence}
-            </span>
+            <Badge variant="default" className="text-[11px] capitalize">{t.cadence}</Badge>
             <Can permission="trackers.manage">
               <button
                 onClick={(e) => { e.stopPropagation(); onSettings() }}
-                className="w-7 h-7 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition"
+                className="w-7 h-7 rounded-xl surface-muted hover:bg-[var(--surface)] flex items-center justify-center transition"
               >
-                <Settings className="w-3.5 h-3.5 text-white" />
+                <Settings className="w-3.5 h-3.5 text-secondary-token" />
               </button>
             </Can>
           </div>
@@ -392,17 +380,17 @@ function TrackerCard({ t, onOpen, onSettings }) {
 
         {/* Name + description */}
         <div className="mb-4">
-          <h3 className="text-lg font-extrabold text-white leading-tight mb-1">{t.name}</h3>
+          <h3 className="text-lg font-extrabold text-primary-token leading-tight mb-1">{t.name}</h3>
           {t.description && (
-            <p className="text-sm text-white/75 line-clamp-2 leading-relaxed">{t.description}</p>
+            <p className="text-sm text-secondary-token line-clamp-2 leading-relaxed">{t.description}</p>
           )}
         </div>
 
         {/* CTA */}
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-white/60 uppercase tracking-widest">Fill today</span>
-          <div className="w-8 h-8 rounded-xl bg-white/20 hover:bg-white/35 flex items-center justify-center transition group-hover:translate-x-0.5">
-            <ChevronRight className="w-4 h-4 text-white" />
+          <span className="text-xs font-semibold text-muted-token uppercase tracking-widest">Fill today</span>
+          <div className="w-8 h-8 rounded-xl surface-muted group-hover:bg-[var(--color-primary-50)] dark:group-hover:bg-[var(--color-primary-900)] flex items-center justify-center transition group-hover:translate-x-0.5">
+            <ChevronRight className="w-4 h-4 text-secondary-token" />
           </div>
         </div>
       </div>
@@ -427,32 +415,27 @@ function TrackerList() {
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-[40vh] gap-3">
-      <div className="w-12 h-12 rounded-2xl grad-saffron animate-pulse flex items-center justify-center">
+      <div className="w-12 h-12 rounded-2xl flex items-center justify-center animate-pulse" style={{ background: 'var(--color-primary)' }}>
         <Flame className="w-6 h-6 text-white" />
       </div>
-      <p className="text-sm text-slate-400 font-medium">Loading your {label}…</p>
+      <p className="text-sm text-muted-token font-medium">Loading your {label}…</p>
     </div>
   )
 
   return (
     <div className="space-y-0">
       {/* ── Hero banner ── */}
-      <div className="relative overflow-hidden rounded-3xl mb-8 mx-1">
-        <div className="absolute inset-0 bg-gradient-to-br from-saffron-500 via-orange-500 to-amber-400" />
-        {/* decorative blobs */}
-        <div className="pointer-events-none absolute -top-16 -right-16 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-black/10 blur-2xl" />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.07]"
-          style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '24px 24px' }}
-        />
-        <div className="relative px-6 py-8 flex items-end justify-between gap-4">
+      <div
+        className="relative overflow-hidden rounded-2xl mb-8 mx-1 text-white"
+        style={{ background: 'linear-gradient(135deg, var(--color-primary-700), var(--color-primary-500))' }}
+      >
+        <div className="relative px-6 py-7 flex items-end justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-4 h-4 text-white/80" />
               <span className="text-xs font-bold text-white/70 uppercase tracking-widest">Daily Practice</span>
             </div>
-            <h1 className="text-3xl font-extrabold text-white leading-tight mb-1">{label}</h1>
+            <h1 className="text-2xl font-extrabold text-white leading-tight mb-1">{label}</h1>
             <p className="text-sm text-white/70 max-w-xs">
               Track your spiritual practices and see your growth over time.
             </p>
@@ -462,7 +445,7 @@ function TrackerList() {
               size="sm"
               icon={Plus}
               onClick={() => navigate('new')}
-              className="bg-white/20 hover:bg-white/30 text-white border-white/30 border backdrop-blur-sm shadow-none flex-shrink-0"
+              className="bg-white/15 hover:bg-white/25 text-white border-white/25 border shadow-none flex-shrink-0"
             >
               New
             </Button>
@@ -473,12 +456,12 @@ function TrackerList() {
       {/* ── Empty state ── */}
       {trackers.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
-          <div className="w-20 h-20 rounded-3xl grad-saffron flex items-center justify-center opacity-40">
-            <BookOpen className="w-9 h-9 text-white" />
+          <div className="w-20 h-20 rounded-3xl flex items-center justify-center surface-muted">
+            <BookOpen className="w-9 h-9 text-muted-token" />
           </div>
           <div>
-            <p className="font-bold text-slate-600 mb-1">No trackers yet</p>
-            <p className="text-sm text-slate-400">Create your first tracker to begin.</p>
+            <p className="font-bold text-secondary-token mb-1">No trackers yet</p>
+            <p className="text-sm text-muted-token">Create your first tracker to begin.</p>
           </div>
           <Can permission="trackers.manage">
             <Button size="sm" icon={Plus} onClick={() => navigate('new')}>
@@ -766,8 +749,8 @@ function TrackerDetail() {
   }
 
   // Initial config load — show loader only if tracker config not yet ready
-  if (configLoading) return <div className="p-8 text-center text-slate-400">Loading tracker…</div>
-  if (!tracker) return <div className="p-8 text-center text-slate-400">Tracker not found.</div>
+  if (configLoading) return <div className="p-8 text-center text-muted-token">Loading tracker…</div>
+  if (!tracker) return <div className="p-8 text-center text-muted-token">Tracker not found.</div>
 
   const recentWithoutSelected = entries.filter((e) => e.period_date !== selectedDate).slice(0, 7)
 
@@ -775,42 +758,37 @@ function TrackerDetail() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
-      {/* ── Hero header ── */}
-      <div className={cn('relative overflow-hidden rounded-3xl', 'bg-gradient-to-br', grad)}>
-        <div className="pointer-events-none absolute -top-12 -right-12 w-52 h-52 rounded-full bg-white/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-10 -left-8 w-40 h-40 rounded-full bg-black/10 blur-2xl" />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.07]"
-          style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '22px 22px' }}
-        />
+      {/* ── Hero header — calm surface card with the tracker's own color as an accent, not a full banner ── */}
+      <div className="relative overflow-hidden rounded-2xl surface border elev-1">
+        <div className={cn('h-1.5 bg-gradient-to-r', grad)} />
         <div className="relative px-5 pt-4 pb-5">
           {/* Back + settings row */}
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => navigate(-1)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-semibold transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl surface-muted hover:bg-[var(--surface)] text-secondary-token text-xs font-semibold transition"
             >
               <ChevronLeft className="w-4 h-4" /> Back
             </button>
             <Can permission="trackers.manage">
               <button
                 onClick={() => navigate('settings')}
-                className="w-8 h-8 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center transition"
+                className="w-8 h-8 rounded-xl surface-muted hover:bg-[var(--surface)] flex items-center justify-center transition"
               >
-                <Settings className="w-4 h-4 text-white" />
+                <Settings className="w-4 h-4 text-secondary-token" />
               </button>
             </Can>
           </div>
           {/* Icon + name */}
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-white/25 ring-1 ring-white/40 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+            <div className={cn('w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br', grad)}>
               <BookOpen className="w-7 h-7 text-white" />
             </div>
             <div>
-              <p className="text-xs font-bold text-white/60 uppercase tracking-widest mb-0.5 capitalize">{tracker.cadence} tracker</p>
-              <h1 className="text-2xl font-extrabold text-white leading-tight">{tracker.name}</h1>
+              <p className="text-xs font-bold text-muted-token uppercase tracking-widest mb-0.5 capitalize">{tracker.cadence} tracker</p>
+              <h1 className="text-2xl font-extrabold text-primary-token leading-tight">{tracker.name}</h1>
               {tracker.description && (
-                <p className="text-sm text-white/70 mt-0.5">{tracker.description}</p>
+                <p className="text-sm text-secondary-token mt-0.5">{tracker.description}</p>
               )}
             </div>
           </div>
@@ -818,7 +796,7 @@ function TrackerDetail() {
       </div>
 
       {/* ── View tabs — pill switcher ── */}
-      <div className="flex items-center gap-2 bg-slate-100/80 p-1 rounded-2xl">
+      <div className="flex items-center gap-2 surface-muted p-1 rounded-2xl">
         {[
           { key: 'today',  label: 'Today',   icon: Calendar },
           { key: 'table',  label: 'Table',   icon: Table2 },
@@ -834,8 +812,8 @@ function TrackerDetail() {
               className={cn(
                 'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-all duration-200',
                 view === t.key
-                  ? 'bg-white text-saffron-600 elev-1 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
+                  ? 'bg-[var(--surface)] text-[var(--color-primary)] elev-1 shadow-sm'
+                  : 'text-secondary-token hover:text-primary-token'
               )}
             >
               <TabIcon className="w-3.5 h-3.5" />
@@ -873,8 +851,8 @@ function TrackerDetail() {
       {view === 'trend' && (
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <TrendingUp className="w-4 h-4 text-saffron-500" />
+            <div className="flex items-center gap-2 text-sm font-semibold text-primary-token">
+              <TrendingUp className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
               {tracker.score_label ?? 'Score'} Trend
             </div>
           </CardHeader>
@@ -895,17 +873,17 @@ function TrackerDetail() {
               type="button"
               disabled={saving || dateLoading}
               onClick={() => setSelectedDate(format(subDays(parseISO(selectedDate), 1), 'yyyy-MM-dd'))}
-              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-saffron-100 text-slate-500 hover:text-saffron-600 flex items-center justify-center transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-9 h-9 rounded-xl surface-muted hover:bg-[var(--color-primary-50)] dark:hover:bg-[var(--color-primary-900)] text-secondary-token hover:text-[var(--color-primary)] flex items-center justify-center transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
 
             <label className={cn('flex-1 relative cursor-pointer group', (saving || dateLoading) && 'pointer-events-none opacity-60')}>
-              <div className="flex flex-col items-center justify-center bg-saffron-50 hover:bg-saffron-100 border border-saffron-200 rounded-2xl px-3 py-2.5 transition">
-                <span className="text-[10px] font-bold text-saffron-400 uppercase tracking-widest">
+              <div className="flex flex-col items-center justify-center bg-[var(--color-primary-50)] hover:bg-[var(--color-primary-100)] dark:bg-[var(--color-primary-900)] dark:hover:bg-[var(--color-primary-800)] border border-[var(--color-primary-100)] dark:border-transparent rounded-2xl px-3 py-2.5 transition">
+                <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary)' }}>
                   {isToday(parseISO(selectedDate)) ? 'Today' : format(parseISO(selectedDate), 'EEEE')}
                 </span>
-                <span className="text-base font-extrabold text-slate-800 leading-tight">
+                <span className="text-base font-extrabold text-primary-token leading-tight">
                   {format(parseISO(selectedDate), 'd MMM yyyy')}
                 </span>
               </div>
@@ -922,13 +900,13 @@ function TrackerDetail() {
               type="button"
               disabled={saving || dateLoading}
               onClick={() => setSelectedDate(format(addDays(parseISO(selectedDate), 1), 'yyyy-MM-dd'))}
-              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-saffron-100 text-slate-500 hover:text-saffron-600 flex items-center justify-center transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-9 h-9 rounded-xl surface-muted hover:bg-[var(--color-primary-50)] dark:hover:bg-[var(--color-primary-900)] text-secondary-token hover:text-[var(--color-primary)] flex items-center justify-center transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
 
             {dateLoading
-              ? <Loader2 className="w-4 h-4 animate-spin text-slate-300 flex-shrink-0" />
+              ? <Loader2 className="w-4 h-4 animate-spin text-muted-token flex-shrink-0" />
               : existingEntry && <Badge variant="tulasi" dot className="flex-shrink-0">Saved</Badge>
             }
           </div>
@@ -938,12 +916,12 @@ function TrackerDetail() {
             {fields.map((field) => (
               <div key={field.id} className="space-y-1.5">
                 <div className="flex items-baseline gap-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-primary-token">
                     {field.label}
                     {field.is_required && <span className="text-red-400 ml-0.5">*</span>}
                   </label>
                   {field.help_text && (
-                    <span className="text-xs text-slate-400">{field.help_text}</span>
+                    <span className="text-xs text-muted-token">{field.help_text}</span>
                   )}
                 </div>
                 <FieldInput
@@ -956,7 +934,7 @@ function TrackerDetail() {
 
             {/* Notes */}
             <div className="space-y-1.5">
-              <label className="text-sm font-semibold text-slate-700">Notes <span className="font-normal text-slate-400">(optional)</span></label>
+              <label className="text-sm font-semibold text-primary-token">Notes <span className="font-normal text-muted-token">(optional)</span></label>
               <textarea
                 rows={2}
                 value={notes}
@@ -967,19 +945,19 @@ function TrackerDetail() {
 
             {/* Score preview */}
             {tracker.has_scoring && scored?.score != null && (
-              <div className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-gradient-to-r from-saffron-50 to-orange-50 border border-saffron-100">
+              <div className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-[var(--color-primary-50)] dark:bg-[var(--color-primary-900)] border border-[var(--color-primary-100)] dark:border-transparent">
                 <div className="flex-1">
-                  <p className="text-xs font-semibold text-saffron-600 uppercase tracking-wide mb-0.5">{tracker.score_label ?? 'Score'}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide mb-0.5" style={{ color: 'var(--color-primary)' }}>{tracker.score_label ?? 'Score'}</p>
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-3xl font-extrabold text-saffron-600">{scored.score}</span>
-                    <span className="text-sm text-slate-400 font-medium">/100</span>
+                    <span className="text-3xl font-extrabold" style={{ color: 'var(--color-primary)' }}>{scored.score}</span>
+                    <span className="text-sm text-muted-token font-medium">/100</span>
                   </div>
                 </div>
                 {/* Bar */}
-                <div className="flex-1 h-2 rounded-full bg-saffron-100 overflow-hidden">
+                <div className="flex-1 h-2 rounded-full bg-[var(--color-primary-100)] dark:bg-[var(--color-primary-800)] overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-saffron-400 to-orange-500 transition-all duration-700"
-                    style={{ width: `${scored.score}%` }}
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${scored.score}%`, background: 'var(--color-primary)' }}
                   />
                 </div>
               </div>
@@ -1007,31 +985,29 @@ function TrackerDetail() {
         <Card>
           <CardHeader border>
             <div className="flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center">
-                <Clock className="w-4 h-4 text-slate-400" />
+              <span className="w-8 h-8 rounded-xl surface-muted flex items-center justify-center">
+                <Clock className="w-4 h-4 text-muted-token" />
               </span>
-              <p className="text-sm font-bold text-slate-800">Recent History</p>
+              <p className="text-sm font-bold text-primary-token">Recent History</p>
             </div>
           </CardHeader>
           <CardBody className="!pt-2">
-            <div className="divide-y divide-slate-50">
+            <div className="divide-y divide-[var(--border-color)]">
             {recentWithoutSelected.map((e) => (
               <div key={e.id} className="flex items-center justify-between py-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                  <div className="w-8 h-8 rounded-xl surface-muted flex items-center justify-center">
+                    <Calendar className="w-3.5 h-3.5 text-muted-token" />
                   </div>
-                  <span className="text-sm font-medium text-slate-700">{format(parseISO(e.period_date), 'EEE, dd MMM')}</span>
+                  <span className="text-sm font-medium text-primary-token">{format(parseISO(e.period_date), 'EEE, dd MMM')}</span>
                 </div>
                 {e.score != null ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-16 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="w-16 h-1.5 rounded-full surface-muted overflow-hidden">
                       <div
                         className={cn(
                           'h-full rounded-full',
-                          e.score >= 70 ? 'bg-gradient-to-r from-tulasi-400 to-emerald-500'
-                            : e.score >= 40 ? 'bg-gradient-to-r from-saffron-400 to-orange-500'
-                            : 'bg-gradient-to-r from-rose-400 to-red-500'
+                          e.score >= 70 ? 'bg-tulasi-500' : e.score >= 40 ? 'bg-saffron-500' : 'bg-red-500'
                         )}
                         style={{ width: `${e.score}%` }}
                       />

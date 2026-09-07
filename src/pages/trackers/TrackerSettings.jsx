@@ -14,7 +14,7 @@ import { calculateEntryScore } from '@/lib/trackerScoring'
 import { FALLBACK_TEMPLATE } from '@/lib/trackerWhatsapp'
 import { fetchTrackerConfig } from '@/lib/trackerApi'
 
-const inputBase = 'w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
+const inputBase = 'w-full px-3 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 const FIELD_TYPES = ['number', 'time', 'duration_min', 'boolean', 'select', 'text', 'textarea']
 const RULE_TYPES = ['boolean', 'threshold', 'range', 'penalty', 'formula']
 const TABS = [
@@ -80,21 +80,21 @@ function GroupsPanel({ groups, onChange, toast, trackerId }) {
 
   return (
     <Card>
-      <CardHeader><p className="text-sm font-bold text-slate-800">Groups</p></CardHeader>
+      <CardHeader><p className="text-sm font-bold text-primary-token">Groups</p></CardHeader>
       <CardBody className="space-y-2">
         {groups.map((g, i) => (
-          <div key={g.id} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50">
+          <div key={g.id} className="flex items-center gap-2 p-2 rounded-xl bg-[var(--surface-muted)]">
             <div className="flex flex-col">
-              <button onClick={() => moveGroup(i, -1)} disabled={i === 0} className="text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
-              <button onClick={() => moveGroup(i, 1)} disabled={i === groups.length - 1} className="text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
+              <button onClick={() => moveGroup(i, -1)} disabled={i === 0} className="text-muted-token hover:text-secondary-token disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
+              <button onClick={() => moveGroup(i, 1)} disabled={i === groups.length - 1} className="text-muted-token hover:text-secondary-token disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
             </div>
             <input
               defaultValue={g.label}
               onBlur={(e) => e.target.value !== g.label && renameGroup(g, e.target.value)}
               className={cn(inputBase, 'flex-1 !py-1.5')}
             />
-            <span className="text-[10px] text-slate-400 font-mono px-1.5 py-0.5 bg-white rounded">{g.key}</span>
-            <button onClick={() => deleteGroup(g)} className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50">
+            <span className="text-[10px] text-muted-token font-mono px-1.5 py-0.5 bg-[var(--surface)] rounded">{g.key}</span>
+            <button onClick={() => deleteGroup(g)} className="p-1.5 rounded-lg text-muted-token hover:text-red-500 hover:bg-red-50">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -124,16 +124,16 @@ function RuleEditor({ rule, onSave, onDelete }) {
   useEffect(() => { setDraft(rule) }, [rule])
 
   return (
-    <div className="rounded-xl border border-slate-200 p-3 space-y-2 bg-white">
+    <div className="rounded-xl border border-[var(--border-color)] p-3 space-y-2 bg-[var(--surface)]">
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="text-[11px] text-slate-400">Rule Type</span>
+          <span className="text-[11px] text-muted-token">Rule Type</span>
           <select value={draft.rule_type} onChange={(e) => setDraft((d) => ({ ...d, rule_type: e.target.value, config: {} }))} className={cn(inputBase, '!py-1.5 mt-0.5')}>
             {RULE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </label>
         <label className="block">
-          <span className="text-[11px] text-slate-400">Max Points</span>
+          <span className="text-[11px] text-muted-token">Max Points</span>
           <input type="number" value={draft.max_points} onChange={(e) => setDraft((d) => ({ ...d, max_points: e.target.value }))} className={cn(inputBase, '!py-1.5 mt-0.5')} />
         </label>
       </div>
@@ -141,23 +141,23 @@ function RuleEditor({ rule, onSave, onDelete }) {
       {draft.rule_type === 'range' && (
         <div className="grid grid-cols-3 gap-2">
           <label className="block">
-            <span className="text-[11px] text-slate-400">Min</span>
+            <span className="text-[11px] text-muted-token">Min</span>
             <input type="number" value={cfg.min ?? 0} onChange={(e) => setCfg({ min: Number(e.target.value) })} className={cn(inputBase, '!py-1.5 mt-0.5')} />
           </label>
           <label className="block">
-            <span className="text-[11px] text-slate-400">Target</span>
+            <span className="text-[11px] text-muted-token">Target</span>
             <input type="number" value={cfg.full_score_at ?? ''} onChange={(e) => setCfg({ full_score_at: Number(e.target.value) })} className={cn(inputBase, '!py-1.5 mt-0.5')} />
           </label>
           <label className="flex items-center gap-1.5 mt-5">
             <input type="checkbox" checked={cfg.allow_partial !== false} onChange={(e) => setCfg({ allow_partial: e.target.checked })} />
-            <span className="text-[11px] text-slate-500">Partial scoring</span>
+            <span className="text-[11px] text-secondary-token">Partial scoring</span>
           </label>
         </div>
       )}
 
       {draft.rule_type === 'threshold' && (
         <div className="space-y-1.5">
-          <span className="text-[11px] text-slate-400">Tiers (cutoff → points, first match wins)</span>
+          <span className="text-[11px] text-muted-token">Tiers (cutoff → points, first match wins)</span>
           {(cfg.tiers ?? []).map((tier, i) => (
             <div key={i} className="flex gap-2">
               <input value={tier.by} onChange={(e) => {
@@ -166,7 +166,7 @@ function RuleEditor({ rule, onSave, onDelete }) {
               <input type="number" value={tier.pts} onChange={(e) => {
                 const tiers = [...cfg.tiers]; tiers[i] = { ...tier, pts: Number(e.target.value) }; setCfg({ tiers })
               }} placeholder="pts" className={cn(inputBase, '!py-1 text-xs w-20')} />
-              <button onClick={() => setCfg({ tiers: cfg.tiers.filter((_, idx) => idx !== i) })} className="text-slate-300 hover:text-red-500">
+              <button onClick={() => setCfg({ tiers: cfg.tiers.filter((_, idx) => idx !== i) })} className="text-muted-token hover:text-red-500">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -181,11 +181,11 @@ function RuleEditor({ rule, onSave, onDelete }) {
       {draft.rule_type === 'penalty' && (
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <span className="text-[11px] text-slate-400">Deduction per unit</span>
+            <span className="text-[11px] text-muted-token">Deduction per unit</span>
             <input type="number" value={cfg.per_unit ?? 0} onChange={(e) => setCfg({ per_unit: Number(e.target.value) })} className={cn(inputBase, '!py-1.5 mt-0.5')} />
           </label>
           <label className="block">
-            <span className="text-[11px] text-slate-400">Unit size</span>
+            <span className="text-[11px] text-muted-token">Unit size</span>
             <input type="number" value={cfg.unit ?? 1} onChange={(e) => setCfg({ unit: Number(e.target.value) })} className={cn(inputBase, '!py-1.5 mt-0.5')} />
           </label>
         </div>
@@ -193,7 +193,7 @@ function RuleEditor({ rule, onSave, onDelete }) {
 
       {draft.rule_type === 'formula' && (
         <label className="block">
-          <span className="text-[11px] text-slate-400">Expression (field keys as variables)</span>
+          <span className="text-[11px] text-muted-token">Expression (field keys as variables)</span>
           <input value={cfg.expr ?? ''} onChange={(e) => setCfg({ expr: e.target.value })} placeholder="e.g. japa_rounds * 10.9375" className={cn(inputBase, '!py-1.5 mt-0.5 font-mono')} />
         </label>
       )}
@@ -289,59 +289,59 @@ function FieldsPanel({ fields, groups, rules, onFieldsChange, onRulesChange, toa
 
   return (
     <Card>
-      <CardHeader><p className="text-sm font-bold text-slate-800">Fields</p></CardHeader>
+      <CardHeader><p className="text-sm font-bold text-primary-token">Fields</p></CardHeader>
       <CardBody className="space-y-2">
         {fields.map((field, i) => {
           const isOpen = expanded === field.id
           const fieldRules = rulesByField[field.key] ?? []
           return (
-            <div key={field.id} className="rounded-xl border border-slate-100 overflow-hidden">
-              <div className="flex items-center gap-2 p-2.5 bg-slate-50">
+            <div key={field.id} className="rounded-xl border border-[var(--border-color)] overflow-hidden">
+              <div className="flex items-center gap-2 p-2.5 bg-[var(--surface-muted)]">
                 <div className="flex flex-col">
-                  <button onClick={() => moveField(i, -1)} disabled={i === 0} className="text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => moveField(i, 1)} disabled={i === fields.length - 1} className="text-slate-400 hover:text-slate-600 disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => moveField(i, -1)} disabled={i === 0} className="text-muted-token hover:text-secondary-token disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => moveField(i, 1)} disabled={i === fields.length - 1} className="text-muted-token hover:text-secondary-token disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
                 </div>
                 <button onClick={() => setExpanded(isOpen ? null : field.id)} className="flex-1 text-left">
-                  <span className="text-sm font-semibold text-slate-800">{field.label}</span>
-                  <span className="ml-2 text-[10px] font-mono text-slate-400">{field.key}</span>
+                  <span className="text-sm font-semibold text-primary-token">{field.label}</span>
+                  <span className="ml-2 text-[10px] font-mono text-muted-token">{field.key}</span>
                   {fieldRules.length > 0 && <Badge variant="tulasi" className="ml-2">{fieldRules.length} rule{fieldRules.length > 1 ? 's' : ''}</Badge>}
                   {field.is_active === false && <Badge variant="default" className="ml-2">Inactive</Badge>}
                 </button>
-                <button onClick={() => deleteField(field)} className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50">
+                <button onClick={() => deleteField(field)} className="p-1.5 rounded-lg text-muted-token hover:text-red-500 hover:bg-red-50">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
 
               {isOpen && (
-                <div className="p-3 space-y-3 bg-white">
+                <div className="p-3 space-y-3 bg-[var(--surface)]">
                   <div className="grid grid-cols-2 gap-2">
                     <label className="block">
-                      <span className="text-[11px] text-slate-400">Label</span>
+                      <span className="text-[11px] text-muted-token">Label</span>
                       <input defaultValue={field.label} onBlur={(e) => e.target.value !== field.label && updateField(field, { label: e.target.value })} className={cn(inputBase, '!py-1.5 mt-0.5')} />
                     </label>
                     <label className="block">
-                      <span className="text-[11px] text-slate-400">Short code (WhatsApp variable)</span>
+                      <span className="text-[11px] text-muted-token">Short code (WhatsApp variable)</span>
                       <input defaultValue={field.short_code ?? ''} placeholder={field.key.toUpperCase()} onBlur={(e) => e.target.value !== field.short_code && updateField(field, { short_code: e.target.value.toUpperCase() || null })} className={cn(inputBase, '!py-1.5 mt-0.5 font-mono')} />
                     </label>
                     <label className="block">
-                      <span className="text-[11px] text-slate-400">Input Type</span>
+                      <span className="text-[11px] text-muted-token">Input Type</span>
                       <select value={field.field_type} onChange={(e) => updateField(field, { field_type: e.target.value })} className={cn(inputBase, '!py-1.5 mt-0.5')}>
                         {FIELD_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </label>
                     <label className="block">
-                      <span className="text-[11px] text-slate-400">Unit</span>
+                      <span className="text-[11px] text-muted-token">Unit</span>
                       <input defaultValue={field.unit ?? ''} placeholder="minutes, rounds…" onBlur={(e) => e.target.value !== field.unit && updateField(field, { unit: e.target.value || null })} className={cn(inputBase, '!py-1.5 mt-0.5')} />
                     </label>
                     <label className="block">
-                      <span className="text-[11px] text-slate-400">Group</span>
+                      <span className="text-[11px] text-muted-token">Group</span>
                       <select value={field.group_id ?? ''} onChange={(e) => updateField(field, { group_id: e.target.value || null })} className={cn(inputBase, '!py-1.5 mt-0.5')}>
                         <option value="">— Ungrouped —</option>
                         {groups.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
                       </select>
                     </label>
                     <label className="block">
-                      <span className="text-[11px] text-slate-400">Missed-day behavior</span>
+                      <span className="text-[11px] text-muted-token">Missed-day behavior</span>
                       <select value={field.missed_day_behavior} onChange={(e) => updateField(field, { missed_day_behavior: e.target.value })} className={cn(inputBase, '!py-1.5 mt-0.5')}>
                         <option value="zero">Count as zero</option>
                         <option value="exclude">Exclude from total</option>
@@ -350,29 +350,29 @@ function FieldsPanel({ fields, groups, rules, onFieldsChange, onRulesChange, toa
                   </div>
 
                   <div className="flex flex-wrap gap-4">
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <label className="flex items-center gap-1.5 text-xs text-secondary-token">
                       <input type="checkbox" checked={field.show_input !== false} onChange={(e) => updateField(field, { show_input: e.target.checked })} /> Show input column
                     </label>
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <label className="flex items-center gap-1.5 text-xs text-secondary-token">
                       <input type="checkbox" checked={field.show_marks !== false} onChange={(e) => updateField(field, { show_marks: e.target.checked })} /> Show marks column
                     </label>
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <label className="flex items-center gap-1.5 text-xs text-secondary-token">
                       <input type="checkbox" checked={field.is_required} onChange={(e) => updateField(field, { is_required: e.target.checked })} /> Mandatory
                     </label>
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <label className="flex items-center gap-1.5 text-xs text-secondary-token">
                       <input type="checkbox" checked={field.is_active !== false} onChange={(e) => updateField(field, { is_active: e.target.checked })} /> Active
                     </label>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-100 space-y-2">
+                  <div className="pt-2 border-t border-[var(--border-color)] space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-600">Scoring Rules</span>
+                      <span className="text-xs font-semibold text-secondary-token">Scoring Rules</span>
                       <Button size="sm" variant="secondary" icon={Plus} onClick={() => addRule(field)}>Add Rule</Button>
                     </div>
                     {fieldRules.map((rule) => (
                       <RuleEditor key={rule.id} rule={rule} onSave={saveRule} onDelete={() => deleteRule(rule)} />
                     ))}
-                    {!fieldRules.length && <p className="text-xs text-slate-400">No scoring rules — this field won't contribute to the score.</p>}
+                    {!fieldRules.length && <p className="text-xs text-muted-token">No scoring rules — this field won't contribute to the score.</p>}
                   </div>
                 </div>
               )}
@@ -435,28 +435,28 @@ function CalculatedColumnsPanel({ columns, fields, groups, onChange, toast, trac
   return (
     <Card>
       <CardHeader>
-        <p className="text-sm font-bold text-slate-800">Calculated Columns</p>
-        <p className="text-xs text-slate-400 mt-0.5">e.g. Body = TB + WU + DR, Total = Body + Soul</p>
+        <p className="text-sm font-bold text-primary-token">Calculated Columns</p>
+        <p className="text-xs text-muted-token mt-0.5">e.g. Body = TB + WU + DR, Total = Body + Soul</p>
       </CardHeader>
       <CardBody className="space-y-3">
         {columns.map((col) => (
-          <div key={col.id} className="rounded-xl border border-slate-100 p-3 space-y-2">
+          <div key={col.id} className="rounded-xl border border-[var(--border-color)] p-3 space-y-2">
             <div className="flex items-center gap-2">
               <input defaultValue={col.label} onBlur={(e) => e.target.value !== col.label && updateColumn(col, { label: e.target.value })} className={cn(inputBase, '!py-1.5 flex-1')} />
-              <label className="flex items-center gap-1.5 text-xs text-slate-600 whitespace-nowrap">
+              <label className="flex items-center gap-1.5 text-xs text-secondary-token whitespace-nowrap">
                 <input type="checkbox" checked={col.is_highlighted} onChange={(e) => updateColumn(col, { is_highlighted: e.target.checked })} /> Highlight
               </label>
-              <button onClick={() => deleteColumn(col)} className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50">
+              <button onClick={() => deleteColumn(col)} className="p-1.5 rounded-lg text-muted-token hover:text-red-500 hover:bg-red-50">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
             <div>
-              <p className="text-[11px] text-slate-400 mb-1">Groups</p>
+              <p className="text-[11px] text-muted-token mb-1">Groups</p>
               <div className="flex flex-wrap gap-1.5">
                 {groups.map((g) => {
                   const on = (col.inputs ?? []).some((i) => i.type === 'group' && i.ref === g.key)
                   return (
-                    <button key={g.id} onClick={() => toggleInput(col, 'group', g.key)} className={cn('px-2.5 py-1 rounded-lg text-xs font-medium border', on ? 'bg-saffron-500 text-white border-transparent' : 'bg-white text-slate-500 border-slate-200')}>
+                    <button key={g.id} onClick={() => toggleInput(col, 'group', g.key)} className={cn('px-2.5 py-1 rounded-lg text-xs font-medium border', on ? 'bg-saffron-500 text-white border-transparent' : 'bg-[var(--surface)] text-secondary-token border-[var(--border-color)]')}>
                       {g.label}
                     </button>
                   )
@@ -464,12 +464,12 @@ function CalculatedColumnsPanel({ columns, fields, groups, onChange, toast, trac
               </div>
             </div>
             <div>
-              <p className="text-[11px] text-slate-400 mb-1">Fields</p>
+              <p className="text-[11px] text-muted-token mb-1">Fields</p>
               <div className="flex flex-wrap gap-1.5">
                 {fields.map((f) => {
                   const on = (col.inputs ?? []).some((i) => i.type === 'field' && i.ref === f.key)
                   return (
-                    <button key={f.id} onClick={() => toggleInput(col, 'field', f.key)} className={cn('px-2.5 py-1 rounded-lg text-xs font-medium border', on ? 'bg-tulasi-500 text-white border-transparent' : 'bg-white text-slate-500 border-slate-200')}>
+                    <button key={f.id} onClick={() => toggleInput(col, 'field', f.key)} className={cn('px-2.5 py-1 rounded-lg text-xs font-medium border', on ? 'bg-tulasi-500 text-white border-transparent' : 'bg-[var(--surface)] text-secondary-token border-[var(--border-color)]')}>
                       {f.label}
                     </button>
                   )
@@ -477,12 +477,12 @@ function CalculatedColumnsPanel({ columns, fields, groups, onChange, toast, trac
               </div>
             </div>
             <div>
-              <p className="text-[11px] text-slate-400 mb-1">Other calculated columns</p>
+              <p className="text-[11px] text-muted-token mb-1">Other calculated columns</p>
               <div className="flex flex-wrap gap-1.5">
                 {columns.filter((c) => c.id !== col.id).map((c) => {
                   const on = (col.inputs ?? []).some((i) => i.type === 'column' && i.ref === c.key)
                   return (
-                    <button key={c.id} onClick={() => toggleInput(col, 'column', c.key)} className={cn('px-2.5 py-1 rounded-lg text-xs font-medium border', on ? 'bg-lotus-500 text-white border-transparent' : 'bg-white text-slate-500 border-slate-200')}>
+                    <button key={c.id} onClick={() => toggleInput(col, 'column', c.key)} className={cn('px-2.5 py-1 rounded-lg text-xs font-medium border', on ? 'bg-lotus-500 text-white border-transparent' : 'bg-[var(--surface)] text-secondary-token border-[var(--border-color)]')}>
                       {c.label}
                     </button>
                   )
@@ -538,18 +538,18 @@ function WhatsAppPanel({ trackerId, fields, groups, columns, toast }) {
 
   return (
     <Card>
-      <CardHeader><p className="text-sm font-bold text-slate-800">Daily WhatsApp Report Template</p></CardHeader>
+      <CardHeader><p className="text-sm font-bold text-primary-token">Daily WhatsApp Report Template</p></CardHeader>
       <CardBody className="space-y-3">
         <textarea rows={12} value={body} onChange={(e) => setBody(e.target.value)} className={cn(inputBase, 'font-mono !py-2')} />
         <div>
-          <p className="text-[11px] text-slate-400 mb-1.5">Available variables — tap to copy the placeholder text</p>
+          <p className="text-[11px] text-muted-token mb-1.5">Available variables — tap to copy the placeholder text</p>
           <div className="flex flex-wrap gap-1.5">
             {availableVars.map((v) => (
               <button
                 key={v}
                 type="button"
                 onClick={() => navigator.clipboard?.writeText(`{${v}}`)}
-                className="px-2 py-1 rounded-lg text-[11px] font-mono bg-slate-100 text-slate-600 hover:bg-slate-200"
+                className="px-2 py-1 rounded-lg text-[11px] font-mono bg-[var(--surface-muted)] text-secondary-token hover:bg-slate-200"
               >{`{${v}}`}</button>
             ))}
           </div>
@@ -571,17 +571,17 @@ function PreviewPanel({ fields, groups, rules, columns }) {
   return (
     <div className="grid md:grid-cols-2 gap-4">
       <Card>
-        <CardHeader><p className="text-sm font-bold text-slate-800">Sample Values</p></CardHeader>
+        <CardHeader><p className="text-sm font-bold text-primary-token">Sample Values</p></CardHeader>
         <CardBody className="space-y-3">
           {fields.filter((f) => f.is_active !== false).map((f) => (
             <label key={f.id} className="block">
-              <span className="text-xs text-slate-500">{f.label}{f.unit ? ` (${f.unit})` : ''}</span>
+              <span className="text-xs text-secondary-token">{f.label}{f.unit ? ` (${f.unit})` : ''}</span>
               {f.field_type === 'boolean' ? (
                 <div className="mt-1">
                   <button
                     type="button"
                     onClick={() => setValues((v) => ({ ...v, [f.key]: !v[f.key] }))}
-                    className={cn('px-3 py-1.5 rounded-lg text-xs font-semibold', values[f.key] ? 'bg-tulasi-500 text-white' : 'bg-slate-100 text-slate-500')}
+                    className={cn('px-3 py-1.5 rounded-lg text-xs font-semibold', values[f.key] ? 'bg-tulasi-500 text-white' : 'bg-[var(--surface-muted)] text-secondary-token')}
                   >{values[f.key] ? 'Yes' : 'No'}</button>
                 </div>
               ) : (
@@ -598,15 +598,15 @@ function PreviewPanel({ fields, groups, rules, columns }) {
       </Card>
 
       <Card>
-        <CardHeader><p className="text-sm font-bold text-slate-800">Computed Result</p></CardHeader>
+        <CardHeader><p className="text-sm font-bold text-primary-token">Computed Result</p></CardHeader>
         <CardBody className="space-y-3">
           <div className="text-center py-3 rounded-2xl bg-gradient-to-r from-saffron-50 to-orange-50">
-            <p className="text-3xl font-extrabold text-saffron-600">{result.score ?? '—'}<span className="text-sm text-slate-400 font-medium">/100</span></p>
-            <p className="text-xs text-slate-400">{result.earned.toFixed(1)} / {result.max.toFixed(1)} points</p>
+            <p className="text-3xl font-extrabold text-saffron-600">{result.score ?? '—'}<span className="text-sm text-muted-token font-medium">/100</span></p>
+            <p className="text-xs text-muted-token">{result.earned.toFixed(1)} / {result.max.toFixed(1)} points</p>
           </div>
           {groups.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-slate-500 mb-1.5">Groups</p>
+              <p className="text-xs font-semibold text-secondary-token mb-1.5">Groups</p>
               {groups.map((g) => {
                 const t = result.groupTotals[g.key]
                 return <div key={g.key} className="flex justify-between text-sm py-1"><span>{g.label}</span><span className="font-semibold">{t?.earned.toFixed(1)} / {t?.max.toFixed(1)}</span></div>
@@ -615,7 +615,7 @@ function PreviewPanel({ fields, groups, rules, columns }) {
           )}
           {columns.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-slate-500 mb-1.5">Calculated Columns</p>
+              <p className="text-xs font-semibold text-secondary-token mb-1.5">Calculated Columns</p>
               {columns.map((c) => {
                 const t = result.columnTotals[c.key]
                 return <div key={c.key} className="flex justify-between text-sm py-1"><span>{c.label}</span><span className="font-semibold">{t?.earned.toFixed(1)} / {t?.max.toFixed(1)}</span></div>
@@ -661,21 +661,21 @@ export default function TrackerSettings() {
 
   useEffect(() => { load() }, [load])
 
-  if (loading) return <div className="p-8 text-center text-slate-400">Loading settings…</div>
-  if (!tracker) return <div className="p-8 text-center text-slate-400">Tracker not found.</div>
+  if (loading) return <div className="p-8 text-center text-muted-token">Loading settings…</div>
+  if (!tracker) return <div className="p-8 text-center text-muted-token">Tracker not found.</div>
 
   return (
     <div className="max-w-4xl mx-auto space-y-5">
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate(`/trackers/${trackerId}`)} className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+        <button onClick={() => navigate(`/trackers/${trackerId}`)} className="p-2 rounded-xl text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)]">
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: tracker.color || '#f97316' }}>
           <SettingsIcon className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-slate-800">{tracker.name} — Settings</h1>
-          <p className="text-xs text-slate-400">Configure groups, fields, scoring rules, calculated columns and reports</p>
+          <h1 className="text-lg font-bold text-primary-token">{tracker.name} — Settings</h1>
+          <p className="text-xs text-muted-token">Configure groups, fields, scoring rules, calculated columns and reports</p>
         </div>
       </div>
 
@@ -688,7 +688,7 @@ export default function TrackerSettings() {
               onClick={() => setTab(t.key)}
               className={cn(
                 'flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all',
-                tab === t.key ? 'bg-white text-saffron-600 elev-1 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                tab === t.key ? 'bg-[var(--surface)] text-saffron-600 elev-1 shadow-sm' : 'text-secondary-token hover:text-primary-token'
               )}
             >
               <TabIcon className="w-3.5 h-3.5" /> {t.label}

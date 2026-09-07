@@ -1,16 +1,23 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, CheckCircle, XCircle, Clock, Send } from 'lucide-react'
+import { RefreshCw, CheckCircle, XCircle, Clock, Send, Info } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import useToastStore from '@/store/toastStore'
 import { listChildRequests, resolveChildRequest } from '@/lib/parentalControlApi'
 
+// Only bonus_time carries a structured payload (minutes) the child app
+// sends — app_unblock/website_access/schedule_exception are freeform text
+// (see RequestPage.jsx on the child device), so approving them can only
+// flip the request's status. There's nothing safe to automate from free
+// text, so we're honest about it here rather than pretending it acts on
+// the device — the parent still needs to make the matching change in
+// Rules / Website Rules themselves.
 const REQUEST_ICONS = {
-  bonus_time: { icon: Clock, label: 'Bonus time' },
-  app_unblock: { icon: Send, label: 'App unblock' },
-  website_access: { icon: Send, label: 'Website access' },
-  schedule_exception: { icon: Clock, label: 'Schedule exception' },
+  bonus_time: { icon: Clock, label: 'Bonus time', autoActs: true },
+  app_unblock: { icon: Send, label: 'App unblock', autoActs: false },
+  website_access: { icon: Send, label: 'Website access', autoActs: false },
+  schedule_exception: { icon: Clock, label: 'Schedule exception', autoActs: false },
 }
 
 export default function RequestsTab({ childId }) {
@@ -106,6 +113,13 @@ export default function RequestsTab({ childId }) {
                         <p className="text-xs text-secondary-token mt-0.5">Requested: {request.metadata.minutes} minutes</p>
                       )}
                       <p className="text-xs text-muted-token mt-1">{new Date(request.created_at).toLocaleString()}</p>
+                      {!iconInfo.autoActs && request.status === 'pending' && (
+                        <p className="flex items-start gap-1 text-xs text-saffron-600 dark:text-saffron-400 mt-2">
+                          <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                          Approving only updates this request's status. You'll still need to make the matching
+                          change yourself in {request.request_type === 'website_access' ? 'Website Rules' : 'Rules'}.
+                        </p>
+                      )}
                     </div>
                     {request.status === 'pending' && (
                       <div className="flex gap-2">

@@ -13,7 +13,7 @@ import {
   calculateFieldScore, hasValue, resolveGroupTotals, resolveCalculatedColumns,
 } from '@/lib/trackerScoring'
 
-const CELL_BASE = 'w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
+const CELL_BASE = 'w-full px-2 py-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--surface)] text-xs text-primary-token focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 const DATE_W = 60
 const DAY_W = 44
 const CALC_W = 68
@@ -30,7 +30,7 @@ function EditableCell({ field, value, onChange }) {
         aria-pressed={on}
         className={cn(
           'w-full h-7 rounded-lg flex items-center justify-center transition',
-          on ? 'bg-tulasi-500 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+          on ? 'bg-tulasi-500 text-white' : 'bg-[var(--surface-muted)] text-muted-token hover:bg-slate-200'
         )}
       >
         {on ? <Check className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
@@ -84,12 +84,12 @@ function ReadOnlyCell({ field, value }) {
   if (field.field_type === 'boolean') {
     const on = value === true || value === 'true' || value === '1'
     return (
-      <div className={cn('w-full h-7 rounded-lg flex items-center justify-center', on ? 'bg-tulasi-100 text-tulasi-600' : 'bg-slate-50 text-slate-300')}>
+      <div className={cn('w-full h-7 rounded-lg flex items-center justify-center', on ? 'bg-tulasi-100 text-tulasi-600' : 'bg-[var(--surface-muted)] text-muted-token')}>
         {on ? <Check className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
       </div>
     )
   }
-  return <div className="px-2 py-1.5 text-xs text-slate-700 text-center truncate">{hasValue(value) ? String(value) : '–'}</div>
+  return <div className="px-2 py-1.5 text-xs text-primary-token text-center truncate">{hasValue(value) ? String(value) : '–'}</div>
 }
 
 export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], rules = [], calculatedColumns = [], orgId, userId, readOnly = false }) {
@@ -293,28 +293,28 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
         <CardBody className="py-3 space-y-2">
           {/* Row 1: mode picker + navigation */}
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 flex-shrink-0">
+            <div className="flex items-center gap-1 bg-[var(--surface-muted)] rounded-xl p-1 flex-shrink-0">
               <button
                 onClick={() => setMode('week')}
-                className={cn('px-3 py-1.5 rounded-lg text-xs font-semibold transition', mode === 'week' ? 'bg-white shadow-sm text-saffron-600' : 'text-slate-500')}
+                className={cn('px-3 py-1.5 rounded-lg text-xs font-semibold transition', mode === 'week' ? 'bg-[var(--surface)] shadow-sm text-saffron-600' : 'text-secondary-token')}
               >Week</button>
               <button
                 onClick={() => setMode('month')}
-                className={cn('px-3 py-1.5 rounded-lg text-xs font-semibold transition', mode === 'month' ? 'bg-white shadow-sm text-saffron-600' : 'text-slate-500')}
+                className={cn('px-3 py-1.5 rounded-lg text-xs font-semibold transition', mode === 'month' ? 'bg-[var(--surface)] shadow-sm text-saffron-600' : 'text-secondary-token')}
               >Month</button>
             </div>
 
-            <button onClick={() => step(-1)} className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex-shrink-0">
+            <button onClick={() => step(-1)} className="p-2 rounded-xl text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)] flex-shrink-0">
               <ChevronLeft className="w-5 h-5" />
             </button>
 
             <div className="flex-1 text-center">
-              <p className="font-bold text-slate-800 text-sm leading-tight">{rangeLabel}</p>
+              <p className="font-bold text-primary-token text-sm leading-tight">{rangeLabel}</p>
             </div>
 
             <button
               onClick={() => step(1)}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex-shrink-0"
+              className="p-2 rounded-xl text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)] flex-shrink-0"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -332,13 +332,13 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
       {/* Spreadsheet */}
       <Card className="!p-0 overflow-hidden">
         {loading ? (
-          <div className="p-10 text-center text-sm text-slate-400">Loading…</div>
+          <div className="p-10 text-center text-sm text-muted-token">Loading…</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="border-collapse w-full">
               <thead>
                 {/* Group header row */}
-                <tr className="bg-gradient-to-r from-saffron-500 to-orange-500">
+                <tr className="bg-saffron-500">
                   <th className="sticky left-0 z-20 bg-saffron-500" style={{ width: DATE_W }} />
                   <th className="sticky z-20 bg-saffron-500" style={{ width: DAY_W, left: DATE_W }} />
                   {orderedGroups.map((g, gi) => {
@@ -367,7 +367,7 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
                   {sortedColumns.map((c) => (
                     <th
                       key={c.key}
-                      className={cn('px-2 py-2 text-[11px] font-bold text-center whitespace-nowrap', c.is_highlighted ? 'bg-yellow-400 text-slate-900' : 'bg-slate-700 text-white')}
+                      className={cn('px-2 py-2 text-[11px] font-bold text-center whitespace-nowrap', c.is_highlighted ? 'bg-yellow-400 text-primary-token' : 'bg-slate-700 text-white')}
                       style={{ width: CALC_W }}
                     >
                       {c.label}
@@ -376,8 +376,8 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
                 </tr>
                 {/* Max marks row */}
                 <tr className="bg-orange-50">
-                  <th className="sticky left-0 z-20 bg-orange-50 text-[10px] text-slate-400" style={{ width: DATE_W }} />
-                  <th className="sticky z-20 bg-orange-50 text-[10px] text-slate-400" style={{ width: DAY_W, left: DATE_W }} />
+                  <th className="sticky left-0 z-20 bg-orange-50 text-[10px] text-muted-token" style={{ width: DATE_W }} />
+                  <th className="sticky z-20 bg-orange-50 text-[10px] text-muted-token" style={{ width: DAY_W, left: DATE_W }} />
                   {activeColumns.map(({ field, showInput, showMarks, hasRule }) => {
                     const max = (rulesByField[field.key] ?? []).reduce((n, r) => n + (Number(r.max_points) || 0), 0)
                     return (
@@ -400,31 +400,31 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
                   const values = grid[iso] ?? {}
                   const t = dayTotals[iso] ?? { fieldTotals: {}, columnTotals: {} }
                   return (
-                    <tr key={iso} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                      <td className="sticky left-0 z-10 bg-inherit px-2 py-1.5 text-xs font-semibold text-slate-700 border-r border-slate-100" style={{ width: DATE_W }}>
+                    <tr key={iso} className={idx % 2 === 0 ? 'bg-[var(--surface)]' : 'bg-slate-50/60'}>
+                      <td className="sticky left-0 z-10 bg-inherit px-2 py-1.5 text-xs font-semibold text-primary-token border-r border-[var(--border-color)]" style={{ width: DATE_W }}>
                         {format(d, 'd MMM')}
                       </td>
-                      <td className="sticky z-10 bg-inherit px-2 py-1.5 text-xs text-slate-500 border-r border-slate-100" style={{ width: DAY_W, left: DATE_W }}>
+                      <td className="sticky z-10 bg-inherit px-2 py-1.5 text-xs text-secondary-token border-r border-[var(--border-color)]" style={{ width: DAY_W, left: DATE_W }}>
                         {format(d, 'EEE')}
                       </td>
                       {activeColumns.map(({ field, showInput, showMarks }) => (
                         <>
                           {showInput && (
-                            <td key={`${field.key}-in`} className="px-1.5 py-1 border-r border-slate-100" style={{ minWidth: 90 }}>
+                            <td key={`${field.key}-in`} className="px-1.5 py-1 border-r border-[var(--border-color)]" style={{ minWidth: 90 }}>
                               {readOnly
                                 ? <ReadOnlyCell field={field} value={values[field.key]} />
                                 : <EditableCell field={field} value={values[field.key]} onChange={(v) => setCell(iso, field.key, v)} />}
                             </td>
                           )}
                           {showMarks && (
-                            <td key={`${field.key}-mk`} className="px-2 py-1.5 text-center text-xs font-semibold text-slate-600 bg-slate-50/60 border-r border-slate-100">
+                            <td key={`${field.key}-mk`} className="px-2 py-1.5 text-center text-xs font-semibold text-secondary-token bg-slate-50/60 border-r border-[var(--border-color)]">
                               {(t.fieldTotals[field.key]?.earned ?? 0).toFixed(2)}
                             </td>
                           )}
                         </>
                       ))}
                       {sortedColumns.map((c) => (
-                        <td key={c.key} className={cn('px-2 py-1.5 text-center text-xs font-bold', c.is_highlighted ? 'bg-yellow-50 text-yellow-800' : 'text-slate-700')}>
+                        <td key={c.key} className={cn('px-2 py-1.5 text-center text-xs font-bold', c.is_highlighted ? 'bg-yellow-50 text-yellow-800' : 'text-primary-token')}>
                           {(t.columnTotals[c.key]?.earned ?? 0).toFixed(2)}
                         </td>
                       ))}

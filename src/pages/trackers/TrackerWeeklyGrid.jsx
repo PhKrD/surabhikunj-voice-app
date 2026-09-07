@@ -8,7 +8,7 @@ import Badge from '@/components/ui/Badge'
 import useToastStore from '@/store/toastStore'
 import { cn } from '@/lib/utils'
 
-const CELL_BASE = 'px-2 py-1 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
+const CELL_BASE = 'px-2 py-1 rounded-lg border border-[var(--border-color)] bg-[var(--surface)] text-xs text-primary-token focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 
 function toISO(d) {
   return format(d, 'yyyy-MM-dd')
@@ -34,7 +34,7 @@ function WeekCell({ field, value, onChange }) {
         aria-pressed={on}
         className={cn(
           'w-8 h-7 rounded-lg flex items-center justify-center transition',
-          on ? 'bg-tulasi-500 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+          on ? 'bg-tulasi-500 text-white' : 'bg-[var(--surface-muted)] text-muted-token hover:bg-slate-200'
         )}
       >
         {on ? <Check className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
@@ -235,18 +235,18 @@ export default function TrackerWeeklyGrid({ tracker, fields = [], rules = [], or
         <CardBody className="py-3 flex items-center gap-3">
           <button
             onClick={() => setAnchor((a) => subWeeks(a, 1))}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+            className="p-2 rounded-xl text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)]"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="flex-1 text-center">
-            <p className="text-xs text-slate-400 uppercase tracking-wide">Week of</p>
-            <p className="font-semibold text-slate-800">{rangeLabel}</p>
+            <p className="text-xs text-muted-token uppercase tracking-wide">Week of</p>
+            <p className="font-semibold text-primary-token">{rangeLabel}</p>
           </div>
           <button
             onClick={() => canGoNext && setAnchor((a) => addWeeks(a, 1))}
             disabled={!canGoNext}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none"
+            className="p-2 rounded-xl text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)] disabled:opacity-40 disabled:pointer-events-none"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -256,7 +256,7 @@ export default function TrackerWeeklyGrid({ tracker, fields = [], rules = [], or
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-700">Week at a glance</span>
+            <span className="text-sm font-semibold text-primary-token">Week at a glance</span>
             {summary.count > 0 && (
               <Badge variant={summary.average >= 70 ? 'tulasi' : summary.average >= 40 ? 'saffron' : 'default'}>
                 Avg {summary.average}/100
@@ -266,22 +266,22 @@ export default function TrackerWeeklyGrid({ tracker, fields = [], rules = [], or
         </CardHeader>
         <CardBody className="pt-0">
           {loading ? (
-            <div className="py-10 text-center text-sm text-slate-400">Loading week…</div>
+            <div className="py-10 text-center text-sm text-muted-token">Loading week…</div>
           ) : fields.length === 0 ? (
-            <div className="py-10 text-center text-sm text-slate-400">No fields configured for this tracker.</div>
+            <div className="py-10 text-center text-sm text-muted-token">No fields configured for this tracker.</div>
           ) : (
             <div className="overflow-x-auto -mx-4 sm:mx-0">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="text-left py-2 px-2 text-xs font-semibold text-slate-500 uppercase whitespace-nowrap">Day</th>
+                  <tr className="border-b border-[var(--border-color)]">
+                    <th className="text-left py-2 px-2 text-xs font-semibold text-secondary-token uppercase whitespace-nowrap">Day</th>
                     {fields.map((f) => (
-                      <th key={f.id ?? f.key} className="text-left py-2 px-2 text-xs font-semibold text-slate-500 uppercase whitespace-nowrap">
+                      <th key={f.id ?? f.key} className="text-left py-2 px-2 text-xs font-semibold text-secondary-token uppercase whitespace-nowrap">
                         {f.label}
-                        {f.unit && <span className="ml-1 text-[10px] font-normal text-slate-400 normal-case">({f.unit})</span>}
+                        {f.unit && <span className="ml-1 text-[10px] font-normal text-muted-token normal-case">({f.unit})</span>}
                       </th>
                     ))}
-                    <th className="text-right py-2 px-2 text-xs font-semibold text-slate-500 uppercase whitespace-nowrap">Score</th>
+                    <th className="text-right py-2 px-2 text-xs font-semibold text-secondary-token uppercase whitespace-nowrap">Score</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -292,8 +292,8 @@ export default function TrackerWeeklyGrid({ tracker, fields = [], rules = [], or
                     return (
                       <tr key={iso} className={cn('border-b border-slate-50 last:border-0', isToday && 'bg-saffron-50/50')}>
                         <td className="py-2 px-2 whitespace-nowrap">
-                          <div className="font-semibold text-slate-700 text-xs">{format(d, 'EEE')}</div>
-                          <div className="text-[10px] text-slate-400">{format(d, 'dd MMM')}</div>
+                          <div className="font-semibold text-primary-token text-xs">{format(d, 'EEE')}</div>
+                          <div className="text-[10px] text-muted-token">{format(d, 'dd MMM')}</div>
                         </td>
                         {fields.map((f) => (
                           <td key={f.id ?? f.key} className="py-2 px-2">
@@ -305,7 +305,7 @@ export default function TrackerWeeklyGrid({ tracker, fields = [], rules = [], or
                           </td>
                         ))}
                         <td className="py-2 px-2 text-right">
-                          <span className="inline-block px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold">
+                          <span className="inline-block px-2 py-0.5 rounded-lg bg-[var(--surface-muted)] text-primary-token text-xs font-bold">
                             {scored?.score != null ? scored.score : '—'}
                           </span>
                         </td>
@@ -321,7 +321,7 @@ export default function TrackerWeeklyGrid({ tracker, fields = [], rules = [], or
             <Button onClick={handleSave} loading={saving} disabled={loading} icon={Save}>
               Save Week
             </Button>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-token">
               {summary.count > 0
                 ? `${summary.count} ${summary.count === 1 ? 'day' : 'days'} scored • total ${summary.total} • average ${summary.average}/100`
                 : 'No scored days yet this week.'}

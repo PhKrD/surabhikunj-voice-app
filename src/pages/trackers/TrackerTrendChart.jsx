@@ -17,7 +17,7 @@ export default function TrackerTrendChart({ entries = [], color = '#f97316' }) {
   if (data.length < 2) {
     return (
       <div className="h-[200px] flex items-center justify-center text-center">
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-token">
           Not enough data yet — submit a few more entries to see your trend.
         </p>
       </div>

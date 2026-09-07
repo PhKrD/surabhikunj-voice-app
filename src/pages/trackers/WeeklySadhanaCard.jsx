@@ -13,18 +13,18 @@ import WhatsAppShareModal from './WhatsAppShareModal'
 function toISO(d) { return format(d, 'yyyy-MM-dd') }
 
 function scoreTone(pct) {
-  if (pct == null) return 'text-slate-400'
+  if (pct == null) return 'text-muted-token'
   if (pct >= 80) return 'text-tulasi-600'
   if (pct >= 60) return 'text-saffron-500'
   if (pct >= 40) return 'text-yellow-600'
   return 'text-red-500'
 }
 function scoreBar(pct) {
-  if (pct == null) return 'bg-slate-200'
-  if (pct >= 80) return 'bg-gradient-to-r from-tulasi-400 to-emerald-500'
-  if (pct >= 60) return 'bg-gradient-to-r from-saffron-400 to-orange-500'
-  if (pct >= 40) return 'bg-gradient-to-r from-yellow-400 to-amber-500'
-  return 'bg-gradient-to-r from-rose-400 to-red-500'
+  if (pct == null) return 'bg-[var(--border-color)]'
+  if (pct >= 80) return 'bg-tulasi-500'
+  if (pct >= 60) return 'bg-saffron-500'
+  if (pct >= 40) return 'bg-yellow-500'
+  return 'bg-red-500'
 }
 
 export default function WeeklySadhanaCard({ tracker, fields = [], groups = [], rules = [], calculatedColumns = [], userId, devoteeName }) {
@@ -135,17 +135,17 @@ export default function WeeklySadhanaCard({ tracker, fields = [], groups = [], r
       {/* Header / navigation */}
       <Card>
         <CardBody className="py-3 flex items-center gap-3">
-          <button onClick={() => setAnchor((a) => subWeeks(a, 1))} className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+          <button onClick={() => setAnchor((a) => subWeeks(a, 1))} className="p-2 rounded-xl text-muted-token hover:text-primary-token hover:bg-[var(--surface-muted)]">
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="flex-1 text-center">
-            <p className="text-xs text-slate-400 uppercase tracking-wide">Weekly Sadhana Card</p>
-            <p className="font-semibold text-slate-800 text-sm">{rangeLabel}</p>
+            <p className="text-xs text-muted-token uppercase tracking-wide">Weekly Sadhana Card</p>
+            <p className="font-semibold text-primary-token text-sm">{rangeLabel}</p>
           </div>
           <button
             onClick={() => canGoNext && setAnchor((a) => addWeeks(a, 1))}
             disabled={!canGoNext}
-            className={cn('p-2 rounded-xl', canGoNext ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-200 cursor-not-allowed')}
+            className={cn('p-2 rounded-xl', canGoNext ? 'text-muted-token hover:text-primary-token hover:bg-[var(--surface-muted)]' : 'text-muted-token opacity-40 cursor-not-allowed')}
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -153,13 +153,15 @@ export default function WeeklySadhanaCard({ tracker, fields = [], groups = [], r
       </Card>
 
       {loading ? (
-        <div className="p-10 text-center text-sm text-slate-400">Loading…</div>
+        <div className="p-10 text-center text-sm text-muted-token">Loading…</div>
       ) : (
         <>
           {/* Overall score hero */}
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-saffron-500 via-orange-500 to-amber-400 p-6">
-            <div className="pointer-events-none absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10 blur-3xl" />
-            <div className="relative flex items-center justify-between">
+          <div
+            className="relative overflow-hidden rounded-2xl p-6"
+            style={{ background: 'linear-gradient(135deg, var(--color-primary-700), var(--color-primary-500))' }}
+          >
+            <div className="relative flex items-center justify-between flex-wrap gap-3">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <p className="text-xs font-bold text-white/70 uppercase tracking-widest">Overall Sadhana Score</p>
@@ -173,7 +175,7 @@ export default function WeeklySadhanaCard({ tracker, fields = [], groups = [], r
               <Button
                 icon={Share2}
                 onClick={() => setShowShare(true)}
-                className="bg-white/20 hover:bg-white/30 text-white border border-white/30 shadow-none"
+                className="bg-white/15 hover:bg-white/25 text-white border border-white/25 shadow-none"
               >
                 Share
               </Button>
@@ -189,7 +191,7 @@ export default function WeeklySadhanaCard({ tracker, fields = [], groups = [], r
                 return (
                   <Card key={g.key}>
                     <CardBody className="text-center py-4">
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{g.label}</p>
+                      <p className="text-xs font-semibold text-muted-token uppercase tracking-wide mb-1">{g.label}</p>
                       <p className={cn('text-2xl font-extrabold', scoreTone(pct))}>{pct != null ? pct.toFixed(1) : '—'}%</p>
                     </CardBody>
                   </Card>
@@ -200,12 +202,12 @@ export default function WeeklySadhanaCard({ tracker, fields = [], groups = [], r
 
           {/* Daily breakdown */}
           <Card>
-            <CardHeader><p className="text-sm font-bold text-slate-800">Daily Breakdown</p></CardHeader>
+            <CardHeader><p className="text-sm font-bold text-primary-token">Daily Breakdown</p></CardHeader>
             <CardBody className="space-y-2">
               {dailyScores.map((d) => (
                 <div key={d.iso} className="flex items-center gap-3">
-                  <span className="w-20 text-xs font-medium text-slate-500">{format(d.date, 'EEEE')}</span>
-                  <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <span className="w-20 text-xs font-medium text-secondary-token">{format(d.date, 'EEEE')}</span>
+                  <div className="flex-1 h-2 rounded-full surface-muted overflow-hidden">
                     {d.score != null && <div className={cn('h-full rounded-full', scoreBar(d.score))} style={{ width: `${d.score}%` }} />}
                   </div>
                   <span className={cn('w-12 text-right text-xs font-bold', scoreTone(d.score))}>{d.score != null ? `${d.score}%` : '—'}</span>
@@ -216,17 +218,17 @@ export default function WeeklySadhanaCard({ tracker, fields = [], groups = [], r
 
           {/* Activity performance */}
           <Card>
-            <CardHeader><p className="text-sm font-bold text-slate-800">Activity Performance</p></CardHeader>
+            <CardHeader><p className="text-sm font-bold text-primary-token">Activity Performance</p></CardHeader>
             <CardBody className="!pt-2">
-              <div className="divide-y divide-slate-50">
+              <div className="divide-y divide-[var(--border-color)]">
                 {fields.filter((f) => weekly.fieldTotals[f.key]?.max).map((f) => {
                   const t = weekly.fieldTotals[f.key]
                   const pct = t.max ? (t.earned / t.max) * 100 : null
                   return (
                     <div key={f.key} className="flex items-center justify-between py-2.5">
-                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                      <span className="text-sm font-medium text-primary-token">{f.label}</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-400">{t.earned.toFixed(1)}/{t.max.toFixed(1)}</span>
+                        <span className="text-xs text-muted-token">{t.earned.toFixed(1)}/{t.max.toFixed(1)}</span>
                         <Badge variant={pct >= 70 ? 'tulasi' : pct >= 40 ? 'saffron' : 'red'}>{pct.toFixed(0)}%</Badge>
                       </div>
                     </div>
@@ -241,12 +243,12 @@ export default function WeeklySadhanaCard({ tracker, fields = [], groups = [], r
             {bestDay && (
               <Card>
                 <CardBody className="flex items-center gap-3 py-4">
-                  <div className="w-10 h-10 rounded-2xl bg-tulasi-50 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-tulasi-50 dark:bg-tulasi-900/30 flex items-center justify-center flex-shrink-0">
                     <Award className="w-5 h-5 text-tulasi-500" />
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400">Best Day</p>
-                    <p className="text-sm font-bold text-slate-800">{format(bestDay.date, 'EEEE')} · {bestDay.score}%</p>
+                    <p className="text-xs text-muted-token">Best Day</p>
+                    <p className="text-sm font-bold text-primary-token">{format(bestDay.date, 'EEEE')} · {bestDay.score}%</p>
                   </div>
                 </CardBody>
               </Card>
@@ -254,12 +256,12 @@ export default function WeeklySadhanaCard({ tracker, fields = [], groups = [], r
             {missedFields.length > 0 && (
               <Card>
                 <CardBody className="flex items-center gap-3 py-4">
-                  <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-red-50 dark:bg-red-950/40 flex items-center justify-center flex-shrink-0">
                     <CalendarX2 className="w-5 h-5 text-red-500" />
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400">Missed this week</p>
-                    <p className="text-sm font-bold text-slate-800">{missedFields.map((f) => f.label).join(', ')}</p>
+                    <p className="text-xs text-muted-token">Missed this week</p>
+                    <p className="text-sm font-bold text-primary-token">{missedFields.map((f) => f.label).join(', ')}</p>
                   </div>
                 </CardBody>
               </Card>

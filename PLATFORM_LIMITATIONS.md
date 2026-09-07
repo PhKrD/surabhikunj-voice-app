@@ -15,6 +15,7 @@ cannot find code for.
 | Internet pause / resume           | FULL (local VPN) | NONE | NONE | NONE | NONE |
 | Screen-time daily cap             | FULL (foreground + background) | NONE | NONE | NONE | NONE |
 | Website allow/block list          | SCHEMA ONLY — no enforcement | NONE | NONE | NONE | NONE |
+| Website visit / search monitoring | BEST-EFFORT (Accessibility Service, requires Usage Access-style manual grant — see below) | NONE | NONE | NONE | NONE |
 | Location tracking                 | FULL    | PARTIAL (native MDM/Screen Time API would be required) | NONE | NONE | NONE |
 | Geofencing                        | FULL    | NONE | NONE | NONE | NONE |
 | App usage reporting               | FULL    | NONE | NONE | NONE | NONE |
@@ -116,6 +117,40 @@ naive DNS blocklist that HTTPS SNI or DoH trivially bypasses) would be
 worse than admitting it doesn't work yet. **Do not present this feature to
 end users as functional** until enforcement lands. Recommended: hide or
 label the Websites tab "Coming soon" in the parent UI until implemented.
+
+## Website visit / search monitoring — best-effort, not exhaustive
+
+`VoiceKidsAccessibilityService` (`android/app/.../dpc/VoiceKidsAccessibilityService.kt`)
+reads the address-bar text of a small list of known browsers (Chrome,
+Samsung Internet, Edge, Firefox, Opera, Brave, Mi Browser, DuckDuckGo)
+via Android's Accessibility API — the same technique real consumer
+parental-control apps use, since there is no official "give me the
+child's browsing history" API on stock Android. Rows land in
+`pc_web_activity` (migration `67_web_activity.sql`), surfaced in the new
+"Web Activity" tab.
+
+**What this genuinely gives you:** for a recognized browser, once the
+address bar settles after navigation, we record either the visited
+domain or — for Google/Bing/DuckDuckGo/Yahoo — the decoded search query.
+
+**What this does NOT give you, and never claim it does:**
+- Only the browsers explicitly listed are recognized at all. Any other
+  browser (or a browser update that renames its address-bar view-id)
+  produces nothing, silently.
+- Incognito/private-browsing behavior is whatever that browser chooses
+  to expose through its own UI — not guaranteed captured or hidden.
+- It cannot see in-app browsers (e.g. a link opened inside Instagram's
+  or TikTok's own in-app WebView) — those aren't in the recognized list
+  and have no stable address-bar UI to read anyway.
+- Like Usage Access, enabling this requires **the parent to manually
+  turn it on** under Settings > Accessibility on the child device — no
+  app, Device Owner or not, can grant this to itself.
+- A determined technical user can turn the accessibility toggle back off
+  on the device itself; this is a monitoring signal, not a tamper-proof
+  control.
+
+Label this "best-effort" everywhere it's shown to a parent — never as a
+complete browsing history.
 
 ## iOS
 

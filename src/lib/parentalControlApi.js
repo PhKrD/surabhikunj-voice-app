@@ -571,6 +571,35 @@ export async function deleteGeofence(geofenceId) {
 }
 
 // ---------------------------------------------------------------------
+// Web activity (best-effort, AccessibilityService-based — see
+// PLATFORM_LIMITATIONS.md and VoiceKidsAccessibilityService.kt's doc
+// comment before treating this as an exhaustive browsing log)
+// ---------------------------------------------------------------------
+
+export async function listWebActivity(childId, { limit = 100 } = {}) {
+  const { data, error } = await supabase
+    .from('pc_web_activity')
+    .select('*')
+    .eq('child_id', childId)
+    .order('occurred_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data ?? []
+}
+
+export function subscribeToWebActivity(childId, onInsert) {
+  const channel = supabase
+    .channel(`pc-web-activity-${childId}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'pc_web_activity', filter: `child_id=eq.${childId}` },
+      (payload) => onInsert(payload.new),
+    )
+    .subscribe()
+  return () => supabase.removeChannel(channel)
+}
+
+// ---------------------------------------------------------------------
 // Alerts
 // ---------------------------------------------------------------------
 

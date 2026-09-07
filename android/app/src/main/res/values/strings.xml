@@ -4,4 +4,5 @@
     <string name="title_activity_main">VOICE</string>
     <string name="package_name">com.surabhikunj.voice</string>
     <string name="custom_url_scheme">com.surabhikunj.voice</string>
+    <string name="accessibility_service_description">Lets a parent see which websites are visited and searches made in supported browsers on this device, as part of Parental Control. Only reads the browser\'s address bar — never other apps.</string>
 </resources>

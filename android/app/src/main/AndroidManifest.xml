@@ -101,6 +101,25 @@
             </intent-filter>
         </service>
 
+        <!-- Best-effort browser activity monitoring (web visits + search
+             queries) — see VoiceKidsAccessibilityService's doc comment and
+             PLATFORM_LIMITATIONS.md for exactly what this does and doesn't
+             cover. BIND_ACCESSIBILITY_SERVICE restricts binding to the
+             system; Android requires the parent to enable this manually
+             under Settings > Accessibility on the child device — no app
+             can turn it on for itself. -->
+        <service
+            android:name="com.surabhikunj.voice.dpc.VoiceKidsAccessibilityService"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <!-- Browsers VoiceKidsAccessibilityService recognizes and reads the
+         address bar of. Must stay in sync with the keys of
+         VoiceKidsAccessibilityService.BROWSER_URL_BAR_IDS (Kotlin). -->
+    <string-array name="monitored_browser_packages">
+        <item>com.android.chrome</item>
+        <item>com.chrome.beta</item>
+        <item>com.chrome.dev</item>
+        <item>com.sec.android.app.sbrowser</item>
+        <item>com.microsoft.emmx</item>
+        <item>org.mozilla.firefox</item>
+        <item>com.opera.browser</item>
+        <item>com.brave.browser</item>
+        <item>com.mi.globalbrowser</item>
+        <item>com.duckduckgo.mobile.android</item>
+    </string-array>
+</resources>

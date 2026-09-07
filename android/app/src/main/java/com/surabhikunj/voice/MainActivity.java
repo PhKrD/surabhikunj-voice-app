@@ -1,6 +1,7 @@
 package com.surabhikunj.voice;
 
 import com.getcapacitor.BridgeActivity;
+import com.surabhikunj.voice.dpc.VoiceKidsAccessibilityPlugin;
 import com.surabhikunj.voice.dpc.VoiceKidsDpcPlugin;
 import com.surabhikunj.voice.dpc.VoiceKidsLocationPlugin;
 import com.surabhikunj.voice.dpc.VoiceKidsUsageStatsPlugin;
@@ -15,6 +16,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(VoiceKidsDpcPlugin.class);
         registerPlugin(VoiceKidsLocationPlugin.class);
         registerPlugin(VoiceKidsUsageStatsPlugin.class);
+        registerPlugin(VoiceKidsAccessibilityPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

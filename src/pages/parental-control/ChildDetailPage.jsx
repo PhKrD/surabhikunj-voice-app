@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Smartphone, Sliders, MapPin, Bell, Gift, BarChart3, Clock, Globe, Send, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, Smartphone, Sliders, MapPin, Bell, Gift, BarChart3, Clock, Globe, Send, ShieldAlert, History } from 'lucide-react'
 import Avatar from '@/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
@@ -11,6 +11,7 @@ import UsageTab from './tabs/UsageTab'
 import RulesTab from './tabs/RulesTab'
 import SchedulesTab from './tabs/SchedulesTab'
 import WebsiteRulesTab from './tabs/WebsiteRulesTab'
+import WebActivityTab from './tabs/WebActivityTab'
 import LocationTab from './tabs/LocationTab'
 import AlertsTab from './tabs/AlertsTab'
 import RequestsTab from './tabs/RequestsTab'
@@ -23,6 +24,7 @@ const TABS = [
   { key: 'schedules', label: 'Schedules', icon: Clock, Component: SchedulesTab },
   { key: 'rules', label: 'App Rules', icon: Sliders, Component: RulesTab },
   { key: 'websites', label: 'Websites', icon: Globe, Component: WebsiteRulesTab },
+  { key: 'webActivity', label: 'Web Activity', icon: History, Component: WebActivityTab },
   { key: 'location', label: 'Location', icon: MapPin, Component: LocationTab },
   { key: 'alerts', label: 'Alerts', icon: Bell, Component: AlertsTab },
   { key: 'requests', label: 'Requests', icon: Send, Component: RequestsTab },

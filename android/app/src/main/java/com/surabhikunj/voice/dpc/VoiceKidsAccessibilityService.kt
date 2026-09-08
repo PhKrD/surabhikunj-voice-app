@@ -149,7 +149,12 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
 
         for ((hostMatch, param, label) in SEARCH_ENGINES) {
             if (host.contains(hostMatch)) {
-                val q = uri.getQueryParameter(param)
+                // Uri.getQueryParameter() only does RFC-3986 percent-decoding —
+                // it deliberately does NOT turn "+" into a space, because that's
+                // an HTML form-encoding convention, not part of URI decoding.
+                // Search engines encode spaces as "+" in query strings, so
+                // without this the query would show up as "hare+krishna".
+                val q = uri.getQueryParameter(param)?.replace('+', ' ')
                 if (!q.isNullOrBlank()) {
                     return ParsedBar(raw = trimmed, host = host, searchEngine = label, searchQuery = q)
                 }

@@ -18,6 +18,7 @@ import { useDeviceState } from '../../store/childDeviceState.js'
 import { startCommandPoller, stopCommandPoller } from '../../lib/commandPoller.js'
 import { syncSessionAndStartTracking } from '../../lib/locationPlugin.js'
 import { getTodayUsage, hasUsageAccess, openUsageAccessSettings, syncInstalledApps } from '../../lib/usageStatsPlugin.js'
+import SetupChecklistCard from '../../components/child-device/SetupChecklistCard.jsx'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -75,6 +76,9 @@ export default function HomePage() {
 
       {/* Body */}
       <div className="flex-1 px-6 py-8 flex flex-col gap-6">
+        {/* Outstanding permissions needed for parental control to actually work */}
+        <SetupChecklistCard />
+
         {/* Screen time card */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-2">

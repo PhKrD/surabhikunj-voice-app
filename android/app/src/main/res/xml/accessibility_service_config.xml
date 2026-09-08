@@ -2,10 +2,16 @@
 <!--
   Config for VoiceKidsAccessibilityService.
 
-  packageNames restricts which apps' events even reach this service — kept
-  narrow to known browsers only, both for privacy (we never want events
-  from arbitrary apps) and performance (fewer events to debounce/process).
-  Must stay in sync with VoiceKidsAccessibilityService.BROWSER_URL_BAR_IDS.
+  No packageNames restriction: this service now has two jobs —
+    1. App-block/schedule enforcement (VoiceKidsAccessibilityService.
+       enforceForegroundApp) needs typeWindowStateChanged from EVERY app,
+       since any app could be the one a parent's rule blocks.
+    2. Best-effort browser monitoring (checkAddressBar) only acts on the
+       browsers in BROWSER_URL_BAR_IDS — it already gates on that map
+       internally, so widening this config to all packages doesn't change
+       what's read there, only what's read for #1 (the foreground package
+       name, nothing more — the equivalent of what any launcher or the
+       Usage Access permission already exposes).
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeViewTextChanged|typeWindowStateChanged"
@@ -13,5 +19,4 @@
     android:accessibilityFlags="flagReportViewIds"
     android:canRetrieveWindowContent="true"
     android:notificationTimeout="500"
-    android:packageNames="@array/monitored_browser_packages"
     android:description="@string/accessibility_service_description" />

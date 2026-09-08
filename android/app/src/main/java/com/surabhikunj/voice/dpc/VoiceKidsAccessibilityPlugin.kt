@@ -1,9 +1,7 @@
 package com.surabhikunj.voice.dpc
 
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
 import android.provider.Settings
-import android.view.accessibility.AccessibilityManager
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
@@ -26,7 +24,7 @@ class VoiceKidsAccessibilityPlugin : Plugin() {
     @PluginMethod
     fun isEnabled(call: PluginCall) {
         val result = JSObject()
-        result.put("enabled", isServiceEnabled())
+        result.put("enabled", AccessibilityStatus.isEnabled(context))
         call.resolve(result)
     }
 
@@ -43,13 +41,4 @@ class VoiceKidsAccessibilityPlugin : Plugin() {
         }
     }
 
-    private fun isServiceEnabled(): Boolean {
-        val am = context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
-            ?: return false
-        val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-        return enabledServices.any {
-            it.resolveInfo?.serviceInfo?.packageName == context.packageName &&
-                it.resolveInfo?.serviceInfo?.name == VoiceKidsAccessibilityService::class.java.name
-        }
-    }
 }

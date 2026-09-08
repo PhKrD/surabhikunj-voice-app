@@ -1,15 +1,19 @@
 package com.surabhikunj.voice.dpc
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.location.Location
 import android.os.Build
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -131,8 +135,43 @@ class VoiceKidsMonitorService : Service() {
         executor = Executors.newSingleThreadExecutor()
         fusedClient = LocationServices.getFusedLocationProviderClient(this)
         createNotificationChannel()
-        startForeground(NOTIF_ID, buildNotification())
+        startForegroundSafely()
         Log.i(TAG, "Monitor service started")
+    }
+
+    /**
+     * The manifest declares foregroundServiceType="location|dataSync". On
+     * API 34+, Android throws a SecurityException from startForeground()
+     * if the LOCATION type is used without ACCESS_FINE/COARSE_LOCATION
+     * already granted — which, under the default (Device Admin only, no
+     * Device Owner) setup, is a normal runtime permission the parent may
+     * not have granted yet, not something that can be silently guaranteed.
+     * Falling back to the DATA_SYNC type keeps this service (and therefore
+     * command polling / policy enforcement — the source of truth
+     * VoiceKidsAccessibilityService's app-block enforcement depends on)
+     * running regardless. Letting this throw would crash the whole
+     * process, taking VoiceKidsAccessibilityService down with it since
+     * they share a process.
+     */
+    private fun startForegroundSafely() {
+        val hasLocationPermission =
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val type = if (hasLocationPermission) {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                } else {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                }
+                startForeground(NOTIF_ID, buildNotification(), type)
+            } else {
+                startForeground(NOTIF_ID, buildNotification())
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "startForeground failed unexpectedly, stopping service: ${e.message}")
+            stopSelf()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

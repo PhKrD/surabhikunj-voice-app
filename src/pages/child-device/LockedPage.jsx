@@ -3,9 +3,12 @@
  * Full-screen overlay shown when the device is in a blocking schedule/routine
  * or the parent issued a lock_device command.
  *
- * In Device Owner mode (Step 3) the DPC will actually prevent the user from
- * leaving this by suspending other apps. In the interim, this screen is
- * displayed by the web layer and back-navigation is disabled.
+ * This is a WebView-layer backup shown while the app is in the foreground.
+ * The real enforcement — including while this app is backgrounded — comes
+ * from VoiceKidsAccessibilityService (Device Admin + Accessibility, no
+ * factory reset needed): it kicks any disallowed foreground app back to
+ * home. See PLATFORM_LIMITATIONS.md for what that soft-lock does and
+ * doesn't guarantee.
  */
 
 import { Clock } from 'lucide-react'

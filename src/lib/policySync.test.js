@@ -51,7 +51,7 @@ test('sync state is "error" when the device reports a last_error', () => {
   const device = {
     applied_policy_version: 5,
     last_seen_at: recent,
-    enforcement_state: { last_error: 'not_device_owner' },
+    enforcement_state: { last_error: 'not_device_admin' },
   }
   assert.equal(derivePolicySyncState(device, { policy_version: 5 }, NOW), 'error')
 })
@@ -62,20 +62,43 @@ test('a device with no heartbeat at all is treated as offline, not a crash', () 
 })
 
 test('enforcementErrorLabel returns a friendly message for known codes and a fallback otherwise', () => {
-  assert.match(enforcementErrorLabel('not_device_owner'), /Device Owner/)
+  assert.match(enforcementErrorLabel('not_device_admin'), /Device Admin/)
   assert.equal(enforcementErrorLabel(null), null)
   assert.match(enforcementErrorLabel('mystery_code'), /mystery_code/)
 })
 
-test('diagnosticChecklist flags a missing Device Owner permission', () => {
+test('diagnosticChecklist flags a missing Device Admin permission (required)', () => {
   const device = {
     applied_policy_version: 2,
     last_seen_at: recent,
-    enforcement_state: { device_owner: false, usage_access: true },
+    enforcement_state: { device_admin: false, accessibility_enabled: true, usage_access: true },
+  }
+  const checklist = diagnosticChecklist(device, { policy_version: 2 }, NOW)
+  const adminRow = checklist.find((r) => r.key === 'device_admin')
+  assert.equal(adminRow.ok, false)
+})
+
+test('diagnosticChecklist flags missing Accessibility (required for app blocking / web monitoring)', () => {
+  const device = {
+    applied_policy_version: 2,
+    last_seen_at: recent,
+    enforcement_state: { device_admin: true, accessibility_enabled: false, usage_access: true },
+  }
+  const checklist = diagnosticChecklist(device, { policy_version: 2 }, NOW)
+  const a11yRow = checklist.find((r) => r.key === 'accessibility_enabled')
+  assert.equal(a11yRow.ok, false)
+})
+
+test('diagnosticChecklist never fails on a missing Device Owner — it is an optional Advanced mode', () => {
+  const device = {
+    applied_policy_version: 2,
+    last_seen_at: recent,
+    enforcement_state: { device_admin: true, accessibility_enabled: true, device_owner: false, usage_access: true },
   }
   const checklist = diagnosticChecklist(device, { policy_version: 2 }, NOW)
   const ownerRow = checklist.find((r) => r.key === 'device_owner')
-  assert.equal(ownerRow.ok, false)
+  assert.equal(ownerRow.ok, true)
+  assert.match(ownerRow.label, /Standard mode/)
 })
 
 test('diagnosticChecklist reports policy_sync as unavailable pre-migration instead of guessing', () => {
@@ -90,7 +113,7 @@ test('diagnosticChecklist is all-green for a healthy, in-sync device', () => {
   const device = {
     applied_policy_version: 3,
     last_seen_at: recent,
-    enforcement_state: { device_owner: true, usage_access: true, last_error: null },
+    enforcement_state: { device_admin: true, accessibility_enabled: true, usage_access: true, last_error: null },
   }
   const checklist = diagnosticChecklist(device, { policy_version: 3 }, NOW)
   for (const row of checklist) assert.notEqual(row.ok, false, `${row.key} should be ok`)

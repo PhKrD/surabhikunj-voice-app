@@ -16,24 +16,24 @@ import com.getcapacitor.annotation.CapacitorPlugin
 /**
  * VoiceKidsDpcPlugin
  *
- * Bridges the web layer to Android's DevicePolicyManager (DPC) APIs.
- * Every method degrades gracefully when the app is NOT Device Owner —
- * it returns { success: false, reason: "not_device_owner" } instead of
- * throwing, so the JS command handler can surface a clear alert to the
- * parent ("this device needs to be re-enrolled as Device Owner").
+ * Bridges the web layer to Android's DevicePolicyManager (DPC) APIs, plus
+ * the handful of special-access permissions the no-factory-reset
+ * enforcement model needs (overlay, VPN consent). See DpcActions.kt's doc
+ * comment for the full enforcement model.
  *
- * Enforcement primitives used:
- *   - setPackagesSuspended()   → per-app block (pc_app_rules action=block)
- *   - setLockTaskPackages() +
- *     startLockTask()          → allow-list-only kiosk mode (routines)
- *   - setPackagesSuspended()      → pause/resume internet by suspending all
- *                                   non-system user apps (child cannot open any app).
- *   - lockNow()                → immediate screen lock (lock_device command)
- *   - wipeData()               → factory_reset command (parent-confirmed only)
- *
- * All of these are Device Owner–only APIs (they silently no-op or throw
- * SecurityException under plain Device Admin), which is why the
- * architecture requires QR provisioning at factory-reset time.
+ * Two tiers of methods:
+ *   - Device-ADMIN-gated (default, no reset required): lockDevice,
+ *     unlockDevice (best-effort — see DpcActions.unlockDevice), pauseInternet/
+ *     resumeInternet (also needs one-time VPN consent), wipeDevice. These
+ *     return { success: false, reason: "not_device_admin" } when the parent
+ *     hasn't done the one-tap "Activate device admin" grant yet.
+ *   - Device-OWNER-gated (optional "Advanced" mode, still requires a
+ *     factory-reset + provisioning): suspendPackages/unsuspendPackages,
+ *     setAllowedPackages/startKioskMode/stopKioskMode, disallowFactoryReset,
+ *     grantRuntimePermissions. Return { success: false, reason:
+ *     "not_device_owner" } otherwise. App-blocking and schedule enforcement
+ *     do NOT depend on these — see VoiceKidsAccessibilityService, which is
+ *     the primary mechanism for both tiers.
  */
 @CapacitorPlugin(name = "VoiceKidsDpc")
 class VoiceKidsDpcPlugin : Plugin() {
@@ -57,7 +57,23 @@ class VoiceKidsDpcPlugin : Plugin() {
         call.resolve(result)
     }
 
-    /** Returns the QR-provisioning JSON the parent app should render for factory-reset setup. */
+    /**
+     * Launches the system "Activate this device admin app?" screen — a
+     * normal one-tap permission grant on an already-set-up phone, NOT
+     * factory-reset provisioning. This is the default setup path.
+     */
+    @PluginMethod
+    fun requestDeviceAdmin(call: PluginCall) {
+        try {
+            activity?.startActivityForResult(DpcActions.requestDeviceAdminIntent(context), 0)
+                ?: context.startActivity(DpcActions.requestDeviceAdminIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            call.resolve(successResult())
+        } catch (e: Exception) {
+            call.reject("Could not open device admin activation: ${e.message}")
+        }
+    }
+
+    /** Returns the QR-provisioning JSON for the OPTIONAL Device Owner "Advanced" setup (still requires a factory reset). */
     @PluginMethod
     fun getProvisioningPayload(call: PluginCall) {
         val json = JSObject()
@@ -67,6 +83,51 @@ class VoiceKidsDpcPlugin : Plugin() {
         json.put("android.app.extra.PROVISIONING_SKIP_ENCRYPTION", false)
         json.put("android.app.extra.PROVISIONING_LEAVE_ALL_SYSTEM_APPS_ENABLED", true)
         call.resolve(json)
+    }
+
+    // ── Overlay permission (block-screen shown when kicking a blocked app) ──
+
+    @PluginMethod
+    fun canDrawOverlays(call: PluginCall) {
+        val result = JSObject()
+        result.put("granted", DpcActions.canDrawOverlays(context))
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun requestOverlayPermission(call: PluginCall) {
+        try {
+            context.startActivity(DpcActions.overlayPermissionIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            call.resolve(successResult())
+        } catch (e: Exception) {
+            call.reject("Could not open overlay permission settings: ${e.message}")
+        }
+    }
+
+    // ── VPN consent (one-time, needed for pause/resume internet) ────────
+
+    @PluginMethod
+    fun hasVpnConsent(call: PluginCall) {
+        val result = JSObject()
+        result.put("granted", DpcActions.hasVpnConsent(context))
+        call.resolve(result)
+    }
+
+    /** Launches the system VPN consent dialog if not already granted; no-ops (resolves success) if already granted. */
+    @PluginMethod
+    fun requestVpnConsent(call: PluginCall) {
+        val intent = DpcActions.vpnConsentIntent(context)
+        if (intent == null) {
+            call.resolve(successResult())
+            return
+        }
+        try {
+            activity?.startActivityForResult(intent, 0)
+                ?: context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            call.resolve(successResult())
+        } catch (e: Exception) {
+            call.reject("Could not open VPN consent dialog: ${e.message}")
+        }
     }
 
     // ── App suspension (per-app block rules) ───────────────────────────
@@ -129,121 +190,52 @@ class VoiceKidsDpcPlugin : Plugin() {
     }
 
     // ── Connectivity (pause_internet / resume_internet commands) ───────
+    // Device-ADMIN-gated is not quite right either — pauseInternet only
+    // needs the one-time VPN consent (DpcActions.hasVpnConsent), not Device
+    // Admin at all. resumeInternet never needs any elevated permission.
 
     @PluginMethod
     fun pauseInternet(call: PluginCall) {
-        android.util.Log.d("VoiceKidsDpc", "pauseInternet called")
-        // Delegates to DpcActions which starts InternetBlockVpnService — a local VPN that
-        // drops all packets for every app except our own (so we keep Supabase access).
-        runDeviceOwnerAction(call) {
-            val success = DpcActions.pauseInternet(context)
-            android.util.Log.d("VoiceKidsDpc", "pauseInternet result: $success")
-            val result = JSObject()
-            result.put("success", success)
-            call.resolve(result)
-        }
+        val success = DpcActions.pauseInternet(context)
+        val result = JSObject()
+        result.put("success", success)
+        if (!success) result.put("reason", "vpn_consent_needed")
+        call.resolve(result)
     }
 
     @PluginMethod
     fun resumeInternet(call: PluginCall) {
-        android.util.Log.d("VoiceKidsDpc", "resumeInternet called")
-        // Delegates to DpcActions which stops InternetBlockVpnService → internet restored.
-        runDeviceOwnerAction(call) {
-            val success = DpcActions.resumeInternet(context)
-            android.util.Log.d("VoiceKidsDpc", "resumeInternet result: $success")
-            val result = JSObject()
-            result.put("success", success)
-            call.resolve(result)
-        }
+        val success = DpcActions.resumeInternet(context)
+        val result = JSObject()
+        result.put("success", success)
+        call.resolve(result)
     }
 
-    // ── Lock / wipe (lock_device / factory_reset commands) ─────────────
+    // ── Lock / unlock / wipe (lock_device / unlock_device / factory_reset) ──
+    // Device-ADMIN-gated (not Owner) — lockNow()/wipeData() genuinely work
+    // under a plain Device Admin grant. unlockDevice degrades honestly: it
+    // resolves success=false, keyguardDisabled=false when this device isn't
+    // Device Owner, since dismissing an EXISTING PIN needs that API — see
+    // DpcActions.unlockDevice's doc comment.
 
     @PluginMethod
     fun lockDevice(call: PluginCall) {
-        android.util.Log.d("VoiceKidsDpc", "lockDevice called")
-        runDeviceOwnerAction(call) {
-            // Re-enable the keyguard so the lock actually requires dismissal on wake.
-            // (A prior unlock_device disables it — without this, lockNow just turns the
-            //  screen off and the next power-press goes straight to the home screen.)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                try {
-                    dpm.setKeyguardDisabled(adminComponent, false)
-                    android.util.Log.d("VoiceKidsDpc", "setKeyguardDisabled(false) - keyguard re-enabled")
-                } catch (e: Exception) {
-                    android.util.Log.w("VoiceKidsDpc", "setKeyguardDisabled(false) failed: ${e.message}")
-                }
-            }
-            dpm.lockNow()
-            android.util.Log.d("VoiceKidsDpc", "lockNow() executed")
-            call.resolve(successResult())
+        runDeviceAdminAction(call) {
+            val success = DpcActions.lockDevice(context)
+            val result = JSObject()
+            result.put("success", success)
+            call.resolve(result)
         }
     }
 
     @PluginMethod
     fun unlockDevice(call: PluginCall) {
-        android.util.Log.d("VoiceKidsDpc", "unlockDevice called")
-        runDeviceOwnerAction(call) {
-            // 1. Dismiss the keyguard. Device Owner can disable it when no PIN is set.
-            //    DO NOT use ACTION_CLOSE_SYSTEM_DIALOGS (requires BROADCAST_CLOSE_SYSTEM_DIALOGS,
-            //    a system-only permission on Android 12+).
-            var keyguardDisabled = false
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                try {
-                    keyguardDisabled = dpm.setKeyguardDisabled(adminComponent, true)
-                    android.util.Log.d("VoiceKidsDpc", "setKeyguardDisabled(true) = $keyguardDisabled")
-                } catch (e: Exception) {
-                    android.util.Log.w("VoiceKidsDpc", "setKeyguardDisabled failed: ${e.message}")
-                }
-            }
-
-            // 2. WAKE the screen. This is the critical step that was missing — dismissing
-            //    the keyguard alone leaves the screen black/asleep. A wake lock with
-            //    ACQUIRE_CAUSES_WAKEUP turns the display back on (WAKE_LOCK perm is declared).
-            try {
-                val pm = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
-                @Suppress("DEPRECATION")
-                val wakeLock = pm.newWakeLock(
-                    android.os.PowerManager.FULL_WAKE_LOCK or
-                        android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP or
-                        android.os.PowerManager.ON_AFTER_RELEASE,
-                    "VoiceKidsDpc:unlock"
-                )
-                wakeLock.acquire(3000L)
-                wakeLock.release()
-                android.util.Log.d("VoiceKidsDpc", "wake lock acquired — screen woken")
-            } catch (e: Exception) {
-                android.util.Log.w("VoiceKidsDpc", "wake lock failed: ${e.message}")
-            }
-
-            // 3. Bring our activity to the front over the (now-dismissed) lock screen and
-            //    keep the screen on for this launch.
-            try {
-                activity?.runOnUiThread {
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
-                        activity?.setShowWhenLocked(true)
-                        activity?.setTurnScreenOn(true)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        activity?.window?.addFlags(
-                            android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                                android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-                        )
-                    }
-                    // Re-launch MainActivity so a backgrounded WebView is brought forward.
-                    val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                    launch?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                    if (launch != null) context.startActivity(launch)
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("VoiceKidsDpc", "Screen-on/foreground failed: ${e.message}")
-            }
-
-            android.util.Log.d("VoiceKidsDpc", "unlockDevice() executed, keyguardDisabled=$keyguardDisabled")
+        runDeviceAdminAction(call) {
+            val keyguardDisabled = DpcActions.unlockDevice(context)
             val result = JSObject()
-            result.put("success", true)
+            result.put("success", keyguardDisabled)
             result.put("keyguardDisabled", keyguardDisabled)
+            if (!keyguardDisabled) result.put("reason", "not_device_owner")
             call.resolve(result)
         }
     }
@@ -255,7 +247,7 @@ class VoiceKidsDpcPlugin : Plugin() {
      */
     @PluginMethod
     fun wipeDevice(call: PluginCall) {
-        runDeviceOwnerAction(call) {
+        runDeviceAdminAction(call) {
             dpm.wipeData(0)
             call.resolve(successResult())
         }
@@ -333,6 +325,30 @@ class VoiceKidsDpcPlugin : Plugin() {
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
+
+    /** Gates the default (no-reset) enforcement actions on plain Device Admin, not Owner. */
+    private fun runDeviceAdminAction(call: PluginCall, action: () -> Unit) {
+        if (!dpm.isAdminActive(adminComponent)) {
+            android.util.Log.e("VoiceKidsDpc", "NOT Device Admin!")
+            val result = JSObject()
+            result.put("success", false)
+            result.put("reason", "not_device_admin")
+            call.resolve(result)
+            return
+        }
+        try {
+            action()
+        } catch (e: SecurityException) {
+            android.util.Log.e("VoiceKidsDpc", "SecurityException: ${e.message}", e)
+            val result = JSObject()
+            result.put("success", false)
+            result.put("reason", "security_exception: ${e.message}")
+            call.resolve(result)
+        } catch (e: Exception) {
+            android.util.Log.e("VoiceKidsDpc", "Exception: ${e.message}", e)
+            call.reject(e.message ?: "Unknown DPC error", e)
+        }
+    }
 
     private fun runDeviceOwnerAction(call: PluginCall, action: () -> Unit) {
         android.util.Log.d("VoiceKidsDpc", "runDeviceOwnerAction: checking Device Owner status")

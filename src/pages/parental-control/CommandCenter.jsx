@@ -142,13 +142,23 @@ export default function CommandCenter({ devices }) {
       <div className="flex flex-wrap gap-2">
         {ACTIONS.map((action) => {
           const Icon = action.icon
-          const supported = targetDevices.some((d) => deviceSupports(d, action.capability))
+          // "Unlock now" needs setKeyguardDisabled(), a Device-Owner-only
+          // API — the default no-reset setup (Device Admin) can never do
+          // this, so it's gated on the optional Advanced mode being active
+          // rather than just platform support. See PLATFORM_LIMITATIONS.md.
+          const platformSupported = targetDevices.some((d) => deviceSupports(d, action.capability))
+          const supported = action.type === 'unlock_device'
+            ? platformSupported && targetDevices.some((d) => d.enforcement_state?.device_owner === true)
+            : platformSupported
+          const title = action.type === 'unlock_device' && platformSupported && !supported
+            ? 'Unlock isn\u2019t available — this device uses the standard (Device Admin) setup, not the optional Advanced (Device Owner) mode required to dismiss an existing lock screen'
+            : supported ? action.label : `${action.label} not supported on this device`
           return (
             <button
               key={action.type}
               disabled={sending || !supported}
               onClick={() => fire(action)}
-              title={supported ? action.label : `${action.label} not supported on this device`}
+              title={title}
               className={cn(
                 'flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-sm font-medium text-secondary-token disabled:opacity-50 disabled:cursor-not-allowed',
                 action.hover,
@@ -168,14 +178,15 @@ export default function CommandCenter({ devices }) {
       </div>
 
       {/* Real Android constraint, surfaced here rather than only in a doc no
-          parent will read: "Unlock now" turns the screen on but cannot bypass
-          an existing PIN/pattern/password — that's an OS restriction, not a
-          bug. If the child's phone has no lock-screen credential set, both
-          Lock and Unlock work as expected. */}
+          parent will read: with the standard (Device Admin, no factory
+          reset) setup, "Unlock now" is unavailable entirely — dismissing an
+          EXISTING PIN/pattern/password needs a Device-Owner-only API. Only
+          the optional Advanced (Device Owner) mode, which does require a
+          factory reset, can do that. See PLATFORM_LIMITATIONS.md. */}
       <p className="flex items-start gap-1.5 text-xs text-muted-token">
         <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-        "Unlock now" turns the screen on, but can't remove an existing PIN/pattern/password on the
-        child's device — that's an Android restriction, not a bug here.
+        "Unlock now" only works on devices set up in the optional Advanced (Device Owner) mode, and even
+        then can't remove an existing PIN/pattern/password — that's an Android restriction, not a bug here.
       </p>
 
       {/* Live command status feed */}

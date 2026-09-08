@@ -66,6 +66,7 @@ export const POLICY_SYNC_META = {
 
 /** Human-readable reason for a device.enforcement_state.last_error code. */
 export const ENFORCEMENT_ERROR_LABEL = {
+  not_device_admin: 'This device has not activated Device Admin yet, so screen lock and internet-pause cannot be enforced. Open VOICE on the device and finish setup.',
   not_device_owner: 'This device is not set up as Device Owner, so app rules cannot be enforced. It must be re-provisioned.',
   partial_apply_failure: 'Some rules could not be applied. The device will retry automatically.',
   no_usage_access: 'Usage Access permission was revoked, so time-limit rules cannot be checked.',
@@ -80,6 +81,11 @@ export function enforcementErrorLabel(code) {
  * (see PLATFORM_LIMITATIONS.md / SECURITY.md §40 self-diagnostic system).
  * Returns an ordered list of { ok, label } so the UI can render ✓ / ⚠ rows
  * without embedding this logic in a component.
+ *
+ * Enforcement model (see PLATFORM_LIMITATIONS.md / DpcActions.kt): the
+ * REQUIRED path is Device Admin + Accessibility (no factory reset). Device
+ * Owner is an OPTIONAL stronger "Advanced" mode — its absence is reported
+ * for visibility but does not fail the checklist.
  */
 export function diagnosticChecklist(device, child, now = Date.now()) {
   const state = device?.enforcement_state ?? {}
@@ -89,14 +95,26 @@ export function diagnosticChecklist(device, child, now = Date.now()) {
   return [
     { key: 'connected', ok: online, label: online ? 'Device connected' : 'Device offline' },
     {
-      key: 'device_owner',
-      ok: state.device_owner !== false,
-      label: state.device_owner === false ? 'Device Owner permission missing' : 'Device Owner active',
+      key: 'device_admin',
+      ok: state.device_admin !== false,
+      label: state.device_admin === false ? 'Device Admin not activated (lock/internet-pause inactive)' : 'Device Admin active',
+    },
+    {
+      key: 'accessibility_enabled',
+      ok: state.accessibility_enabled !== false,
+      label: state.accessibility_enabled === false ? 'Accessibility not enabled (app blocking & web monitoring inactive)' : 'Accessibility enabled',
     },
     {
       key: 'usage_access',
       ok: state.usage_access !== false,
       label: state.usage_access === false ? 'Usage Access permission missing (time limits inactive)' : 'Usage Access granted',
+    },
+    {
+      key: 'device_owner',
+      // Informational only — Device Owner is an optional stronger mode,
+      // never required, so its absence is never a checklist failure.
+      ok: true,
+      label: state.device_owner ? 'Advanced mode: Device Owner active' : 'Standard mode (Device Admin) — Advanced mode not set up',
     },
     {
       key: 'policy_sync',

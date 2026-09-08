@@ -16,28 +16,34 @@ import org.json.JSONObject
 /**
  * VoiceKidsAccessibilityService
  *
- * BEST-EFFORT browser-activity monitoring (website visits + search
- * queries) — the same technique real-world consumer parental-control apps
- * use on Android without Device Owner/MDM: reading the browser's own
- * address-bar text via the Accessibility API, keyed off each browser's
- * known view-id for that field (see BROWSER_URL_BAR_IDS below).
+ * Does two independent jobs, both keyed off the same TYPE_WINDOW_STATE_CHANGED
+ * events (this service now watches ALL apps, not just browsers — see
+ * accessibility_service_config.xml, which no longer restricts packageNames):
  *
- * Explicitly NOT a guarantee of complete coverage:
- *  - Only recognizes the browsers listed below, matched against
- *    `res/values/arrays.xml`'s monitored_browser_packages (which MUST be
- *    kept in sync with the keys of BROWSER_URL_BAR_IDS — the XML list is
- *    what actually filters which events this service even receives).
- *  - A browser UI update can rename its view id and silently break
- *    detection for that browser until this list is updated.
- *  - Incognito/private tabs behave however that specific browser chooses
- *    to expose (or hide) the same address-bar view — not guaranteed
- *    either way, never assume it is/isn't captured.
- *  - Requires the parent to manually enable "VOICE" under
- *    Settings > Accessibility > Installed apps on the CHILD device.
- *    Android does not allow any app to turn this on for itself — same
- *    category of manual, one-time step as Usage Access.
- * See PLATFORM_LIMITATIONS.md before presenting this as exhaustive
- * "we see everything" monitoring anywhere in the UI.
+ * 1. APP BLOCKING / SCHEDULES (see enforceForegroundApp below) — the
+ *    PRIMARY app-block mechanism for the default, no-factory-reset
+ *    enforcement model (Device Admin, not Device Owner). PolicyEnforcer.kt
+ *    writes the desired blocked/allow-list/block-all state into
+ *    VoiceKidsPrefs every pass; this service reads it and, the moment a
+ *    disallowed app comes to the foreground, calls
+ *    performGlobalAction(GLOBAL_ACTION_HOME) and shows a brief block
+ *    overlay (BlockOverlay.kt) if the overlay permission is granted.
+ *    This is a best-effort deterrent, not a hard OS-level lock — a
+ *    technically determined child could disable Accessibility for this
+ *    app in Settings. See PLATFORM_LIMITATIONS.md. (On a device that
+ *    additionally happens to be Device Owner, PolicyEnforcer ALSO applies
+ *    a real setPackagesSuspended()/lock-task, which this soft mechanism
+ *    then backs up rather than replaces.)
+ *
+ * 2. BEST-EFFORT browser-activity monitoring (website visits + search
+ *    queries) — reading the browser's own address-bar text, keyed off
+ *    each browser's known view-id (see BROWSER_URL_BAR_IDS below). Same
+ *    caveats as before: only recognizes listed browsers, a browser UI
+ *    update can silently break detection, incognito behavior is
+ *    browser-dependent, and it requires the parent to manually enable
+ *    "VOICE" under Settings > Accessibility on the CHILD device — same
+ *    category of manual step as Usage Access. See PLATFORM_LIMITATIONS.md
+ *    before presenting either of these as exhaustive/unbypassable.
  */
 class VoiceKidsAccessibilityService : AccessibilityService() {
 
@@ -52,11 +58,10 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
 
         // package -> candidate address-bar view-id local names (without the
         // "<package>:id/" prefix, which is built per-event from the actual
-        // reporting package). MUST be kept in sync with
-        // res/values/arrays.xml's monitored_browser_packages, which is the
-        // list that actually determines which apps' events reach this
-        // service at all (AndroidManifest -> accessibility_service_config.xml
-        // -> android:packageNames).
+        // reporting package). This is the ONLY gate on which packages get
+        // their address bar read (accessibility_service_config.xml no
+        // longer restricts packageNames, since enforceForegroundApp() below
+        // needs window-state events from every app, not just browsers).
         private val BROWSER_URL_BAR_IDS: Map<String, List<String>> = mapOf(
             "com.android.chrome" to listOf("url_bar"),
             "com.chrome.beta" to listOf("url_bar"),
@@ -77,6 +82,31 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
             Triple("duckduckgo.com", "q", "DuckDuckGo"),
             Triple("search.yahoo.com", "p", "Yahoo"),
         )
+
+        // Never kick these to home regardless of policy — mirrors
+        // PolicyEnforcer.kt's PROTECTED_PACKAGES / pc_is_protected_package().
+        // Must include our own package and the launcher, or a block_all
+        // schedule would lock the child out of the one screen that can fix it.
+        private val NEVER_BLOCK = setOf(
+            "com.surabhikunj.voice",
+            "com.android.systemui",
+            "com.android.settings",
+            "com.android.providers.settings",
+            "com.android.launcher3",
+            "com.google.android.apps.nexuslauncher",
+            "com.android.server.telecom",
+            "com.android.phone",
+            "com.android.dialer",
+            "com.google.android.dialer",
+            "com.android.emergency",
+            "com.android.incallui",
+            "android",
+        )
+
+        // Avoid re-triggering the kick-to-home/overlay every single time a
+        // WINDOW_STATE_CHANGED fires for the same still-foreground blocked
+        // app (multiple events can fire per app open).
+        private const val REBLOCK_COOLDOWN_MS = 1500L
     }
 
     private data class ParsedBar(val raw: String, val host: String, val searchEngine: String?, val searchQuery: String?)
@@ -85,9 +115,16 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private var pendingCheck: Runnable? = null
     private val lastLoggedByPackage = HashMap<String, String>()
+    private var lastBlockedPkg: String? = null
+    private var lastBlockedAt = 0L
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val pkg = event?.packageName?.toString() ?: return
+
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            enforceForegroundApp(pkg)
+        }
+
         if (!BROWSER_URL_BAR_IDS.containsKey(pkg)) return
         // Not enrolled/configured as a supervised device -> do nothing,
         // even if the toggle was somehow left on (e.g. after unenrolling).
@@ -101,6 +138,39 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         // Nothing to tear down — no persistent resources held between events.
+    }
+
+    /**
+     * Primary app-block enforcement for the default (Device Admin only, no
+     * factory reset) model. See PolicyEnforcer.kt for what writes the
+     * desired* state this reads, and DpcActions.kt's doc comment for the
+     * full enforcement model / why this exists alongside the optional
+     * Device Owner path.
+     */
+    private fun enforceForegroundApp(pkg: String) {
+        if (pkg == applicationContext.packageName) return
+        if (NEVER_BLOCK.contains(pkg)) return
+        if (!VoiceKidsPrefs.isConfigured(applicationContext)) return
+
+        val blockAllActive = VoiceKidsPrefs.desiredBlockAllActive(applicationContext)
+        val allowList = VoiceKidsPrefs.desiredAllowListPackages(applicationContext)
+        val blockedSet = VoiceKidsPrefs.desiredBlockedPackages(applicationContext)
+
+        val isBlocked = when {
+            blockAllActive -> true
+            allowList != null -> !allowList.contains(pkg)
+            else -> blockedSet.contains(pkg)
+        }
+        if (!isBlocked) return
+
+        val now = System.currentTimeMillis()
+        if (pkg == lastBlockedPkg && now - lastBlockedAt < REBLOCK_COOLDOWN_MS) return
+        lastBlockedPkg = pkg
+        lastBlockedAt = now
+
+        Log.i(TAG, "Blocking foreground app: $pkg")
+        performGlobalAction(GLOBAL_ACTION_HOME)
+        BlockOverlay.show(applicationContext)
     }
 
     private fun checkAddressBar(pkg: String) {

@@ -94,71 +94,95 @@ object PolicyEnforcer {
             return // nothing changed since the last successful pass
         }
 
-        if (!DpcActions.isDeviceOwner(context)) {
-            reportEnforcementState(context, deviceId, mapOf(
-                "device_owner" to false,
-                "usage_access" to usageAvailable,
-                "desired_blocked" to JSONArray(blockList),
-                "suspended_count" to 0,
-                "last_error" to "not_device_owner",
-            ))
-            return
-        }
+        val deviceAdmin = DpcActions.isDeviceAdmin(context)
+        val deviceOwner = DpcActions.isDeviceOwner(context)
+        // Accessibility-based soft blocking (VoiceKidsAccessibilityService)
+        // needs no Device Admin/Owner at all — it's a separate OS permission.
+        // Device Admin is only needed here for lockDevice()/pauseInternet().
+        // We always write the desired block/allow state below regardless of
+        // deviceAdmin, so a device with only Accessibility enabled (no admin
+        // yet) still gets real app-blocking — just not lockNow()/VPN pause.
 
         var ok = true
 
         // ── Schedule-level enforcement ──────────────────────────────────
+        // Soft-lock state (desired*) is always written for
+        // VoiceKidsAccessibilityService to enforce, regardless of Device
+        // Admin/Owner status. Device Owner additionally gets the harder
+        // OS-level lock-task/suspend calls as a bonus (see DpcActions.kt).
         if (activeSchedule != null) {
             val action = activeSchedule.optString("action")
             when (action) {
                 "block_all" -> {
                     val allowed = jsonStringArray(activeSchedule.optJSONArray("always_allowed_packages"))
-                    ok = if (allowed.isNotEmpty()) DpcActions.setAllowedPackages(context, allowed)
-                         else DpcActions.lockDevice(context)
+                    if (allowed.isNotEmpty()) {
+                        VoiceKidsPrefs.setDesiredAllowListPackages(context, allowed.toSet())
+                        VoiceKidsPrefs.setDesiredBlockAllActive(context, false)
+                        if (deviceOwner) ok = DpcActions.setAllowedPackages(context, allowed)
+                    } else {
+                        VoiceKidsPrefs.setDesiredBlockAllActive(context, true)
+                        VoiceKidsPrefs.setDesiredAllowListPackages(context, null)
+                        // Best-effort hard lock too (works if no PIN is set, or under
+                        // Device Owner); the Accessibility soft-lock above is the
+                        // real guarantee when this doesn't fully hold.
+                        if (deviceAdmin) DpcActions.lockDevice(context)
+                    }
                 }
-                "block_internet" -> ok = DpcActions.pauseInternet(context)
+                "block_internet" -> {
+                    VoiceKidsPrefs.setDesiredAllowListPackages(context, null)
+                    VoiceKidsPrefs.setDesiredBlockAllActive(context, false)
+                    ok = DpcActions.pauseInternet(context)
+                }
                 "allow_list_only" -> {
                     val allowed = jsonStringArray(activeSchedule.optJSONArray("always_allowed_packages"))
-                    ok = DpcActions.setAllowedPackages(context, allowed)
+                    VoiceKidsPrefs.setDesiredAllowListPackages(context, allowed.toSet())
+                    VoiceKidsPrefs.setDesiredBlockAllActive(context, false)
+                    if (deviceOwner) ok = DpcActions.setAllowedPackages(context, allowed)
                 }
             }
             VoiceKidsPrefs.setAppliedScheduleLock(context, true)
         } else if (appliedScheduleLock) {
-            DpcActions.unlockDevice(context)
+            VoiceKidsPrefs.setDesiredAllowListPackages(context, null)
+            VoiceKidsPrefs.setDesiredBlockAllActive(context, false)
+            if (deviceAdmin) DpcActions.unlockDevice(context)
             DpcActions.resumeInternet(context)
             VoiceKidsPrefs.setAppliedScheduleLock(context, false)
         }
 
         // ── Per-app reconciliation ──────────────────────────────────────
-        val appliedSuspended = VoiceKidsPrefs.appliedSuspended(context)
+        // Primary mechanism: write the desired set for
+        // VoiceKidsAccessibilityService to enforce (works under Device
+        // Admin only, no reset needed). Device Owner additionally gets a
+        // real setPackagesSuspended() call as a stronger bonus layer.
         val desiredSet = blockList.filterNot { isProtectedPackage(it) }.toSet()
-        val toSuspend = (desiredSet - appliedSuspended).toList()
-        val toUnsuspend = (appliedSuspended - desiredSet).filterNot { isProtectedPackage(it) }
+        VoiceKidsPrefs.setDesiredBlockedPackages(context, desiredSet)
 
         var suspendOk = true
-        if (toSuspend.isNotEmpty()) {
-            val failed = DpcActions.setPackagesSuspended(context, toSuspend, true)
-            suspendOk = failed != null
-        }
-        var unsuspendOk = true
-        if (toUnsuspend.isNotEmpty()) {
-            val failed = DpcActions.setPackagesSuspended(context, toUnsuspend, false)
-            unsuspendOk = failed != null
+        if (deviceOwner) {
+            val appliedSuspended = VoiceKidsPrefs.appliedSuspended(context)
+            val toSuspend = (desiredSet - appliedSuspended).toList()
+            val toUnsuspend = (appliedSuspended - desiredSet).filterNot { isProtectedPackage(it) }
+            if (toSuspend.isNotEmpty()) suspendOk = DpcActions.setPackagesSuspended(context, toSuspend, true) != null
+            if (toUnsuspend.isNotEmpty()) suspendOk = suspendOk && DpcActions.setPackagesSuspended(context, toUnsuspend, false) != null
+            if (suspendOk) VoiceKidsPrefs.setAppliedSuspended(context, desiredSet)
         }
 
-        val settled = suspendOk && unsuspendOk && ok
+        val settled = suspendOk && ok
         if (settled) {
-            VoiceKidsPrefs.setAppliedSuspended(context, desiredSet)
             VoiceKidsPrefs.setAppliedSignature(context, signature)
         } else {
             VoiceKidsPrefs.setAppliedSignature(context, null) // force retry next tick
         }
 
         reportEnforcementState(context, deviceId, mapOf(
-            "device_owner" to true,
+            "device_admin" to deviceAdmin,
+            "device_owner" to deviceOwner,
+            "accessibility_enabled" to AccessibilityStatus.isEnabled(context),
+            "overlay_granted" to DpcActions.canDrawOverlays(context),
+            "vpn_consent" to DpcActions.hasVpnConsent(context),
             "usage_access" to usageAvailable,
             "active_schedule" to (activeSchedule?.optString("name")),
-            "suspended_count" to (if (settled) desiredSet.size else appliedSuspended.size),
+            "desired_blocked_count" to desiredSet.size,
             "last_error" to if (settled) null else "partial_apply_failure",
         ))
     }

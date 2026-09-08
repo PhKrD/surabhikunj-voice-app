@@ -97,4 +97,44 @@ object VoiceKidsPrefs {
     }
 
     fun isBonusActive(context: Context): Boolean = bonusExpiresAt(context) > System.currentTimeMillis()
+
+    // ── Desired enforcement state for Accessibility-based soft blocking ──
+    // Written by PolicyEnforcer every pass, read by VoiceKidsAccessibilityService
+    // on every TYPE_WINDOW_STATE_CHANGED event. This is the primary app-block
+    // mechanism for devices that are Device Admin only (the default, no-reset
+    // path) — see DpcActions.kt's doc comment for the full enforcement model.
+
+    /** Packages that should be kicked to home the moment they come to the foreground. */
+    fun desiredBlockedPackages(context: Context): Set<String> =
+        prefs(context).getStringSet("desired_blocked_packages", emptySet()) ?: emptySet()
+
+    fun setDesiredBlockedPackages(context: Context, packages: Set<String>) {
+        prefs(context).edit().putStringSet("desired_blocked_packages", packages).apply()
+    }
+
+    /**
+     * Non-null while an allow_list_only (or block_all with a non-empty
+     * always-allowed list) schedule is active: only these packages may be
+     * in the foreground, everything else gets kicked home. Null = no
+     * allow-list restriction currently active.
+     */
+    fun desiredAllowListPackages(context: Context): Set<String>? =
+        if (prefs(context).getBoolean("desired_allow_list_active", false))
+            prefs(context).getStringSet("desired_allow_list_packages", emptySet()) ?: emptySet()
+        else null
+
+    fun setDesiredAllowListPackages(context: Context, packages: Set<String>?) {
+        prefs(context).edit()
+            .putBoolean("desired_allow_list_active", packages != null)
+            .putStringSet("desired_allow_list_packages", packages ?: emptySet())
+            .apply()
+    }
+
+    /** True while a block_all schedule with NO always-allowed apps is active (hard lock attempt + soft-lock fallback). */
+    fun desiredBlockAllActive(context: Context): Boolean =
+        prefs(context).getBoolean("desired_block_all_active", false)
+
+    fun setDesiredBlockAllActive(context: Context, active: Boolean) {
+        prefs(context).edit().putBoolean("desired_block_all_active", active).apply()
+    }
 }

@@ -32,9 +32,38 @@ export const dpc = {
     return NativeDpc.isDeviceOwner()
   },
 
+  /** Opens the system "Activate this device admin app?" screen — one tap, no reset needed. */
+  async requestDeviceAdmin() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.requestDeviceAdmin()
+  },
+
+  /** OPTIONAL "Advanced" mode only — still requires a factory reset. Not part of the default setup flow. */
   async getProvisioningPayload() {
     if (!isNative()) return webFallback()
     return NativeDpc.getProvisioningPayload()
+  },
+
+  /** "Draw over other apps" — used for the brief block-screen shown when a disallowed app is kicked to home. */
+  async canDrawOverlays() {
+    if (!isNative()) return { granted: false }
+    return NativeDpc.canDrawOverlays()
+  },
+
+  async requestOverlayPermission() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.requestOverlayPermission()
+  },
+
+  /** One-time system consent needed before pause_internet/resume_internet can work. */
+  async hasVpnConsent() {
+    if (!isNative()) return { granted: false }
+    return NativeDpc.hasVpnConsent()
+  },
+
+  async requestVpnConsent() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.requestVpnConsent()
   },
 
   async suspendPackages(packages) {

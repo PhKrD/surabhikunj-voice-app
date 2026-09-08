@@ -6,62 +6,104 @@ cannot find code for.
 
 | Feature                        | Android | iOS | Windows | macOS | Web (browser) |
 |---------------------------------|:-------:|:---:|:-------:|:-----:|:--------------:|
-| App block / allow                | FULL (foreground + background) | NONE | NONE | NONE | NONE |
-| App daily time limit              | FULL (foreground + background) | NONE | NONE | NONE | NONE |
-| Schedules (block_all / kiosk)     | FULL (foreground + background) | NONE | NONE | NONE | NONE |
-| Schedules (internet-only block)   | FULL (foreground + background) | NONE | NONE | NONE | NONE |
-| Device lock                       | FULL — but only a real deterrent if the child device has NO lock-screen PIN/pattern set (see below) | NONE | NONE | NONE | NONE |
-| Device unlock (remote)            | PARTIAL — cannot dismiss an existing PIN/pattern/password (see below) | NONE | NONE | NONE | NONE |
-| Internet pause / resume           | FULL (local VPN) | NONE | NONE | NONE | NONE |
-| Screen-time daily cap             | FULL (foreground + background) | NONE | NONE | NONE | NONE |
+| App block / allow                | FULL, no reset required (Accessibility soft-block; Device Owner adds a harder OS-level suspend as an optional bonus — see below) | NONE | NONE | NONE | NONE |
+| App daily time limit              | FULL, no reset required (same mechanism as app block) | NONE | NONE | NONE | NONE |
+| Schedules (block_all / kiosk)     | SOFT LOCK, no reset required — see "Soft lock vs. hard kiosk" below | NONE | NONE | NONE | NONE |
+| Schedules (internet-only block)   | FULL, no reset required (one-time VPN consent — see below) | NONE | NONE | NONE | NONE |
+| Device lock                       | FULL, no reset required (`lockNow()` works under plain Device Admin) — real deterrent only if the child device has NO lock-screen PIN/pattern set | NONE | NONE | NONE | NONE |
+| Device unlock (remote)            | ADVANCED MODE ONLY — requires the optional Device Owner setup (factory reset); unavailable in the default setup at all (see below) | NONE | NONE | NONE | NONE |
+| Internet pause / resume           | FULL, no reset required (local VPN + one-time consent) | NONE | NONE | NONE | NONE |
+| Screen-time daily cap             | FULL, no reset required | NONE | NONE | NONE | NONE |
 | Website allow/block list          | SCHEMA ONLY — no enforcement | NONE | NONE | NONE | NONE |
-| Website visit / search monitoring | BEST-EFFORT (Accessibility Service, requires Usage Access-style manual grant — see below) | NONE | NONE | NONE | NONE |
+| Website visit / search monitoring | BEST-EFFORT (Accessibility Service, requires a manual one-time grant — see below) | NONE | NONE | NONE | NONE |
 | Location tracking                 | FULL    | PARTIAL (native MDM/Screen Time API would be required) | NONE | NONE | NONE |
 | Geofencing                        | FULL    | NONE | NONE | NONE | NONE |
 | App usage reporting               | FULL    | NONE | NONE | NONE | NONE |
 | SOS / panic button                | FULL    | NONE | NONE | NONE | NONE |
 | Bonus time requests               | FULL    | NONE | NONE | NONE | NONE |
-| Factory reset (remote wipe)       | FULL (Device Owner only) | NONE | NONE | NONE | NONE |
+| Factory reset (remote wipe)       | FULL, no reset required (`wipeData()` works under plain Device Admin) | NONE | NONE | NONE | NONE |
 | Remote device diagnostics         | FULL (this release) | NONE | NONE | NONE | NONE |
 
-## Why Android-only, and why Device Owner specifically
+## Enforcement model: Device Admin + Accessibility (default), Device Owner (optional "Advanced" mode)
 
-Every enforcement primitive here (`setPackagesSuspended`, `setLockTaskPackages`,
-`lockNow`, `wipeData`, the local drop-all VPN) is a **Device Owner–only**
-Android API. Under plain Device Admin these either throw `SecurityException`
-or silently no-op. Device Owner can only be established at
-factory-reset/first-boot time (QR provisioning) or via `adb shell dpm
-set-device-owner` on a device with zero accounts — there is no way to grant
-it after the fact without wiping the device. This is an Android platform
-restriction, not a design choice we can work around.
+**As of this rewrite, no factory reset is required to set up parental
+control at all.** The default enforcement model is:
 
-**What happens when a device is NOT Device Owner:** every native call
-degrades to `{ success: false, reason: 'not_device_owner' }` instead of
-throwing or lying about success (`VoiceKidsDpcPlugin.runDeviceOwnerAction`).
-`ruleEngine.js` reports this to `pc_devices.enforcement_state.last_error`,
-which the parent Devices tab surfaces as "App blocking is not active on
-this device" rather than showing a false "Rules active" state.
+- **Device Admin** (`DpcActions.isDeviceAdmin`) — a normal one-tap "Activate
+  this device admin app?" grant on an already-set-up phone (Settings →
+  triggered by the in-app setup checklist's "Activate device admin"
+  button). This alone makes `lockNow()` and `wipeData()` genuinely work
+  (`res/xml/device_admin_policies.xml` declares `force-lock`/`wipe-data` —
+  these are legacy Device Admin policies, NOT Device-Owner-only APIs,
+  contrary to how this doc used to describe them).
+- **Accessibility Service** (`VoiceKidsAccessibilityService.kt`) — the
+  PRIMARY app-block/schedule-enforcement mechanism. It watches
+  `TYPE_WINDOW_STATE_CHANGED` events for every app (not just browsers —
+  `accessibility_service_config.xml` no longer restricts `packageNames`)
+  and, the instant a disallowed app comes to the foreground, calls
+  `performGlobalAction(GLOBAL_ACTION_HOME)` plus shows a brief "This app is
+  blocked" overlay if the optional "Draw over other apps" permission is
+  granted. `PolicyEnforcer.kt` writes the desired blocked/allow-list/
+  block-all state into `VoiceKidsPrefs` every enforcement pass; this
+  service reads it. **Verified for real** on an emulator provisioned as
+  plain Device Admin (explicitly NOT Device Owner — confirmed via
+  `dumpsys device_policy` showing `Device Owner Type: -1`): a package
+  marked blocked was genuinely kicked back to the launcher the instant it
+  opened, logged as `VoiceKidsA11y: Blocking foreground app: ...`.
+- **One-time VPN consent** (`DpcActions.hasVpnConsent`/`requestVpnConsent`)
+  — the standard system "Allow VOICE to set up a VPN connection?" dialog,
+  needed once for internet-pause to work.
 
-**Getting a device to actually become Device Owner is a manual, technical
-step the app does NOT walk a parent through today.** `DeviceModeSetupPage.jsx`
-lets a parent pick "This is my child's device" and enter a pairing code, but
-that alone never grants Device Owner — Android requires either QR
-provisioning at factory-reset time (not implemented — `getProvisioningPayload()`
-still has a placeholder APK URL) or running, from a computer with adb, before
-any account exists on the phone:
-```
-adb shell dpm set-device-owner com.surabhikunj.voice/.dpc.VoiceKidsDeviceAdminReceiver
-```
-Skipping this step is the single most common reason "nothing works" — every
-lock/unlock/pause/resume/block command will fail with `not_device_owner` and
-the Devices tab will show "Not enrolled", but a parent who doesn't know to
-check that badge has no other signal until they read the failed-command
-alert. This needs a much more prominent in-app setup flow; tracked as a TODO.
+All three are ordinary Android permission grants a parent can complete
+entirely within the app's setup checklist (`SetupChecklistCard.jsx`, shown
+on the child device's home screen) — no computer, no adb, no factory
+reset, no QR code.
+
+### Soft lock vs. hard kiosk
+
+Without Device Owner, `block_all`/`allow_list_only` schedules cannot use a
+true OS-level lock-task (`startLockTask()`/`setLockTaskPackages()` are
+Device-Owner-only). Instead, the same Accessibility mechanism above kicks
+any disallowed app back to home the moment it's opened — functionally
+similar to how real consumer apps like Qustodio/Bark implement "kiosk"
+enforcement, but it is a **best-effort deterrent, not an unbypassable
+lock**. A technically determined child could interrupt it for a second or
+two before being kicked out again, or go disable Accessibility for VOICE
+under Settings entirely (the same tamper vector every non-Device-Owner
+parental control app on Android has — there is no way around this without
+the optional Advanced mode below).
+
+### Optional "Advanced" mode — Device Owner (still requires a factory reset)
+
+The original Device-Owner-only code path (`setPackagesSuspended`,
+`setLockTaskPackages`/real kiosk, `setKeyguardDisabled` for
+`unlockDevice`) is kept working and covered, but is entirely OPTIONAL and
+not part of the default setup flow — nothing prompts a parent to do this.
+When a device happens to be Device Owner (set up the old way, via QR
+provisioning or `adb shell dpm set-device-owner` on a device with zero
+accounts), `PolicyEnforcer.kt` additionally applies the harder OS-level
+suspend/lock-task calls as a bonus layer on top of the Accessibility
+soft-block, and `unlockDevice` (dismissing an EXISTING PIN/pattern) becomes
+available — that specific capability needs `setKeyguardDisabled()`, which
+has no Device-Admin equivalent at all and is impossible under the default
+setup. The parent Devices tab's diagnostic checklist reports Device Owner
+status as informational only ("Standard mode" vs. "Advanced mode active")
+— its absence is never treated as an error.
+
+**What happens when a device is missing a REQUIRED permission (Device
+Admin or Accessibility):** every native call/enforcement pass degrades to
+a truthful `{ success: false, reason: 'not_device_admin' }` (or simply
+skips the Accessibility-based block) instead of throwing or lying about
+success. `PolicyEnforcer.kt` reports this to
+`pc_devices.enforcement_state`, which the parent Devices tab surfaces as
+specific actionable checklist rows ("Device Admin not activated",
+"Accessibility not enabled") rather than a vague failure.
 
 ## Device lock / unlock — real Android constraints
 
-`lockNow()` (Device Owner API) locks the screen using whatever lock-screen
-security is *currently configured on the device*:
+`lockNow()` works under plain Device Admin (no Device Owner/reset needed —
+see the enforcement model above) and locks the screen using whatever
+lock-screen security is *currently configured on the device*:
   - **If the child's phone has NO PIN/pattern/password set**, `lockNow()`
     only turns the screen off. Pressing power turns it back on with a plain
     swipe — there is no credential prompt, so the child can trivially
@@ -69,12 +111,14 @@ security is *currently configured on the device*:
   - **If the child's phone HAS a PIN/pattern/password set** (the normal
     state of almost every personal phone), `lockNow()` correctly requires
     that credential to dismiss — but then "Unlock Now" from the parent
-    **cannot bypass it**. `setKeyguardDisabled(true)` (the only Device-Owner
-    API that can disable the keyguard) only succeeds when the device has no
-    secure lock screen to begin with; it cannot and must not be able to
-    dismiss one that already exists — Android intentionally does not expose
-    that capability to any app, Device Owner or not, since it would be a
-    severe security hole.
+    **cannot bypass it** in the default setup at all. `setKeyguardDisabled(true)`
+    (the only API that can disable the keyguard) is Device-Owner-only, so
+    it's available exclusively in the optional Advanced mode above, and
+    even then only succeeds when the device has no secure lock screen to
+    begin with — it cannot and must not be able to dismiss one that
+    already exists — Android intentionally does not expose that capability
+    to any app, Device Owner or not, since it would be a severe security
+    hole.
 
 **There is no way to make "remote unlock past an existing real PIN" work**
 via public Android APIs. The only two honest options are: (a) require the

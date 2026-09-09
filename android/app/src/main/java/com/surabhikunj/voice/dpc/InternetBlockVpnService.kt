@@ -5,45 +5,98 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import java.io.FileDescriptor
 import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.IOException
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /**
  * InternetBlockVpnService
  *
- * A minimal VPN that captures ALL device traffic and silently drops it, effectively
- * cutting off internet for every app — EXCEPT the VOICE Kids app itself, which is
- * exempted via addDisallowedApplication() so the background monitoring service can
- * still reach Supabase and receive the parent's resume_internet command.
+ * A local VPN with two independent modes, both built on the same
+ * VpnService/TUN mechanism, so only one ever needs to hold the single
+ * VPN session Android allows an app at a time:
  *
- * Usage (called from DpcActions):
- *   1. Device Owner calls dpm.setAlwaysOnVpnPackage(...) → grants VPN permission silently.
- *   2. InternetBlockVpnService.start(context)  → internet blocked for child.
- *   3. InternetBlockVpnService.stop(context)   → internet restored for child.
+ *   MODE_BLOCK_ALL — captures ALL device traffic and silently drops it,
+ *     used for pause_internet / block_internet schedules. Unchanged from
+ *     the original implementation.
  *
- * IMPORTANT — no startForeground() call here:
- *   VpnService is special: the Android OS automatically promotes any service that
- *   has an active VPN interface (via Builder.establish()) to the foreground and
- *   shows the system VPN key notification.  Calling startForeground() ourselves
- *   would require declaring a foregroundServiceType in the manifest (and on
- *   API 34+ this causes a crash if the type isn't recognised for VPN).
- *   Removing that call is the correct, documented approach for VpnService.
+ *   MODE_DNS_FILTER — real domain-level website blocking for
+ *     pc_website_rules (see PLATFORM_LIMITATIONS.md "Website filtering"
+ *     — this is the enforcement counterpart to the schema that used to
+ *     be enforcement-less). Only DNS-port UDP traffic (plus a short list
+ *     of known public DoH resolver IPs, on any port, so we can drop their
+ *     non-DNS-port traffic too — see KNOWN_DOH_IPS below) is ever routed
+ *     into this VPN at all; everything else — every other IP, every
+ *     other port — bypasses the tunnel completely and is untouched. This
+ *     is the same "DNS-only local VPN" technique apps like DNS66/AdGuard
+ *     use, chosen deliberately over a full drop-everything tunnel so
+ *     normal browsing/streaming/etc. is unaffected except for the
+ *     specific blocked domains.
  *
- * Works on Android 7.0+ (API 24+, where setAlwaysOnVpnPackage is available).
+ *     Blocked domains get an immediate synthetic NXDOMAIN reply (built by
+ *     DnsFilterEngine, no real network round-trip). Everything else is
+ *     forwarded to a real public resolver (Cloudflare 1.1.1.1) via a
+ *     plain socket that automatically bypasses this same VPN (our own
+ *     app is addDisallowedApplication()-exempted below) and the reply is
+ *     relayed back verbatim.
+ *
+ *     HONEST LIMITATION: a browser hardwired to use its OWN DNS-over-HTTPS
+ *     resolver (e.g. Chrome/Firefox defaulting to Cloudflare/Google DoH)
+ *     ignores the system DNS server entirely, bypassing this filter. We
+ *     mitigate this by also routing KNOWN_DOH_IPS into the tunnel and
+ *     dropping any non-port-53 traffic to them outright (forcing that
+ *     specific DoH connection to fail closed, which makes well-behaved
+ *     browsers fall back to system DNS — which we do filter). This is
+ *     best-effort, not exhaustive: a resolver IP outside this short list
+ *     is not intercepted at all. Document this to parents; never claim
+ *     "guaranteed" website blocking.
+ *
+ * IMPORTANT — no startForeground() call here: see the original doc
+ * comment below (VpnService auto-promotes itself once a VPN interface is
+ * established; calling startForeground() ourselves would need a
+ * foregroundServiceType and crashes on API 34+ for VPN).
  */
 class InternetBlockVpnService : VpnService() {
 
     private var vpnInterface: ParcelFileDescriptor? = null
     @Volatile private var running = false
+    @Volatile private var mode: String = MODE_BLOCK_ALL
+    private var dnsDispatchExecutor: ExecutorService? = null
 
     companion object {
         private const val TAG = "VoiceKidsVPN"
+        const val MODE_BLOCK_ALL = "block_all"
+        const val MODE_DNS_FILTER = "dns_filter"
+        private const val EXTRA_MODE = "mode"
 
-        fun start(context: Context) {
+        private const val FAKE_DNS_IP = "10.200.200.1"
+        private const val UPSTREAM_DNS_IP = "1.1.1.1" // Cloudflare — forwarded via a socket our own app is exempt from this VPN for
+
+        // Known public DoH/DoT resolver IPs. Routed into our tunnel ONLY so
+        // we can drop their non-DNS-port (443/853) traffic outright — see
+        // the class doc comment's "HONEST LIMITATION" above. Plain port-53
+        // traffic to any of these still works normally (proxied/filtered
+        // like any other DNS query); this list is best-effort, not
+        // exhaustive.
+        private val KNOWN_DOH_IPS = listOf(
+            "1.1.1.1", "1.0.0.1",               // Cloudflare
+            "8.8.8.8", "8.8.4.4",               // Google
+            "9.9.9.9", "149.112.112.112",       // Quad9
+            "208.67.222.222", "208.67.220.220", // OpenDNS
+        )
+
+        fun start(context: Context, mode: String = MODE_BLOCK_ALL) {
+            val intent = Intent(context, InternetBlockVpnService::class.java).putExtra(EXTRA_MODE, mode)
             // Plain startService() — VpnService handles its own foreground state
             // once Builder.establish() succeeds; startForegroundService() is NOT
             // needed here and would require a foregroundServiceType on API 34+.
-            context.startService(Intent(context, InternetBlockVpnService::class.java))
+            context.startService(intent)
         }
 
         fun stop(context: Context) {
@@ -52,6 +105,14 @@ class InternetBlockVpnService : VpnService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val requestedMode = intent?.getStringExtra(EXTRA_MODE) ?: MODE_BLOCK_ALL
+        if (running && requestedMode != mode) {
+            // Mode switch (e.g. a block_internet schedule starts while the
+            // DNS filter was running) — tear down and re-establish under
+            // the new mode rather than trying to mutate a live TUN.
+            stopVpn()
+        }
+        mode = requestedMode
         startVpn()
         return START_STICKY
     }
@@ -59,42 +120,39 @@ class InternetBlockVpnService : VpnService() {
     private fun startVpn() {
         if (running) return
         try {
-            val vpnBuilder = Builder()
-                .setSession("VOICE Kids – Internet Paused")
-                // Tunnel address — any unused LAN address will do
-                .addAddress("10.200.200.1", 32)
-                // Route ALL IPv4 and IPv6 through this VPN (drop-everything tunnel)
-                .addRoute("0.0.0.0", 0)
-                .addRoute("::", 0)
-                // Our own app bypasses the VPN so the monitoring service keeps
-                // Supabase connectivity and can receive the resume_internet command.
+            val builder = Builder()
+                .addAddress(FAKE_DNS_IP, 32)
+                // Our own app bypasses the VPN entirely so the monitoring
+                // service keeps Supabase connectivity, receives commands,
+                // and our own DNS-forwarding socket (MODE_DNS_FILTER) never
+                // loops back through the tunnel it created.
                 .addDisallowedApplication(packageName)
 
-            vpnInterface = vpnBuilder.establish() ?: run {
+            if (mode == MODE_DNS_FILTER) {
+                builder.setSession("VOICE — Website filtering")
+                    .addDnsServer(FAKE_DNS_IP)
+                    .addRoute(FAKE_DNS_IP, 32)
+                KNOWN_DOH_IPS.forEach { ip ->
+                    try { builder.addRoute(ip, 32) } catch (e: Exception) { /* duplicate/invalid — ignore, best-effort list */ }
+                }
+            } else {
+                builder.setSession("VOICE — Internet Paused")
+                    .addRoute("0.0.0.0", 0)
+                    .addRoute("::", 0)
+            }
+
+            vpnInterface = builder.establish() ?: run {
                 Log.e(TAG, "VPN establish() returned null — VPN permission not granted yet")
                 stopSelf()
                 return
             }
 
             running = true
-            Log.i(TAG, "VPN started — internet blocked for all apps except $packageName")
+            Log.i(TAG, "VPN started in mode=$mode")
 
-            // Drain the VPN interface on a background thread.
-            // Reading packets and discarding them == no forwarding == no internet for captured apps.
             val fd = vpnInterface!!.fileDescriptor
             Thread {
-                val buf = ByteArray(32_767)
-                val stream = FileInputStream(fd)
-                try {
-                    while (running) {
-                        val n = stream.read(buf)
-                        if (n < 0) break
-                        // Intentionally discard — drop the packet
-                    }
-                } catch (e: IOException) {
-                    // Normal when vpnInterface.close() is called from stopVpn()
-                }
-                Log.i(TAG, "VPN drain thread finished")
+                if (mode == MODE_DNS_FILTER) runDnsFilterLoop(fd) else runDropAllLoop(fd)
             }.apply { isDaemon = true; start() }
 
         } catch (e: Exception) {
@@ -103,11 +161,109 @@ class InternetBlockVpnService : VpnService() {
         }
     }
 
+    /** MODE_BLOCK_ALL: read and discard every packet — no forwarding == no internet for any captured app. */
+    private fun runDropAllLoop(fd: FileDescriptor) {
+        val buf = ByteArray(32_767)
+        val stream = FileInputStream(fd)
+        try {
+            while (running) {
+                val n = stream.read(buf)
+                if (n < 0) break
+                // Intentionally discard — drop the packet
+            }
+        } catch (e: IOException) {
+            // Normal when vpnInterface.close() is called from stopVpn()
+        }
+        Log.i(TAG, "drop-all drain thread finished")
+    }
+
+    /** MODE_DNS_FILTER: the only packets that ever arrive here are DNS-port UDP (or non-DNS traffic to a KNOWN_DOH_IPS entry, which we intentionally drop by never forwarding it). */
+    private fun runDnsFilterLoop(fd: FileDescriptor) {
+        val input = FileInputStream(fd)
+        val output = FileOutputStream(fd)
+        val buf = ByteArray(32_767)
+        // Each query is forwarded on its own worker so one slow/unresponsive
+        // upstream lookup never stalls reading the NEXT packet off the tun —
+        // real browsing fires many DNS lookups back-to-back.
+        val executor = Executors.newFixedThreadPool(4)
+        dnsDispatchExecutor = executor
+        try {
+            while (running) {
+                val n = input.read(buf)
+                if (n < 0) break
+                val packet = buf.copyOf(n)
+                try {
+                    handleDnsPacket(packet, output, executor)
+                } catch (e: Exception) {
+                    Log.w(TAG, "handleDnsPacket error: ${e.message}")
+                }
+            }
+        } catch (e: IOException) {
+            // Normal when vpnInterface.close() is called from stopVpn()
+        } finally {
+            executor.shutdownNow()
+            dnsDispatchExecutor = null
+        }
+        Log.i(TAG, "dns-filter loop finished")
+    }
+
+    private fun handleDnsPacket(buf: ByteArray, output: FileOutputStream, executor: ExecutorService) {
+        val datagram = DnsFilterEngine.parseIpv4Udp(buf, buf.size) ?: return
+        // Anything other than DNS-port UDP arriving here can only be
+        // non-DNS traffic to a KNOWN_DOH_IPS address (that's the only
+        // other thing routed into this tunnel) — intentionally dropped by
+        // doing nothing, which forces that specific DoH connection closed.
+        if (datagram.dstPort != DnsFilterEngine.DNS_PORT) return
+        if (datagram.payloadLength < 12) return
+
+        val dnsQuery = buf.copyOfRange(datagram.payloadOffset, datagram.payloadOffset + datagram.payloadLength)
+        val domain = DnsFilterEngine.extractQuestionName(dnsQuery, dnsQuery.size)
+
+        if (domain != null && DnsFilterEngine.isBlocked(domain, VoiceKidsPrefs.blockedDomains(applicationContext))) {
+            Log.i(TAG, "DNS blocked: $domain")
+            val response = DnsFilterEngine.buildBlockedResponsePacket(datagram, dnsQuery, dnsQuery.size)
+            writePacket(output, response)
+            return
+        }
+
+        executor.execute { forwardToUpstream(datagram, dnsQuery, output, domain) }
+    }
+
+    private fun forwardToUpstream(datagram: DnsFilterEngine.UdpDatagram, dnsQuery: ByteArray, output: FileOutputStream, domain: String?) {
+        try {
+            DatagramSocket().use { socket ->
+                socket.soTimeout = 4000
+                val upstreamAddr = InetAddress.getByName(UPSTREAM_DNS_IP)
+                socket.send(DatagramPacket(dnsQuery, dnsQuery.size, upstreamAddr, DnsFilterEngine.DNS_PORT))
+
+                val replyBuf = ByteArray(1500)
+                val reply = DatagramPacket(replyBuf, replyBuf.size)
+                socket.receive(reply)
+
+                val response = DnsFilterEngine.buildForwardedResponsePacket(datagram, replyBuf.copyOf(reply.length))
+                writePacket(output, response)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Upstream DNS forward failed for domain=$domain: ${e.message}")
+        }
+    }
+
+    private fun writePacket(output: FileOutputStream, packet: ByteArray) {
+        synchronized(output) {
+            try {
+                output.write(packet)
+            } catch (e: IOException) {
+                // Normal if the VPN was torn down between the read and this write.
+            }
+        }
+    }
+
     private fun stopVpn() {
         running = false
+        dnsDispatchExecutor?.shutdownNow()
         try { vpnInterface?.close() } catch (_: Exception) {}
         vpnInterface = null
-        Log.i(TAG, "VPN stopped — internet restored")
+        Log.i(TAG, "VPN stopped (mode=$mode) — restored")
     }
 
     override fun onDestroy() {

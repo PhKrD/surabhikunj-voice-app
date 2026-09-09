@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { ShieldCheck, Eye, AppWindow, Wifi, ChevronRight } from 'lucide-react'
+import { ShieldCheck, Eye, AppWindow, Wifi, BatteryCharging, ChevronRight } from 'lucide-react'
 import { dpc } from '../../lib/dpcPlugin.js'
 import { hasAccessibilityAccess, openAccessibilitySettings } from '../../lib/accessibilityPlugin.js'
 
@@ -23,13 +23,14 @@ export default function SetupChecklistCard() {
   const [status, setStatus] = useState(null)
 
   const refresh = useCallback(async () => {
-    const [{ isDeviceAdmin }, { enabled }, { granted: overlayGranted }, { granted: vpnGranted }] = await Promise.all([
+    const [{ isDeviceAdmin }, { enabled }, { granted: overlayGranted }, { granted: vpnGranted }, { granted: batteryGranted }] = await Promise.all([
       dpc.isDeviceOwner(),
       hasAccessibilityAccess(),
       dpc.canDrawOverlays(),
       dpc.hasVpnConsent(),
+      dpc.isIgnoringBatteryOptimizations(),
     ])
-    setStatus({ deviceAdmin: isDeviceAdmin, accessibility: enabled, overlay: overlayGranted, vpn: vpnGranted })
+    setStatus({ deviceAdmin: isDeviceAdmin, accessibility: enabled, overlay: overlayGranted, vpn: vpnGranted, battery: batteryGranted })
   }, [])
 
   useEffect(() => {
@@ -76,8 +77,17 @@ export default function SetupChecklistCard() {
       done: status.vpn,
       icon: Wifi,
       label: 'Allow VPN connection',
-      hint: 'Needed only for scheduled internet-pause breaks (optional)',
+      hint: 'Needed for scheduled internet-pause breaks and website filtering (optional)',
       action: () => dpc.requestVpnConsent().then(refresh),
+      required: false,
+    },
+    {
+      key: 'battery',
+      done: status.battery,
+      icon: BatteryCharging,
+      label: 'Allow VOICE to run in the background',
+      hint: 'Stops Android from silently killing supervision to save battery (optional, recommended)',
+      action: () => dpc.requestIgnoreBatteryOptimizations().then(refresh),
       required: false,
     },
   ]

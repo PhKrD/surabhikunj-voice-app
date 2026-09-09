@@ -89,8 +89,23 @@ Deno.serve(async (req: Request) => {
   if (deviceErr || !device?.auth_user_id) return json({ error: 'Device not found' }, 404)
 
   // --- Mint a real session for the device auth user (no password ever exposed) ---
+  // This is either a throwaway device-only account, OR — when the child is
+  // linked to a real org member (pc_children.linked_profile_id, see
+  // supabase/68_child_org_link_and_tamper.sql) — that member's own real
+  // account. Either way the mint mechanism is identical; only the identity
+  // behind auth_user_id differs.
   const { data: userRes, error: userErr } = await admin.auth.admin.getUserById(device.auth_user_id)
   if (userErr || !userRes?.user?.email) return json({ error: 'Device account not found' }, 500)
+
+  // Is this device signing in as a real org member? Drives whether the JS
+  // layer shows the full app (Sadhana/cleanliness/etc. + a "Family" section)
+  // or the legacy fully-isolated child experience — see src/App.jsx.
+  const { data: linkedProfile } = await admin
+    .from('profiles')
+    .select('id, display_name, spiritual_name')
+    .eq('id', device.auth_user_id)
+    .maybeSingle()
+  const isOrgMember = !!linkedProfile
 
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
     type: 'magiclink',
@@ -133,5 +148,9 @@ Deno.serve(async (req: Request) => {
     org_id: device.org_id,
     // @ts-ignore — nested select typing
     child_name: device.pc_children?.display_name ?? '',
+    // Drives whether the JS layer shows the full org app (Sadhana,
+    // cleanliness, etc. + a "Family" section) or the legacy fully-isolated
+    // child experience — see src/App.jsx / src/lib/deviceStore.js.
+    is_org_member: isOrgMember,
   })
 })

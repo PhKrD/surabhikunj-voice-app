@@ -10,8 +10,9 @@ import useToastStore from '@/store/toastStore'
 import { listChildren, createChild } from '@/lib/parentalControlApi'
 import { useDeviceModeStore } from '@/store/deviceModeStore'
 import DeviceModeSetupPage from './DeviceModeSetupPage'
+import MemberLinkPicker from '@/components/parental-control/MemberLinkPicker'
 
-const defaultForm = { displayName: '', dateOfBirth: '', ageGroup: 'child' }
+const defaultForm = { displayName: '', dateOfBirth: '', ageGroup: 'child', linkedProfileId: null }
 
 export default function ParentalControlPage() {
   const navigate = useNavigate()
@@ -63,6 +64,7 @@ export default function ParentalControlPage() {
         displayName: form.displayName.trim(),
         dateOfBirth: form.dateOfBirth,
         ageGroup: form.ageGroup,
+        linkedProfileId: form.linkedProfileId,
       })
       resetForm()
       setShowForm(false)
@@ -146,6 +148,10 @@ export default function ParentalControlPage() {
                 <option value="teen">Teen</option>
               </select>
             </label>
+            <MemberLinkPicker
+              value={form.linkedProfileId}
+              onChange={(id) => setForm((f) => ({ ...f, linkedProfileId: id }))}
+            />
             {formError && <p className="text-sm text-red-600">{formError}</p>}
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="secondary" size="sm" onClick={() => { resetForm(); setShowForm(false) }}>

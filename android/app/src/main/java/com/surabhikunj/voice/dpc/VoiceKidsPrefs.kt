@@ -137,4 +137,51 @@ object VoiceKidsPrefs {
     fun setDesiredBlockAllActive(context: Context, active: Boolean) {
         prefs(context).edit().putBoolean("desired_block_all_active", active).apply()
     }
+
+    // ── Tamper-detection state (see TamperGuard.kt) ─────────────────────
+    // Defaults to FALSE ("never seen enabled") rather than TRUE, so a
+    // freshly-enrolled device that hasn't completed the setup checklist
+    // yet never fires a false "tampering" alert just for not having
+    // turned a permission on for the first time — only a TRUE -> FALSE
+    // flip (it WAS on, now it's off) counts as tampering.
+
+    fun accessibilityWasEnabled(context: Context): Boolean =
+        prefs(context).getBoolean("accessibility_was_enabled", false)
+
+    fun setAccessibilityWasEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean("accessibility_was_enabled", enabled).apply()
+    }
+
+    fun deviceAdminWasActive(context: Context): Boolean =
+        prefs(context).getBoolean("device_admin_was_active", false)
+
+    fun setDeviceAdminWasActive(context: Context, active: Boolean) {
+        prefs(context).edit().putBoolean("device_admin_was_active", active).apply()
+    }
+
+    /** Per-kind cooldown so repeated reminders for a still-off permission don't spam pc_alerts, but two DIFFERENT kinds never suppress each other. */
+    fun lastTamperAlertAt(context: Context, kind: String): Long =
+        prefs(context).getLong("last_tamper_alert_$kind", 0L)
+
+    fun setLastTamperAlertAt(context: Context, kind: String, epochMillis: Long) {
+        prefs(context).edit().putLong("last_tamper_alert_$kind", epochMillis).apply()
+    }
+
+    // ── Website filtering (see PolicyEnforcer.kt / InternetBlockVpnService.kt) ──
+
+    /** Cached blocked-domain set from pc_website_rules (action='block'), refreshed each PolicyEnforcer pass. */
+    fun blockedDomains(context: Context): Set<String> =
+        prefs(context).getStringSet("website_blocked_domains", emptySet()) ?: emptySet()
+
+    fun setBlockedDomains(context: Context, domains: Set<String>) {
+        prefs(context).edit().putStringSet("website_blocked_domains", domains).apply()
+    }
+
+    /** True while PolicyEnforcer wants the DNS-filtering VPN mode running (there is at least one enabled block rule). */
+    fun websiteFilterActive(context: Context): Boolean =
+        prefs(context).getBoolean("website_filter_active", false)
+
+    fun setWebsiteFilterActive(context: Context, active: Boolean) {
+        prefs(context).edit().putBoolean("website_filter_active", active).apply()
+    }
 }

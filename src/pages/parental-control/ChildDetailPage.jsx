@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Smartphone, Sliders, MapPin, Bell, Gift, BarChart3, Clock, Globe, Send, ShieldAlert, History } from 'lucide-react'
+import { ArrowLeft, Smartphone, Sliders, MapPin, Bell, Gift, BarChart3, Clock, Globe, Send, ShieldAlert, History, Link2 } from 'lucide-react'
 import Avatar from '@/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
-import { getChild, listDevices } from '@/lib/parentalControlApi'
+import { getChild, listDevices, updateChild } from '@/lib/parentalControlApi'
+import MemberLinkPicker from '@/components/parental-control/MemberLinkPicker'
 import CommandCenter from './CommandCenter'
 import DevicesTab from './tabs/DevicesTab'
 import UsageTab from './tabs/UsageTab'
@@ -41,6 +42,8 @@ export default function ChildDetailPage() {
   const [devices, setDevices] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('devices')
+  const [showLinkPicker, setShowLinkPicker] = useState(false)
+  const [savingLink, setSavingLink] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,6 +64,20 @@ export default function ChildDetailPage() {
   }, [load])
 
   const activeDevices = devices.filter((d) => d.is_active)
+
+  const handleLinkChange = async (profileId) => {
+    setSavingLink(true)
+    try {
+      const updated = await updateChild(childId, { linked_profile_id: profileId })
+      setChild(updated)
+      setShowLinkPicker(false)
+      toast.success(profileId ? 'Linked to VOICE member' : 'Unlinked — device-only again')
+    } catch (error) {
+      toast.error('Could not update link', error.message)
+    } finally {
+      setSavingLink(false)
+    }
+  }
 
   if (loading) return <div className="text-center py-12 text-muted-token text-sm">Loading...</div>
   if (!child) return <div className="text-center py-12 text-muted-token text-sm">Child not found.</div>
@@ -85,7 +102,30 @@ export default function ChildDetailPage() {
             {activeDevices.length} active device{activeDevices.length === 1 ? '' : 's'}
           </p>
         </div>
+        <button
+          onClick={() => setShowLinkPicker((v) => !v)}
+          className={cn(
+            'flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border transition-colors',
+            child.linked_profile_id
+              ? 'border-tulasi-200 bg-tulasi-50 text-tulasi-700'
+              : 'border-[var(--border-color)] text-secondary-token hover:bg-[var(--surface-muted)]'
+          )}
+        >
+          <Link2 className="w-3.5 h-3.5" />
+          {child.linked_profile_id ? 'Linked to member' : 'Link to member'}
+        </button>
       </div>
+
+      {showLinkPicker && (
+        <div className="rounded-2xl border border-[var(--border-color)] p-4">
+          <MemberLinkPicker value={child.linked_profile_id} onChange={handleLinkChange} />
+          {savingLink && <p className="text-xs text-muted-token mt-2">Saving...</p>}
+          <p className="text-xs text-muted-token mt-2">
+            Changing this only affects the NEXT time a device is paired (or re-paired) for this child —
+            it does not retroactively change already-paired devices' sessions.
+          </p>
+        </div>
+      )}
 
       {/* Command center — per-device targeting + true command lifecycle */}
       <CommandCenter devices={devices} />

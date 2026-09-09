@@ -9,6 +9,7 @@ import Avatar from '@/components/ui/Avatar'
 import Badge from '@/components/ui/Badge'
 import usePermission from '@/hooks/usePermission'
 import { supabase } from '@/lib/supabase'
+import { useDeviceState } from '@/store/childDeviceState'
 
 const BOTTOM_ROUTES = ['/notifications', '/settings']
 
@@ -149,6 +150,15 @@ export default function Sidebar({ mobileOpen, onClose }) {
   const navigate = useNavigate()
   const [signingOut, setSigningOut] = useState(false)
 
+  // This device is ALSO paired as a supervised child device (see
+  // src/lib/deviceStore.js isOrgMemberDevice() / src/App.jsx) — show a
+  // "Family" entry point to the setup checklist, SOS and bonus-time
+  // request pages alongside the rest of the org app.
+  const familyEnrolled = useDeviceState((s) => s.enrolled)
+  const familyIsOrgMember = useDeviceState((s) => s.isOrgMember)
+  const showFamilyNav = familyEnrolled && familyIsOrgMember
+  const familyItem = { key: 'family', label: 'Family', icon: 'Baby', route: '/family' }
+
   const canMentor    = usePermission('mentorship.view_own')
   const canSeeMembers = usePermission('members.manage')
 
@@ -228,6 +238,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
       {/* Nav — sourced from my_navigation(), grouped into sections */}
       <nav className="flex-1 px-3 py-4 space-y-4 scroll-container scrollbar-hide">
         {dashboardItem && <NavItem item={dashboardItem} onClick={onClose} />}
+        {showFamilyNav && <NavItem item={familyItem} onClick={onClose} />}
         {navGroups.map((group) => (
           <div key={group.id}>
             <p className="px-3 mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-token">

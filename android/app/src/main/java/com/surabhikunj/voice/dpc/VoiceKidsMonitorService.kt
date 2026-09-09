@@ -8,10 +8,13 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.database.ContentObserver
 import android.location.Location
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -108,9 +111,49 @@ class VoiceKidsMonitorService : Service() {
     // PolicyEnforcer.kt for why this exists.
     private val policyRunnable = object : Runnable {
         override fun run() {
-            executor.execute { PolicyEnforcer.enforce(applicationContext) }
+            executor.execute {
+                PolicyEnforcer.enforce(applicationContext)
+                // Steady-state fallback tamper check (the ContentObserver
+                // below reacts near-instantly to the Accessibility toggle
+                // specifically; this catches anything it might ever miss,
+                // plus Device Admin, on the same cadence).
+                TamperGuard.check(applicationContext)
+            }
             if (commandPollingActive) commandHandler.postDelayed(this, POLICY_ENFORCE_INTERVAL_MS)
         }
+    }
+
+    // ── Tamper detection: near-instant reaction to the Accessibility
+    // toggle specifically, via a ContentObserver on the Settings key
+    // Android itself updates the instant a service is enabled/disabled —
+    // much faster than waiting for the next POLICY_ENFORCE_INTERVAL_MS
+    // poll tick. See TamperGuard.kt.
+    private var accessibilitySettingObserver: ContentObserver? = null
+
+    private fun registerTamperObserver() {
+        if (accessibilitySettingObserver != null) return
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                executor.execute { TamperGuard.check(applicationContext) }
+            }
+        }
+        accessibilitySettingObserver = observer
+        try {
+            contentResolver.registerContentObserver(
+                Settings.Secure.getUriFor(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES),
+                false,
+                observer,
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not register tamper ContentObserver: ${e.message}")
+        }
+    }
+
+    private fun unregisterTamperObserver() {
+        accessibilitySettingObserver?.let {
+            try { contentResolver.unregisterContentObserver(it) } catch (e: Exception) { /* already gone */ }
+        }
+        accessibilitySettingObserver = null
     }
 
     /**
@@ -136,6 +179,7 @@ class VoiceKidsMonitorService : Service() {
         fusedClient = LocationServices.getFusedLocationProviderClient(this)
         createNotificationChannel()
         startForegroundSafely()
+        registerTamperObserver()
         Log.i(TAG, "Monitor service started")
     }
 
@@ -193,6 +237,7 @@ class VoiceKidsMonitorService : Service() {
         locationCallback?.let { fusedClient.removeLocationUpdates(it) }
         stopCommandPolling()
         stopPeriodicReporting()
+        unregisterTamperObserver()
         executor.shutdown()
         Log.i(TAG, "Monitor service stopped")
     }

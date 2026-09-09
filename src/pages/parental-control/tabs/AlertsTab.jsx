@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  ShieldAlert, MapPin, Clock, Ban, WifiOff, Gift, BatteryLow, Smartphone, Bell, CheckCircle, RefreshCw,
+  ShieldAlert, MapPin, Clock, Ban, WifiOff, Gift, BatteryLow, Smartphone, Bell, CheckCircle, RefreshCw, ShieldOff,
 } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
@@ -19,6 +19,7 @@ const ALERT_ICONS = {
   bonus_time_requested: Gift,
   low_battery: BatteryLow,
   device_enrolled: Smartphone,
+  tamper_detected: ShieldOff,
 }
 
 const SEVERITY_VARIANT = { info: 'blue', warning: 'yellow', critical: 'red' }
@@ -28,6 +29,7 @@ const ALERT_SUGGESTIONS = {
   app_time_limit_exceeded: 'Consider increasing the per-app time limit or blocking the app.',
   blocked_app_attempt: 'The device may not be Device Owner. Re-enroll to enforce rules.',
   device_offline: 'Check if the device is connected to the internet.',
+  tamper_detected: 'A supervision permission was turned off on this device — the screen was locked automatically. Check the device and ask your child to re-enable it.',
 }
 
 export default function AlertsTab({ childId }) {

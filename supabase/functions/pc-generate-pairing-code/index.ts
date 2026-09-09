@@ -77,12 +77,31 @@ Deno.serve(async (req: Request) => {
   // --- Verify caller is the parent of this child ---
   const { data: child, error: childErr } = await admin
     .from('pc_children')
-    .select('id, org_id, parent_id')
+    .select('id, org_id, parent_id, linked_profile_id')
     .eq('id', childId)
     .single()
 
   if (childErr || !child) return json({ error: 'Child not found' }, 404)
   if (child.parent_id !== userData.user.id) return json({ error: 'Not authorized for this child' }, 403)
+
+  // --- Resolve the linked org member (if any), verifying same-org ---
+  // See supabase/68_child_org_link_and_tamper.sql. When set, pairing signs
+  // the device in AS this real member's own account instead of minting a
+  // throwaway device-only one, so org features (Sadhana, cleanliness, etc.)
+  // work on the same device that is under parental-control supervision.
+  let linkedAuthUserId: string | null = null
+  if (child.linked_profile_id) {
+    const { data: linkedProfile } = await admin
+      .from('profiles')
+      .select('id, org_id')
+      .eq('id', child.linked_profile_id)
+      .maybeSingle()
+    if (linkedProfile && linkedProfile.org_id === child.org_id) {
+      linkedAuthUserId = linkedProfile.id
+    }
+    // Silently ignore an invalid/cross-org link rather than failing pairing
+    // entirely — falls back to the device-only throwaway account below.
+  }
 
   // --- Reuse an existing device (re-pair) or create a new one ---
   // Reusing keeps the same device_id + auth user, so command history, rules,
@@ -106,10 +125,17 @@ Deno.serve(async (req: Request) => {
   if (existing?.id && existing.auth_user_id) {
     // Re-pair the existing device.
     deviceId = existing.id
-    await admin
-      .from('pc_devices')
-      .update({ device_name: deviceName, is_active: true, device_owner_mode: 'none' })
-      .eq('id', deviceId)
+    const updates: Record<string, unknown> = { device_name: deviceName, is_active: true, device_owner_mode: 'none' }
+    // If the child was linked to (or re-linked to a different) org member
+    // since this device was first created, adopt that identity now rather
+    // than leaving the device stuck on a stale/throwaway auth user — the
+    // child's next pairing-code redemption then signs in as the right
+    // account. Never downgrades an already-linked device back to a
+    // throwaway account (linkedAuthUserId is only ever a real profile id).
+    if (linkedAuthUserId && linkedAuthUserId !== existing.auth_user_id) {
+      updates.auth_user_id = linkedAuthUserId
+    }
+    await admin.from('pc_devices').update(updates).eq('id', deviceId)
     // Invalidate any still-valid unused codes for this device.
     await admin
       .from('pc_pairing_codes')
@@ -117,19 +143,26 @@ Deno.serve(async (req: Request) => {
       .eq('device_id', deviceId)
       .is('used_at', null)
   } else {
-    // No existing device — create the device-only auth user + device row.
-    const deviceUuid = crypto.randomUUID()
-    const deviceEmail = `device-${deviceUuid}@voice.kids.internal`
-    const devicePassword = randomPassword()
+    // No existing device. If this child is linked to a real org member,
+    // sign the device in as THAT member's own account (no throwaway auth
+    // user needed — see supabase/68_child_org_link_and_tamper.sql). Only
+    // create a device-only account when there's no link.
+    let deviceAuthUserId = linkedAuthUserId
+    if (!deviceAuthUserId) {
+      const deviceUuid = crypto.randomUUID()
+      const deviceEmail = `device-${deviceUuid}@voice.kids.internal`
+      const devicePassword = randomPassword()
 
-    const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
-      email: deviceEmail,
-      password: devicePassword,
-      email_confirm: true,
-      user_metadata: { role: 'pc_device', child_id: childId },
-    })
-    if (authErr || !authUser?.user) {
-      return json({ error: `Could not create device account: ${authErr?.message}` }, 500)
+      const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
+        email: deviceEmail,
+        password: devicePassword,
+        email_confirm: true,
+        user_metadata: { role: 'pc_device', child_id: childId },
+      })
+      if (authErr || !authUser?.user) {
+        return json({ error: `Could not create device account: ${authErr?.message}` }, 500)
+      }
+      deviceAuthUserId = authUser.user.id
     }
 
     const { data: device, error: deviceErr } = await admin
@@ -138,7 +171,7 @@ Deno.serve(async (req: Request) => {
         child_id: childId,
         org_id: child.org_id,
         device_name: deviceName,
-        auth_user_id: authUser.user.id,
+        auth_user_id: deviceAuthUserId,
         device_owner_mode: 'none',
         is_active: true,
       })

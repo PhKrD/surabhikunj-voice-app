@@ -73,6 +73,12 @@ object PolicyEnforcer {
             Log.w(TAG, "enforce: fetch failed, skipping pass")
             return
         }
+        // Website rules are fetched separately and tolerate failure without
+        // aborting the whole pass — a transient failure here shouldn't also
+        // block app-rule/schedule enforcement (see the website-filtering
+        // block near the end of this function, which simply skips updating
+        // when this is null rather than treating it as "no blocked domains").
+        val websiteRules = fetchRows(context, "pc_website_rules", "child_id=eq.$childId&is_enabled=eq.true&select=domain,action")
 
         val bonusActive = VoiceKidsPrefs.isBonusActive(context)
         val now = Calendar.getInstance()
@@ -84,9 +90,10 @@ object PolicyEnforcer {
         } else emptyMap()
 
         val (blockList, allowList) = resolveAppRules(rules, usageByPackage, usageAvailable, bonusActive)
+        val blockedDomains = resolveBlockedDomains(websiteRules)
 
         val signature = "${activeSchedule?.optString("id")}|${activeSchedule?.optString("action")}|" +
-            "${blockList.sorted()}|${allowList.sorted()}"
+            "${blockList.sorted()}|${allowList.sorted()}|${blockedDomains?.sorted()}"
         val appliedSignature = VoiceKidsPrefs.appliedSignature(context)
         val appliedScheduleLock = VoiceKidsPrefs.appliedScheduleLock(context)
 
@@ -174,6 +181,41 @@ object PolicyEnforcer {
             VoiceKidsPrefs.setAppliedSignature(context, null) // force retry next tick
         }
 
+        // ── Website filtering (pc_website_rules enforcement) ────────────
+        // See DpcActions.startWebsiteFilter/InternetBlockVpnService's
+        // MODE_DNS_FILTER for the actual mechanism. Skipped entirely when
+        // the websiteRules fetch itself failed (null) — same
+        // fail-safe-by-not-changing-anything rule as schedules/app rules.
+        var websiteFilterActive = VoiceKidsPrefs.websiteFilterActive(context)
+        if (blockedDomains != null) {
+            VoiceKidsPrefs.setBlockedDomains(context, blockedDomains)
+            // A block_internet schedule already owns the VPN tunnel via
+            // pauseInternet() above (MODE_BLOCK_ALL) — domain filtering
+            // would be moot underneath a full internet pause, and only one
+            // VPN mode can hold the tunnel at a time anyway.
+            val scheduleOwnsVpn = activeSchedule?.optString("action") == "block_internet"
+            val desiredWebsiteFilter = blockedDomains.isNotEmpty() && !scheduleOwnsVpn && DpcActions.hasVpnConsent(context)
+            if (desiredWebsiteFilter != websiteFilterActive) {
+                if (desiredWebsiteFilter) {
+                    if (DpcActions.startWebsiteFilter(context)) {
+                        websiteFilterActive = true
+                        VoiceKidsPrefs.setWebsiteFilterActive(context, true)
+                    }
+                } else if (scheduleOwnsVpn) {
+                    // The schedule block above just called pauseInternet()
+                    // (MODE_BLOCK_ALL) THIS SAME pass — never call
+                    // stopWebsiteFilter() here, it would tear that back
+                    // down. Just record that we're no longer the one
+                    // driving the tunnel.
+                    websiteFilterActive = false
+                    VoiceKidsPrefs.setWebsiteFilterActive(context, false)
+                } else if (DpcActions.stopWebsiteFilter(context)) {
+                    websiteFilterActive = false
+                    VoiceKidsPrefs.setWebsiteFilterActive(context, false)
+                }
+            }
+        }
+
         reportEnforcementState(context, deviceId, mapOf(
             "device_admin" to deviceAdmin,
             "device_owner" to deviceOwner,
@@ -183,6 +225,7 @@ object PolicyEnforcer {
             "usage_access" to usageAvailable,
             "active_schedule" to (activeSchedule?.optString("name")),
             "desired_blocked_count" to desiredSet.size,
+            "website_filter_active" to websiteFilterActive,
             "last_error" to if (settled) null else "partial_apply_failure",
         ))
     }
@@ -271,6 +314,26 @@ object PolicyEnforcer {
     }
 
     private fun isProtectedPackage(pkg: String): Boolean = PROTECTED_PACKAGES.contains(pkg)
+
+    // ── Website-rule resolution ──────────────────────────────────────────
+    // Only 'block' rules matter for enforcement — 'allow' rules exist in
+    // the schema for a future default-deny allow-list mode, but with no
+    // such mode implemented yet an 'allow' row has no enforcement effect
+    // (mirrors pc_website_rules' current schema-only history — see
+    // PLATFORM_LIMITATIONS.md). Returns null (not empty) when the fetch
+    // itself failed, so the caller can distinguish "no rules" from
+    // "couldn't check" and avoid flipping filtering off on a network blip.
+    private fun resolveBlockedDomains(websiteRules: JSONArray?): Set<String>? {
+        if (websiteRules == null) return null
+        val blocked = mutableSetOf<String>()
+        for (i in 0 until websiteRules.length()) {
+            val rule = websiteRules.getJSONObject(i)
+            if (rule.optString("action") == "block") {
+                rule.optString("domain").trim().lowercase().takeIf { it.isNotEmpty() }?.let { blocked.add(it) }
+            }
+        }
+        return blocked
+    }
 
     // ── I/O helpers ──────────────────────────────────────────────────────
 

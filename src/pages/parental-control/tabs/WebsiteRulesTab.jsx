@@ -78,10 +78,12 @@ export default function WebsiteRulesTab({ childId }) {
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 flex items-start gap-3">
         <AlertTriangle className="w-4.5 h-4.5 text-amber-600 flex-shrink-0 mt-0.5" />
         <p className="text-xs text-amber-800 leading-relaxed">
-          <span className="font-semibold">Not yet enforced.</span> Rules saved here are stored but
-          nothing on the device currently blocks these domains — there is no on-device filtering
-          mechanism yet. Do not rely on this to actually restrict browsing. See
-          PLATFORM_LIMITATIONS.md for what full support requires.
+          <span className="font-semibold">Best-effort, not guaranteed.</span> "Block" rules are enforced
+          on-device via a local DNS filter (needs the one-time VPN permission from the device's setup
+          checklist). It blocks the domain and its subdomains for any app using the system DNS resolver,
+          but a browser hardwired to its own DNS-over-HTTPS provider outside our short mitigated list can
+          bypass it. "Allow" rules are stored only and have no enforcement effect yet. See
+          PLATFORM_LIMITATIONS.md for the full picture.
         </p>
       </div>
 

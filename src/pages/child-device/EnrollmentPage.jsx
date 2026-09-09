@@ -74,6 +74,10 @@ export default function EnrollmentPage() {
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
         enrolledAt: new Date().toISOString(),
+        // See src/lib/deviceStore.js isOrgMemberDevice() — decides whether
+        // App.jsx shows the full org app (+ Family section) or the legacy
+        // fully-isolated child experience.
+        isOrgMember: !!data.is_org_member,
       }
 
       saveDeviceCreds(creds)
@@ -86,7 +90,12 @@ export default function EnrollmentPage() {
       // shouldn't block navigation to the home screen.
       syncSessionAndStartTracking().catch(() => {})
 
-      navigate('/child/home', { replace: true })
+      // A device linked to a real org member (see 68_child_org_link_and_tamper.sql)
+      // gets the full org app instead of the isolated child shell — App.jsx
+      // re-renders into the normal <Routes> tree the instant isOrgMember
+      // flips true, which has no /child/* routes at all, so send it to the
+      // Family section's real path instead of the (now unreachable) one.
+      navigate(data.is_org_member ? '/family' : '/child/home', { replace: true })
     } catch (err) {
       setError(err.message)
     } finally {

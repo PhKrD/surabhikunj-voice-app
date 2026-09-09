@@ -202,6 +202,25 @@ object DpcActions {
             android.net.Uri.parse("package:${context.packageName}"),
         )
 
+    // ── Battery optimization exemption (recommended, not required) ──────
+    // Android can kill VoiceKidsMonitorService (and therefore command
+    // polling, policy enforcement and tamper detection) in the background
+    // on stricter OEM battery savers even while it's a foreground service.
+    // Being killed looks identical to "tampering" from the parent's side
+    // (enforcement just stops) but isn't malicious — exempting the app
+    // from battery optimization is the standard mitigation. One normal
+    // system dialog, no reset needed.
+
+    fun isIgnoringBatteryOptimizations(context: Context): Boolean {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        return pm.isIgnoringBatteryOptimizations(context.packageName)
+    }
+
+    fun batteryOptimizationIntent(context: Context): Intent =
+        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = android.net.Uri.parse("package:${context.packageName}")
+        }
+
     // ── Internet pause/resume — local VPN, one-time user consent ────────
     // VpnService.prepare() returns null once the parent has already tapped
     // "OK" on the system VPN consent dialog for this app (that grant
@@ -250,6 +269,42 @@ object DpcActions {
             true
         } catch (e: Exception) {
             Log.e(TAG, "resumeInternet failed: ${e.message}")
+            false
+        }
+    }
+
+    // ── Website filtering (pc_website_rules enforcement) ────────────────
+    // Real domain-level blocking via InternetBlockVpnService's
+    // MODE_DNS_FILTER — see that class's doc comment for the full
+    // mechanism + honest DoH-bypass limitation. Driven by
+    // PolicyEnforcer.enforce(), which decides whether this should be
+    // running based on whether the child has any enabled block rule.
+    // Needs the SAME one-time VPN consent as pause/resume internet — no
+    // separate permission. Never runs at the same time as a full
+    // pause_internet (MODE_BLOCK_ALL already blocks everything, making
+    // domain-level filtering moot); PolicyEnforcer is responsible for not
+    // calling this while a block_internet/block_all schedule is active.
+
+    fun startWebsiteFilter(context: Context): Boolean {
+        if (!hasVpnConsent(context)) {
+            Log.w(TAG, "startWebsiteFilter: VPN consent not granted yet")
+            return false
+        }
+        return try {
+            InternetBlockVpnService.start(context, "dns_filter")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "startWebsiteFilter failed: ${e.message}")
+            false
+        }
+    }
+
+    fun stopWebsiteFilter(context: Context): Boolean {
+        return try {
+            InternetBlockVpnService.stop(context)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "stopWebsiteFilter failed: ${e.message}")
             false
         }
     }

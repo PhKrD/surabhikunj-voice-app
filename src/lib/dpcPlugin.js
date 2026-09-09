@@ -66,6 +66,22 @@ export const dpc = {
     return NativeDpc.requestVpnConsent()
   },
 
+  /**
+   * Recommended, not required — exempts the app from OS battery
+   * optimization so VoiceKidsMonitorService (and therefore enforcement +
+   * tamper detection) doesn't get silently killed in the background,
+   * which would otherwise look identical to actual tampering.
+   */
+  async isIgnoringBatteryOptimizations() {
+    if (!isNative()) return { granted: false }
+    return NativeDpc.isIgnoringBatteryOptimizations()
+  },
+
+  async requestIgnoreBatteryOptimizations() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.requestIgnoreBatteryOptimizations()
+  },
+
   async suspendPackages(packages) {
     if (!isNative()) return webFallback()
     return NativeDpc.suspendPackages({ packages })

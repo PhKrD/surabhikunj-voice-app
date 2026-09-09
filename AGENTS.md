@@ -79,8 +79,18 @@ implementation. It is NOT deleted (data-safety default) but is superseded
 — do not add new features there.
 
 ## Known gaps
-- Website allow/block rules (`pc_website_rules`) have a full parent UI but
-  **no on-device enforcement**. See PLATFORM_LIMITATIONS.md before shipping
-  this as a user-facing feature.
+- Website "block" rules (`pc_website_rules`) ARE enforced on-device now,
+  via a local DNS-filtering VPN (`InternetBlockVpnService`'s
+  `MODE_DNS_FILTER` + `DnsFilterEngine.kt`, driven by `PolicyEnforcer.kt`)
+  — best-effort, bypassable by a browser hardwired to a DoH resolver
+  outside the short mitigated IP list. "Allow" rules are still stored
+  only, no enforcement effect. See PLATFORM_LIMITATIONS.md "Website
+  filtering" before presenting this as guaranteed.
 - iOS/Windows/macOS parental control: not implemented (Apple/Microsoft MDM
   entitlements required; see PLATFORM_LIMITATIONS.md).
+- A child device can optionally be linked to a real org member account
+  (`pc_children.linked_profile_id`, see `68_child_org_link_and_tamper.sql`)
+  so the same device gets both the full org app (Sadhana, cleanliness,
+  etc.) AND parental-control supervision — see PLATFORM_LIMITATIONS.md
+  "Child device can also use org features" and `src/App.jsx`. Unlinked
+  children keep the original fully-isolated device-only experience.

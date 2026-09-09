@@ -16,6 +16,12 @@ import { isBonusActive } from '../lib/commandPoller.js'
 export const useDeviceState = create((set) => ({
   enrolled: isEnrolled(),
   childName: loadDeviceCreds()?.childName ?? '',
+  // True when this device's session is a real VOICE org member's own
+  // account (pc_children.linked_profile_id was set at pairing time) rather
+  // than a throwaway device-only one — see src/lib/deviceStore.js
+  // isOrgMemberDevice() and App.jsx for how this changes the whole app
+  // shell shown on this device.
+  isOrgMember: !!loadDeviceCreds()?.isOrgMember,
   isLocked: false,
   bonusActive: isBonusActive(),
   pendingSOS: false,
@@ -27,7 +33,7 @@ export const useDeviceState = create((set) => ({
   revoked: false,
 
   setEnrolled: (creds) =>
-    set({ enrolled: true, revoked: false, childName: creds.childName ?? '' }),
+    set({ enrolled: true, revoked: false, childName: creds.childName ?? '', isOrgMember: !!creds.isOrgMember }),
 
   setRevoked: () => set({ enrolled: false, revoked: true, isLocked: false }),
 
@@ -46,5 +52,6 @@ export const useDeviceState = create((set) => ({
       enrolled: isEnrolled(),
       bonusActive: isBonusActive(),
       childName: loadDeviceCreds()?.childName ?? '',
+      isOrgMember: !!loadDeviceCreds()?.isOrgMember,
     }),
 }))

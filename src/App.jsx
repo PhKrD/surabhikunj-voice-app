@@ -10,7 +10,9 @@ import '@/lib/healthCheck'
 import Toaster from '@/components/ui/Toaster'
 import Button from '@/components/ui/Button'
 import { useDeviceModeStore } from '@/store/deviceModeStore'
+import { useDeviceState } from '@/store/childDeviceState'
 import ChildDeviceShell from '@/components/child-device/ChildDeviceShell'
+import FamilySupervision from '@/components/family/FamilySupervision'
 
 const AppLayout = lazy(() => import('@/components/layout/AppLayout'))
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
@@ -35,6 +37,10 @@ const BroadcastPage = lazy(() => import('@/pages/admin/BroadcastPage'))
 const ParentalControlPage = lazy(() => import('@/pages/parental-control/ParentalControlPage'))
 const ParentalControlDashboardPage = lazy(() => import('@/pages/parental-control/ParentalControlDashboardPage'))
 const ChildDetailPage = lazy(() => import('@/pages/parental-control/ChildDetailPage'))
+const FamilyHomePage = lazy(() => import('@/pages/family/FamilyHomePage'))
+const FamilySosPage = lazy(() => import('@/pages/family/FamilySosPage'))
+const FamilyBonusPage = lazy(() => import('@/pages/family/FamilyBonusPage'))
+const FamilyRequestPage = lazy(() => import('@/pages/family/FamilyRequestPage'))
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -124,34 +130,44 @@ function PageFallback() {
 function AppBootstrap() {
   const { initialize, initialized } = useAuthStore()
   const deviceMode = useDeviceModeStore((s) => s.mode)
+  const isOrgMember = useDeviceState((s) => s.isOrgMember)
 
   useEffect(() => {
     useThemeStore.getState().init()
   }, [])
 
   useEffect(() => {
-    // A child-mode device's Supabase session belongs to its own device
-    // auth user, not an org member — org bootstrap (profile lookup, org
-    // membership resolution) has nothing valid to resolve there and would
-    // just be a wasted round trip against tables it has no RLS grant to
-    // read anyway.
-    if (deviceMode === 'child') return
+    // A child-mode device's Supabase session belongs to its own throwaway
+    // device auth user, not an org member — org bootstrap (profile lookup,
+    // org membership resolution) has nothing valid to resolve there and
+    // would just be a wasted round trip against tables it has no RLS grant
+    // to read anyway. EXCEPT when this child is linked to a real org
+    // member (isOrgMember — see 68_child_org_link_and_tamper.sql): then
+    // the session IS a real member's own account and org bootstrap must
+    // run normally, same as any other device.
+    if (deviceMode === 'child' && !isOrgMember) return
     if (!initialized) {
       initialize()
     }
-  }, [initialize, initialized, deviceMode])
+  }, [initialize, initialized, deviceMode, isOrgMember])
 
   return null
 }
 
 function AppRoutes() {
   // A device that has been set up as a supervised child device (see
-  // src/store/deviceModeStore.js + DeviceModeSetupPage) NEVER shows the
-  // org login or any org route — it boots straight into the child
-  // experience. This check happens before ProtectedRoute would otherwise
-  // redirect an unauthenticated device to /login.
+  // src/store/deviceModeStore.js + DeviceModeSetupPage) with NO linked org
+  // member account NEVER shows the org login or any org route — it boots
+  // straight into the fully-isolated legacy child experience. This check
+  // happens before ProtectedRoute would otherwise redirect an
+  // unauthenticated device to /login. A child device that IS linked to a
+  // real org member (isOrgMember) instead gets the full org app below,
+  // plus a "Family" section + a global lock overlay — see
+  // src/components/family/FamilySupervision.jsx.
   const deviceMode = useDeviceModeStore((s) => s.mode)
-  if (deviceMode === 'child') {
+  const enrolled = useDeviceState((s) => s.enrolled)
+  const isOrgMember = useDeviceState((s) => s.isOrgMember)
+  if (deviceMode === 'child' && (!enrolled || !isOrgMember)) {
     return (
       <Suspense fallback={<PageFallback />}>
         <ChildDeviceShell />
@@ -172,6 +188,15 @@ function AppRoutes() {
             </RequireAuth>
           }
         />
+
+        {/* Family section: reachable alongside the rest of the org app on
+            a device that is ALSO paired as a supervised child device.
+            Full-bleed, no AppLayout chrome — same style as the legacy
+            child-device pages, just not walled off from everything else. */}
+        <Route path="/family" element={<RequireAuth><FamilyHomePage /></RequireAuth>} />
+        <Route path="/family/sos" element={<RequireAuth><FamilySosPage /></RequireAuth>} />
+        <Route path="/family/bonus" element={<RequireAuth><FamilyBonusPage /></RequireAuth>} />
+        <Route path="/family/request" element={<RequireAuth><FamilyRequestPage /></RequireAuth>} />
 
         <Route
           path="/"
@@ -242,6 +267,7 @@ export default function App() {
         <ErrorBoundary>
           <AppBootstrap />
           <AppRoutes />
+          <FamilySupervision />
         </ErrorBoundary>
         <Toaster />
       </BrowserRouter>

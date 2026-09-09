@@ -45,7 +45,7 @@ export async function listChildren() {
   return data ?? []
 }
 
-export async function createChild({ orgId, displayName, dateOfBirth, ageGroup }) {
+export async function createChild({ orgId, displayName, dateOfBirth, ageGroup, linkedProfileId }) {
   const { data, error } = await supabase
     .from('pc_children')
     .insert({
@@ -54,6 +54,7 @@ export async function createChild({ orgId, displayName, dateOfBirth, ageGroup })
       display_name: displayName,
       date_of_birth: dateOfBirth || null,
       age_group: ageGroup || null,
+      linked_profile_id: linkedProfileId || null,
     })
     .select()
     .single()

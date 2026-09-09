@@ -52,6 +52,15 @@ class VoiceKidsDeviceAdminReceiver : DeviceAdminReceiver() {
     override fun onDisabled(context: Context, intent: Intent) {
         super.onDisabled(context, intent)
         Log.w(TAG, "Device Admin disabled — enforcement stopped. This should not happen in Device Owner mode.")
+        // Fires exactly when deactivation happens — react immediately
+        // instead of waiting for VoiceKidsMonitorService's next poll tick.
+        // Only a real tamper event if this device had completed setup
+        // before (see TamperGuard.check's wasOk gate); this direct call
+        // bypasses that gate deliberately since onDisabled() firing at all
+        // IS the "it was active, now it's not" transition by definition.
+        if (VoiceKidsPrefs.isConfigured(context)) {
+            TamperGuard.reportTamper(context, "device_admin_disabled")
+        }
     }
 
     override fun onLockTaskModeEntering(context: Context, intent: Intent, pkg: String) {

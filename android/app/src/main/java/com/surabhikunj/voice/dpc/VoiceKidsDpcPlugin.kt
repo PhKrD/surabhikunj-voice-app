@@ -104,6 +104,25 @@ class VoiceKidsDpcPlugin : Plugin() {
         }
     }
 
+    // ── Battery optimization exemption (recommended, not required) ──────
+
+    @PluginMethod
+    fun isIgnoringBatteryOptimizations(call: PluginCall) {
+        val result = JSObject()
+        result.put("granted", DpcActions.isIgnoringBatteryOptimizations(context))
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun requestIgnoreBatteryOptimizations(call: PluginCall) {
+        try {
+            context.startActivity(DpcActions.batteryOptimizationIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            call.resolve(successResult())
+        } catch (e: Exception) {
+            call.reject("Could not open battery optimization settings: ${e.message}")
+        }
+    }
+
     // ── VPN consent (one-time, needed for pause/resume internet) ────────
 
     @PluginMethod

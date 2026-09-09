@@ -14,7 +14,7 @@ cannot find code for.
 | Device unlock (remote)            | ADVANCED MODE ONLY — requires the optional Device Owner setup (factory reset); unavailable in the default setup at all (see below) | NONE | NONE | NONE | NONE |
 | Internet pause / resume           | FULL, no reset required (local VPN + one-time consent) | NONE | NONE | NONE | NONE |
 | Screen-time daily cap             | FULL, no reset required | NONE | NONE | NONE | NONE |
-| Website allow/block list          | SCHEMA ONLY — no enforcement | NONE | NONE | NONE | NONE |
+| Website allow/block list          | BEST-EFFORT enforcement (DNS-filtering VPN, no reset required — see below); bypassable by hardwired DoH resolvers outside the mitigated list | NONE | NONE | NONE | NONE |
 | Website visit / search monitoring | BEST-EFFORT (Accessibility Service, requires a manual one-time grant — see below) | NONE | NONE | NONE | NONE |
 | Location tracking                 | FULL    | PARTIAL (native MDM/Screen Time API would be required) | NONE | NONE | NONE |
 | Geofencing                        | FULL    | NONE | NONE | NONE | NONE |
@@ -23,6 +23,8 @@ cannot find code for.
 | Bonus time requests               | FULL    | NONE | NONE | NONE | NONE |
 | Factory reset (remote wipe)       | FULL, no reset required (`wipeData()` works under plain Device Admin) | NONE | NONE | NONE | NONE |
 | Remote device diagnostics         | FULL (this release) | NONE | NONE | NONE | NONE |
+| Tamper detection (Accessibility/Device Admin turned off) | DETECTION + ALERT + AUTO-LOCK, no reset required — see below. Cannot PREVENT it, only react. | NONE | NONE | NONE | NONE |
+| Child device can also use org features (Sadhana, cleanliness, etc.) | FULL, when the child is linked to a real VOICE member account — see below | N/A | N/A | N/A | N/A |
 
 ## Enforcement model: Device Admin + Accessibility (default), Device Owner (optional "Advanced" mode)
 
@@ -145,22 +147,115 @@ Keep `PolicyEnforcer.kt`'s decision logic in sync with `policy.js` (protected
 package list, schedule severity order, allow-overrides-block) if either
 changes.
 
-## Website filtering — schema exists, enforcement does not
+## Website filtering — real DNS-based enforcement (best-effort)
 
-`pc_website_rules` stores allow/block domain rules and the parent UI lets
-you create them, but **no enforcement mechanism reads them on-device**.
-Real domain-level filtering on Android requires either:
-  - a system-wide VPN doing DNS/SNI inspection (`InternetBlockVpnService`
-    already establishes a VPN for internet-pause — extending it to
-    selectively filter by domain is the natural next step), or
-  - Android's `DevicePolicyManager` DNS-over-HTTPS provider override
-    (API 28+, coarser: whole-device DNS provider, not per-domain rules).
+`pc_website_rules` stores block domain rules (allow rules are stored but
+have no enforcement effect yet — there's no default-deny allow-list mode
+implemented). Enforcement is a local DNS-filtering VPN
+(`InternetBlockVpnService`'s `MODE_DNS_FILTER`, driven by
+`PolicyEnforcer.kt`/`DnsFilterEngine.kt`), the same technique consumer
+ad-blockers/DNS filters like DNS66/AdGuard use on Android without root:
 
-We did not implement either in this pass because doing it wrong (e.g. a
-naive DNS blocklist that HTTPS SNI or DoH trivially bypasses) would be
-worse than admitting it doesn't work yet. **Do not present this feature to
-end users as functional** until enforcement lands. Recommended: hide or
-label the Websites tab "Coming soon" in the parent UI until implemented.
+- Only DNS-port (53) UDP traffic — plus a short list of known public DoH
+  resolver IPs (Cloudflare, Google, Quad9, OpenDNS), for the mitigation
+  below — is ever routed into the VPN's tunnel at all.  **Every other
+  packet, on every other address/port, bypasses the tunnel completely**
+  and is untouched — normal browsing, streaming, etc. see zero difference
+  in behavior or speed except for the specific blocked domains.
+- A blocked domain gets an immediate synthetic NXDOMAIN reply (no real
+  network round-trip). Everything else is forwarded to a real public
+  resolver (Cloudflare `1.1.1.1`) and the reply relayed back verbatim.
+- Blocking a domain also blocks its subdomains (`youtube.com` blocks
+  `www.youtube.com`, `m.youtube.com`, etc.) via suffix matching.
+- Needs the same one-time VPN consent as pause/resume internet — no
+  separate permission, no reset.
+- Never runs at the same time as a `block_internet` schedule (that
+  already blocks everything via the drop-all VPN mode; domain filtering
+  would be moot underneath it, and only one VPN mode can hold the single
+  tunnel Android allows an app at a time) — `PolicyEnforcer` coordinates
+  this so the two never fight over the tunnel.
+
+**Honest limitation — DNS-over-HTTPS bypass:** a browser hardwired to use
+its own DoH resolver (e.g. Chrome/Firefox defaulting to Cloudflare/Google)
+ignores the device's system DNS server entirely, bypassing this filter
+for that browser. We mitigate this by also routing the well-known public
+DoH resolver IPs into the tunnel and dropping their non-port-53 traffic
+outright, which forces that specific DoH connection closed and makes a
+well-behaved browser fall back to system DNS (which we DO filter) — but
+this list is short and best-effort, not exhaustive. A resolver IP outside
+it is not intercepted at all. **Never present this to a parent as
+"guaranteed" blocking** — label it "best-effort" in the UI, same as web
+activity monitoring.
+
+## Tamper detection — Accessibility / Device Admin turned off
+
+Android gives no app a way to truly PREVENT a determined user from
+disabling Accessibility or Device Admin outside of full Device Owner
+mode (see "Optional Advanced mode" above) — this is detection + reaction,
+not prevention, same honest limit as every non-Device-Owner parental
+control app on Android.
+
+`TamperGuard.kt`, driven from `VoiceKidsMonitorService`'s enforcement tick
+plus a `ContentObserver` on `Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES`
+for a near-instant reaction to that specific toggle, and
+`VoiceKidsDeviceAdminReceiver.onDisabled()` for Device Admin — detects the
+moment either permission flips from ON to OFF on a device that had
+completed setup (never fires just for not having finished the setup
+checklist yet) and reacts:
+
+1. Writes a critical `pc_alerts` row (`alert_type = 'tamper_detected'`) so
+   the parent is notified immediately, independent of the WebView.
+2. Shows a persistent, hard-to-dismiss notification on the child's device
+   explaining supervision was disabled and it's been reported.
+3. Immediately locks the screen (`lockDevice()`) as a deterrent — the
+   parent's explicit choice (alert + auto-lock, not alert-only). May fail
+   if Device Admin itself is what just got disabled, since `lockNow()`
+   needs it; that failure is expected and not itself re-reported.
+
+Repeated reminders for a still-off permission are capped at once every 15
+minutes per kind, so a device sitting with Accessibility off doesn't spam
+`pc_alerts` forever.
+
+## Battery optimization exemption (recommended, not required)
+
+Android can silently kill `VoiceKidsMonitorService` in the background on
+stricter OEM battery savers even while it's a foreground service — which
+looks identical to tampering from the parent's side (enforcement just
+stops) but isn't malicious. `DpcActions.isIgnoringBatteryOptimizations` /
+`requestIgnoreBatteryOptimizations` (one normal system dialog, no reset)
+is offered as an optional, recommended item in `SetupChecklistCard.jsx`.
+
+## Child device can also use org features — optional identity link
+
+By default, a device paired as a supervised child device authenticates
+as a throwaway device-only account with no org membership at all, so it
+could never see Sadhana, cleanliness, or any other VOICE feature — by
+design, for children with no org account (e.g. too young for duties).
+
+`pc_children.linked_profile_id` (see `68_child_org_link_and_tamper.sql`)
+lets a parent optionally link a child profile to a REAL VOICE org member
+account (an existing resident's own login) when creating or editing the
+child in Parental Control. When linked:
+
+- Pairing (`pc-generate-pairing-code` / `pc-redeem-pairing-code`) signs
+  the device in AS that member's own account instead of minting a
+  throwaway one — there is exactly one Supabase session on the device,
+  valid for both org RLS (`profiles.id = auth.uid()`) and parental-control
+  device RLS (`pc_devices.auth_user_id = auth.uid()`) simultaneously, with
+  no special-casing needed anywhere in the org auth stack.
+- `src/App.jsx` renders the FULL normal org app (Sadhana, cleanliness,
+  Dashboard, etc.) instead of the isolated child shell, plus a "Family"
+  nav item (`/family`, `/family/sos`, `/family/bonus`, `/family/request`)
+  and a global lock overlay (`FamilySupervision.jsx`) that appears over
+  whatever page is open when the parent locks the device or a blocking
+  schedule is active.
+- Native enforcement (Accessibility soft-block, Device Admin lock/wipe,
+  `PolicyEnforcer`, tamper detection, website filtering) is completely
+  unaffected either way — it already ran off its own independently
+  persisted session in Android SharedPreferences (`VoiceKidsPrefs`), not
+  whatever the WebView's active Supabase session happens to be.
+- Leaving `linked_profile_id` unset preserves today's fully-isolated
+  device-only experience exactly, unchanged — this is purely additive.
 
 ## Website visit / search monitoring — best-effort, not exhaustive
 
@@ -222,11 +317,13 @@ either platform. A real implementation would need:
 
 ## What full support actually requires going forward
 
-1. Website filtering: extend `InternetBlockVpnService` to a selective
-   DNS-filtering VPN (Android's `VpnService` + a userspace DNS proxy that
-   resolves against `pc_website_rules`, refusing SNI/DoH bypass by also
-   blocking known DoH resolver IPs — still imperfect, must be documented as
-   "best-effort" to parents, never "guaranteed").
+1. Website filtering: DNS-based enforcement now exists (see "Website
+   filtering" above) — remaining gap is SNI/TLS-level inspection for
+   browsers that bypass system DNS via hardwired DoH resolvers outside
+   the short mitigated list; closing that fully would need a local
+   TLS-terminating proxy (far more invasive, would need the parent to
+   install a CA certificate on the child's device — a much bigger ask,
+   not recommended unless there's real demand for it).
 2. iOS: separate Swift/SwiftUI companion app using `FamilyControls` +
    `ManagedSettings`, sharing the same Supabase backend and `pc_*` schema.
    This is a multi-week project requiring Apple's entitlement approval.

@@ -280,6 +280,68 @@ export async function createWebsiteRule({ childId, deviceId, domain, action }) {
   return data
 }
 
+// ---------------------------------------------------------------------
+// Website filtering — categories + settings (see src/lib/webCategories.js)
+// ---------------------------------------------------------------------
+
+export async function listCategoryRules(childId) {
+  const { data, error } = await supabase
+    .from('pc_website_category_rules')
+    .select('*')
+    .eq('child_id', childId)
+  if (error) throw error
+  return data ?? []
+}
+
+/** Upserts the allow/block action for one category. Deletes the row if action is null (falls back to the category's own default). */
+export async function setCategoryRule({ childId, categoryKey, action }) {
+  if (!action) {
+    const { error } = await supabase
+      .from('pc_website_category_rules')
+      .delete()
+      .eq('child_id', childId)
+      .eq('category_key', categoryKey)
+    if (error) throw error
+    return null
+  }
+  const { data, error } = await supabase
+    .from('pc_website_category_rules')
+    .upsert({ child_id: childId, category_key: categoryKey, action }, { onConflict: 'child_id,category_key' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+const DEFAULT_FILTER_SETTINGS = {
+  apply_filters: true,
+  block_unsupported_browsers: false,
+  block_unknown_websites: false,
+  enforce_safe_search: false,
+  alert_on_block: true,
+}
+
+export async function getWebsiteFilterSettings(childId) {
+  const { data, error } = await supabase
+    .from('pc_website_filter_settings')
+    .select('*')
+    .eq('child_id', childId)
+    .maybeSingle()
+  if (error) throw error
+  return data ?? { child_id: childId, ...DEFAULT_FILTER_SETTINGS }
+}
+
+export async function updateWebsiteFilterSettings(childId, patch) {
+  const current = await getWebsiteFilterSettings(childId)
+  const { data, error } = await supabase
+    .from('pc_website_filter_settings')
+    .upsert({ ...current, child_id: childId, ...patch }, { onConflict: 'child_id' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function deleteWebsiteRule(ruleId) {
   const { data: rule } = await supabase
     .from('pc_website_rules')

@@ -187,6 +187,50 @@ it is not intercepted at all. **Never present this to a parent as
 "guaranteed" blocking** — label it "best-effort" in the UI, same as web
 activity monitoring.
 
+**Incognito/private browsing does NOT bypass any of this.** DNS filtering
+happens at the network layer, before the browser ever gets a response —
+incognito mode has no effect on it. Web-activity monitoring (below) reads
+the browser's own on-screen address bar, which Chrome/Firefox/etc. still
+render normally in incognito, so visits are logged there too. The only
+real bypass vector is the DoH one above, unrelated to incognito.
+
+### Website filtering categories (`pc_website_category_rules`, `pc_website_filter_settings`)
+
+See `supabase/69_website_categories_and_filter_settings.sql`,
+`src/lib/webCategories.js` / `android/.../dpc/WebCategories.kt`,
+`WebsiteRulesTab.jsx`. Per-child category allow/block (Educational,
+Entertainment, Pornography, Gambling, ... — full list in
+`webCategories.js`) resolves to a domain set that's unioned with the
+per-domain `pc_website_rules` and enforced by the same DNS filter above.
+
+**Honest limitation — seed list, not a classifier.** Each category is a
+*curated list of well-known domains*, not a real-time content-classification
+service. A blocked category catches every domain in its seed list (and any
+custom domain added under "Websites"); it will NOT catch an unlisted site
+hosting the same kind of content. Additional settings close some of that
+gap, each with its own trade-off:
+
+- **Block unsupported browsers** — kicks to home any installed browser app
+  outside the short list `VoiceKidsAccessibilityService` can actually read
+  the address bar of (Chrome, Firefox, Samsung Internet, Edge, Opera,
+  Brave, Mi Browser, DuckDuckGo). Catches browsers in our seed list
+  (`WebCategories.OTHER_KNOWN_BROWSER_PACKAGES`) only — not literally every
+  APK that could exist.
+- **Block unknown websites** — default-denies any domain that isn't in
+  ANY category's seed list and isn't explicitly allowed. Closes most of
+  the "unlisted site" gap above, at the cost of also blocking harmless
+  uncategorized sites (a parent has to explicitly allow them under
+  "Websites").
+- **Enforce Safe Search** — DNS-answers Google/Bing/DuckDuckGo/YouTube
+  queries with the IP of their own "strict" safe-search alias hostname
+  (`forcesafesearch.google.com`, `strict.bing.com`, `safe.duckduckgo.com`,
+  `restrict.youtube.com`) instead of the real one — the same technique
+  those providers document for router/DNS-level filters. Only covers
+  those four engines; a search engine outside this list is unaffected.
+- **Blocked-website alerts** — a rate-limited (15 min per domain)
+  `pc_alerts` row with `alert_type = 'website_blocked'` whenever the DNS
+  filter actually blocks a query, if enabled.
+
 ## Tamper detection — Accessibility / Device Admin turned off
 
 Android gives no app a way to truly PREVENT a determined user from

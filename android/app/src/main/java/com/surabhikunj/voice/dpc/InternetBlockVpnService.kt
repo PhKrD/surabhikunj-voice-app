@@ -219,14 +219,76 @@ class InternetBlockVpnService : VpnService() {
         val dnsQuery = buf.copyOfRange(datagram.payloadOffset, datagram.payloadOffset + datagram.payloadLength)
         val domain = DnsFilterEngine.extractQuestionName(dnsQuery, dnsQuery.size)
 
-        if (domain != null && DnsFilterEngine.isBlocked(domain, VoiceKidsPrefs.blockedDomains(applicationContext))) {
-            Log.i(TAG, "DNS blocked: $domain")
-            val response = DnsFilterEngine.buildBlockedResponsePacket(datagram, dnsQuery, dnsQuery.size)
-            writePacket(output, response)
-            return
+        if (domain != null) {
+            val allowed = DnsFilterEngine.matchesAny(domain, VoiceKidsPrefs.allowedDomains(applicationContext))
+            val blocked = !allowed && (
+                DnsFilterEngine.isBlocked(domain, VoiceKidsPrefs.blockedDomains(applicationContext)) ||
+                    // "Block unknown websites": default-deny anything not
+                    // explicitly categorized/allowed once enabled. A domain
+                    // is "known" if it's in ANY category's seed list
+                    // (allowed or blocked — being blocked already covers
+                    // it above; this only adds the block for domains in
+                    // NO list at all).
+                    (VoiceKidsPrefs.blockUnknownWebsites(applicationContext) &&
+                        !DnsFilterEngine.matchesAny(domain, WebCategories.categoryDomains(WebCategories.CATEGORY_DOMAINS.keys)))
+                )
+            if (blocked) {
+                Log.i(TAG, "DNS blocked: $domain")
+                val response = DnsFilterEngine.buildBlockedResponsePacket(datagram, dnsQuery, dnsQuery.size)
+                writePacket(output, response)
+                maybeAlertBlocked(domain)
+                return
+            }
+
+            if (!allowed && VoiceKidsPrefs.enforceSafeSearch(applicationContext)) {
+                val alias = DnsFilterEngine.safeSearchAliasFor(domain)
+                if (alias != null) {
+                    executor.execute { forwardSafeSearch(datagram, dnsQuery, output, domain, alias) }
+                    return
+                }
+            }
         }
 
         executor.execute { forwardToUpstream(datagram, dnsQuery, output, domain) }
+    }
+
+    /** Resolves the safe-search alias hostname and answers the original query with ITS ip — see DnsFilterEngine.buildSafeSearchResponsePacket. */
+    private fun forwardSafeSearch(datagram: DnsFilterEngine.UdpDatagram, dnsQuery: ByteArray, output: FileOutputStream, domain: String, alias: String) {
+        try {
+            // Our own app is excluded from this VPN's routing (see Builder
+            // setup below), so this plain resolution goes out over the
+            // normal system network path, not back into the tunnel.
+            val resolved = InetAddress.getByName(alias).address
+            if (resolved.size != 4) { // IPv6 alias result — fall back to a real answer rather than guess-truncate
+                forwardToUpstream(datagram, dnsQuery, output, domain)
+                return
+            }
+            val response = DnsFilterEngine.buildSafeSearchResponsePacket(datagram, dnsQuery, dnsQuery.size, resolved)
+            writePacket(output, response)
+        } catch (e: Exception) {
+            Log.w(TAG, "Safe search resolve failed for $domain -> $alias: ${e.message}")
+            forwardToUpstream(datagram, dnsQuery, output, domain)
+        }
+    }
+
+    /** Rate-limited (per-domain, 15 min) pc_alerts insert when alert_on_block is enabled — see pc_website_filter_settings. */
+    private fun maybeAlertBlocked(domain: String) {
+        if (!VoiceKidsPrefs.alertOnWebsiteBlock(applicationContext)) return
+        val now = System.currentTimeMillis()
+        if (now - VoiceKidsPrefs.lastWebsiteBlockAlertAt(applicationContext, domain) < 15 * 60_000L) return
+        VoiceKidsPrefs.setLastWebsiteBlockAlertAt(applicationContext, domain, now)
+
+        val deviceId = VoiceKidsPrefs.deviceId(applicationContext) ?: return
+        val childId = VoiceKidsPrefs.childId(applicationContext) ?: return
+        val row = org.json.JSONObject().apply {
+            put("device_id", deviceId)
+            put("child_id", childId)
+            put("alert_type", "website_blocked")
+            put("severity", "info")
+            put("title", "Blocked website attempt")
+            put("body", "Tried to visit a blocked website: $domain")
+        }
+        SupabaseRest.insert(applicationContext, "pc_alerts", row)
     }
 
     private fun forwardToUpstream(datagram: DnsFilterEngine.UdpDatagram, dnsQuery: ByteArray, output: FileOutputStream, domain: String?) {

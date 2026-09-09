@@ -90,17 +90,35 @@ object DnsFilterEngine {
         return if (sb.isEmpty()) null else sb.toString().lowercase()
     }
 
-    /** True if `domain` (or any parent domain of it) is in `blockedDomains` — so blocking "youtube.com" also matches "www.youtube.com". */
-    fun isBlocked(domain: String, blockedDomains: Set<String>): Boolean {
-        if (blockedDomains.isEmpty()) return false
+    /** True if `domain` (or any parent domain of it) is in `domainSet` — so blocking/allowing "youtube.com" also matches "www.youtube.com". */
+    fun isBlocked(domain: String, domainSet: Set<String>): Boolean {
+        if (domainSet.isEmpty()) return false
         var d = domain
         while (true) {
-            if (blockedDomains.contains(d)) return true
+            if (domainSet.contains(d)) return true
             val dot = d.indexOf('.')
             if (dot < 0) return false
             d = d.substring(dot + 1)
         }
     }
+
+    /** Same parent-domain-walk membership test as isBlocked — named separately at call sites for readability (allow-list / known-domain checks). */
+    fun matchesAny(domain: String, domainSet: Set<String>): Boolean = isBlocked(domain, domainSet)
+
+    // ── Safe Search (DNS-based, see buildSafeSearchResponsePacket) ──────
+    // (host-suffix match, safe alias hostname to resolve instead). Real
+    // technique documented by each provider for router/DNS-level filters.
+    val SAFE_SEARCH_ALIASES: List<Pair<String, String>> = listOf(
+        "google." to "forcesafesearch.google.com",
+        "bing.com" to "strict.bing.com",
+        "duckduckgo.com" to "safe.duckduckgo.com",
+        "youtube.com" to "restrict.youtube.com",
+        "ytimg.com" to "restrict.youtube.com",
+    )
+
+    /** Returns the safe alias hostname to resolve-and-substitute for, or null if `domain` isn't a known search/video engine. */
+    fun safeSearchAliasFor(domain: String): String? =
+        SAFE_SEARCH_ALIASES.firstOrNull { (suffix, _) -> domain == suffix.trimEnd('.') || domain.endsWith(".$suffix") || domain.contains(suffix) }?.second
 
     /**
      * Builds a synthetic NXDOMAIN DNS response for a blocked query,
@@ -127,6 +145,39 @@ object DnsFilterEngine {
             dstIp = query.srcIp, dstPort = query.srcPort,
             payload = upstreamResponse,
         )
+
+    /**
+     * Builds a synthetic DNS response for `dnsQuery` that answers with a
+     * single A record pointing at `resolvedIp` (an already-resolved
+     * "safe" alias, e.g. forcesafesearch.google.com's IP), under the
+     * ORIGINAL queried name — this is the standard DNS-based Safe Search
+     * enforcement technique (same one Google/Bing/DuckDuckGo document for
+     * router-level DNS filters). Uses a compression pointer (0xC00C) back
+     * to the question name rather than repeating it, which is legal and
+     * simpler than re-encoding the labels.
+     */
+    fun buildSafeSearchResponsePacket(query: UdpDatagram, dnsQuery: ByteArray, dnsQueryLength: Int, resolvedIp: ByteArray): ByteArray {
+        val header = dnsQuery.copyOf(12)
+        header[2] = (header[2].toInt() or 0x80).toByte() // QR=1 (response); RCODE (byte 3) stays 0 = no error
+        writeU16(header, 6, 1) // ANCOUNT=1
+
+        val question = dnsQuery.copyOfRange(12, dnsQueryLength)
+        val answer = ByteArray(10 + 4).apply {
+            writeU16(this, 0, 0xC00C) // name = pointer to offset 12 (the question name)
+            writeU16(this, 2, 1)      // TYPE=A
+            writeU16(this, 4, 1)      // CLASS=IN
+            writeU32(this, 6, 60)     // TTL=60s — short, so a later disabled-toggle takes effect quickly
+            writeU16(this, 10, 4)     // RDLENGTH=4
+            System.arraycopy(resolvedIp, 0, this, 12, 4)
+        }
+
+        val dnsResponse = header + question + answer
+        return buildIpv4UdpPacket(
+            srcIp = query.dstIp, srcPort = DNS_PORT,
+            dstIp = query.srcIp, dstPort = query.srcPort,
+            payload = dnsResponse,
+        )
+    }
 
     private var identCounter = 0
 
@@ -168,6 +219,13 @@ object DnsFilterEngine {
     private fun writeU16(buf: ByteArray, offset: Int, value: Int) {
         buf[offset] = ((value shr 8) and 0xFF).toByte()
         buf[offset + 1] = (value and 0xFF).toByte()
+    }
+
+    private fun writeU32(buf: ByteArray, offset: Int, value: Int) {
+        buf[offset] = ((value shr 24) and 0xFF).toByte()
+        buf[offset + 1] = ((value shr 16) and 0xFF).toByte()
+        buf[offset + 2] = ((value shr 8) and 0xFF).toByte()
+        buf[offset + 3] = (value and 0xFF).toByte()
     }
 
     /** Standard Internet checksum (RFC 791) over `length` bytes starting at `offset`. Caller must zero the checksum field first. */

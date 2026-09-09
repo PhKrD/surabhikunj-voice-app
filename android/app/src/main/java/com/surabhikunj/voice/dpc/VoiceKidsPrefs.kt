@@ -184,4 +184,44 @@ object VoiceKidsPrefs {
     fun setWebsiteFilterActive(context: Context, active: Boolean) {
         prefs(context).edit().putBoolean("website_filter_active", active).apply()
     }
+
+    // ── Website filtering: categories + settings (see WebCategories.kt, ──
+    // pc_website_category_rules / pc_website_filter_settings) ───────────
+
+    /** Domains explicitly allow-listed (individual rule OR an allowed category) — overrides block on conflict AND is the exception set for "block unknown websites". */
+    fun allowedDomains(context: Context): Set<String> =
+        prefs(context).getStringSet("website_allowed_domains", emptySet()) ?: emptySet()
+
+    fun setAllowedDomains(context: Context, domains: Set<String>) {
+        prefs(context).edit().putStringSet("website_allowed_domains", domains).apply()
+    }
+
+    fun blockUnknownWebsites(context: Context): Boolean =
+        prefs(context).getBoolean("block_unknown_websites", false)
+
+    fun setBlockUnknownWebsites(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean("block_unknown_websites", enabled).apply()
+    }
+
+    fun enforceSafeSearch(context: Context): Boolean =
+        prefs(context).getBoolean("enforce_safe_search", false)
+
+    fun setEnforceSafeSearch(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean("enforce_safe_search", enabled).apply()
+    }
+
+    fun alertOnWebsiteBlock(context: Context): Boolean =
+        prefs(context).getBoolean("alert_on_website_block", true)
+
+    fun setAlertOnWebsiteBlock(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean("alert_on_website_block", enabled).apply()
+    }
+
+    /** Per-domain cooldown so a repeatedly-retried blocked domain doesn't spam pc_alerts. */
+    fun lastWebsiteBlockAlertAt(context: Context, domain: String): Long =
+        prefs(context).getLong("last_website_block_alert_$domain", 0L)
+
+    fun setLastWebsiteBlockAlertAt(context: Context, domain: String, epochMillis: Long) {
+        prefs(context).edit().putLong("last_website_block_alert_$domain", epochMillis).apply()
+    }
 }

@@ -79,6 +79,9 @@ object PolicyEnforcer {
         // block near the end of this function, which simply skips updating
         // when this is null rather than treating it as "no blocked domains").
         val websiteRules = fetchRows(context, "pc_website_rules", "child_id=eq.$childId&is_enabled=eq.true&select=domain,action")
+        val categoryRules = fetchRows(context, "pc_website_category_rules", "child_id=eq.$childId&select=category_key,action")
+        val filterSettingsRows = fetchRows(context, "pc_website_filter_settings", "child_id=eq.$childId&select=*")
+        val filterSettings = filterSettingsRows?.optJSONObject(0)
 
         val bonusActive = VoiceKidsPrefs.isBonusActive(context)
         val now = Calendar.getInstance()
@@ -89,11 +92,32 @@ object PolicyEnforcer {
             UsageStatsHelper.queryTodayUsage(context).associate { it.packageName to it.totalForegroundMs }
         } else emptyMap()
 
-        val (blockList, allowList) = resolveAppRules(rules, usageByPackage, usageAvailable, bonusActive)
-        val blockedDomains = resolveBlockedDomains(websiteRules)
+        val (blockListBase, allowList) = resolveAppRules(rules, usageByPackage, usageAvailable, bonusActive)
+        val applyFilters = filterSettings?.optBoolean("apply_filters", true) ?: true
+        val blockUnsupportedBrowsers = applyFilters && (filterSettings?.optBoolean("block_unsupported_browsers", false) ?: false)
+        val blockUnknownWebsites = applyFilters && (filterSettings?.optBoolean("block_unknown_websites", false) ?: false)
+        val enforceSafeSearch = applyFilters && (filterSettings?.optBoolean("enforce_safe_search", false) ?: false)
+        val alertOnBlock = filterSettings?.optBoolean("alert_on_block", true) ?: true
+
+        // "Block unsupported browsers": kick to home any known browser app
+        // that isn't one VoiceKidsAccessibilityService can actually read
+        // the address bar of / DNS filtering can't be bypassed via — see
+        // WebCategories.kt's doc comment.
+        val blockList = if (blockUnsupportedBrowsers) {
+            blockListBase + WebCategories.OTHER_KNOWN_BROWSER_PACKAGES
+        } else blockListBase
+
+        val (categoryBlockedDomains, categoryAllowedDomains) = resolveCategoryDomains(categoryRules)
+        val blockedDomains = resolveBlockedDomains(websiteRules)?.let { it + (if (applyFilters) categoryBlockedDomains else emptySet()) }
+        val allowedDomains = (resolveAllowedDomains(websiteRules) ?: emptySet()) + (if (applyFilters) categoryAllowedDomains else emptySet())
+        VoiceKidsPrefs.setAllowedDomains(context, allowedDomains)
+        VoiceKidsPrefs.setBlockUnknownWebsites(context, blockUnknownWebsites)
+        VoiceKidsPrefs.setEnforceSafeSearch(context, enforceSafeSearch)
+        VoiceKidsPrefs.setAlertOnWebsiteBlock(context, alertOnBlock)
 
         val signature = "${activeSchedule?.optString("id")}|${activeSchedule?.optString("action")}|" +
-            "${blockList.sorted()}|${allowList.sorted()}|${blockedDomains?.sorted()}"
+            "${blockList.sorted()}|${allowList.sorted()}|${blockedDomains?.sorted()}|" +
+            "$blockUnknownWebsites|$enforceSafeSearch|${allowedDomains.sorted()}"
         val appliedSignature = VoiceKidsPrefs.appliedSignature(context)
         val appliedScheduleLock = VoiceKidsPrefs.appliedScheduleLock(context)
 
@@ -194,7 +218,8 @@ object PolicyEnforcer {
             // would be moot underneath a full internet pause, and only one
             // VPN mode can hold the tunnel at a time anyway.
             val scheduleOwnsVpn = activeSchedule?.optString("action") == "block_internet"
-            val desiredWebsiteFilter = blockedDomains.isNotEmpty() && !scheduleOwnsVpn && DpcActions.hasVpnConsent(context)
+            val desiredWebsiteFilter = (blockedDomains.isNotEmpty() || blockUnknownWebsites || enforceSafeSearch) &&
+                !scheduleOwnsVpn && DpcActions.hasVpnConsent(context)
             if (desiredWebsiteFilter != websiteFilterActive) {
                 if (desiredWebsiteFilter) {
                     if (DpcActions.startWebsiteFilter(context)) {
@@ -334,6 +359,60 @@ object PolicyEnforcer {
         }
         return blocked
     }
+
+    /** Individually allow-listed domains (rule.action == 'allow') — overrides a category block on conflict. Null on fetch failure, mirrors resolveBlockedDomains. */
+    private fun resolveAllowedDomains(websiteRules: JSONArray?): Set<String>? {
+        if (websiteRules == null) return null
+        val allowed = mutableSetOf<String>()
+        for (i in 0 until websiteRules.length()) {
+            val rule = websiteRules.getJSONObject(i)
+            if (rule.optString("action") == "allow") {
+                rule.optString("domain").trim().lowercase().takeIf { it.isNotEmpty() }?.let { allowed.add(it) }
+            }
+        }
+        return allowed
+    }
+
+    /**
+     * Resolves per-category allow/block into concrete domain sets via
+     * WebCategories.CATEGORY_DOMAINS. A category with no explicit row
+     * uses its own default (see src/lib/webCategories.js defaultAction) —
+     * matters because most categories default to 'allow' and only a
+     * handful (gambling, violence, pornography, ...) default to 'block'.
+     */
+    private fun resolveCategoryDomains(categoryRules: JSONArray?): Pair<Set<String>, Set<String>> {
+        val explicit = mutableMapOf<String, String>() // category_key -> action
+        if (categoryRules != null) {
+            for (i in 0 until categoryRules.length()) {
+                val row = categoryRules.getJSONObject(i)
+                val key = row.optString("category_key").takeIf { it.isNotEmpty() } ?: continue
+                explicit[key] = row.optString("action")
+            }
+        }
+        val blocked = mutableSetOf<String>()
+        val allowed = mutableSetOf<String>()
+        for ((key, domains) in WebCategories.CATEGORY_DOMAINS) {
+            val action = explicit[key] ?: DEFAULT_CATEGORY_ACTION[key] ?: "allow"
+            if (action == "block") blocked.addAll(domains) else allowed.addAll(domains)
+        }
+        return blocked to allowed
+    }
+
+    // Mirrors src/lib/webCategories.js's per-category defaultAction — kept
+    // in sync manually (only the categories that default to 'block' need
+    // listing; everything else defaults to 'allow').
+    private val DEFAULT_CATEGORY_ACTION = mapOf(
+        "gambling" to "block",
+        "proxies_loopholes" to "block",
+        "violence" to "block",
+        "weapons" to "block",
+        "profanity" to "block",
+        "mature_content" to "block",
+        "pornography" to "block",
+        "alcohol" to "block",
+        "drugs" to "block",
+        "tobacco" to "block",
+    )
 
     // ── I/O helpers ──────────────────────────────────────────────────────
 

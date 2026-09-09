@@ -91,6 +91,9 @@ export function diagnosticChecklist(device, child, now = Date.now()) {
   const state = device?.enforcement_state ?? {}
   const online = isDeviceOnline(device, now)
   const migrationApplied = isMigrationApplied(device)
+  const appliedVersion = device?.applied_policy_version ?? null
+  const currentVersion = child?.policy_version ?? null
+  const versionsMatch = appliedVersion != null && currentVersion != null && appliedVersion === currentVersion
 
   return [
     { key: 'connected', ok: online, label: online ? 'Device connected' : 'Device offline' },
@@ -118,7 +121,12 @@ export function diagnosticChecklist(device, child, now = Date.now()) {
     },
     {
       key: 'policy_sync',
-      ok: migrationApplied ? derivePolicySyncState(device, child, now) === 'in_sync' : null,
+      // The "applied version" check is purely about whether the device has
+      // confirmed it received and applied the current policy version. A
+      // separate `last_error` row already surfaces enforcement problems,
+      // so this row should not turn red just because an optional/advanced
+      // issue (e.g. not Device Owner) is reported.
+      ok: migrationApplied ? versionsMatch && online : null,
       label: migrationApplied
         ? `Policy version ${device?.applied_policy_version ?? '—'} of ${child?.policy_version ?? '—'} applied`
         : 'Policy version tracking unavailable (migration pending)',

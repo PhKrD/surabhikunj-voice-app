@@ -8,29 +8,31 @@
  * silently. See PLATFORM_LIMITATIONS.md for the full enforcement model.
  *
  * Renders nothing once everything required is granted (Device Admin +
- * Accessibility). Overlay and VPN consent are listed as recommended but
- * not required, since app-blocking already works without them (overlay
- * only adds the "why was I kicked out" explanation screen; VPN consent is
- * only needed for the internet-pause schedule action specifically).
+ * Accessibility + Usage access). Overlay and VPN consent are listed as
+ * recommended but not required, since app-blocking already works without
+ * them (overlay only adds the "why was I kicked out" explanation screen;
+ * VPN consent is only needed for internet pause and website filtering).
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { ShieldCheck, Eye, AppWindow, Wifi, BatteryCharging, ChevronRight } from 'lucide-react'
+import { ShieldCheck, Eye, AppWindow, Wifi, BatteryCharging, ChevronRight, BarChart3 } from 'lucide-react'
 import { dpc } from '../../lib/dpcPlugin.js'
 import { hasAccessibilityAccess, openAccessibilitySettings } from '../../lib/accessibilityPlugin.js'
+import { hasUsageAccess, openUsageAccessSettings } from '../../lib/usageStatsPlugin.js'
 
 export default function SetupChecklistCard() {
   const [status, setStatus] = useState(null)
 
   const refresh = useCallback(async () => {
-    const [{ isDeviceAdmin }, { enabled }, { granted: overlayGranted }, { granted: vpnGranted }, { granted: batteryGranted }] = await Promise.all([
+    const [{ isDeviceAdmin }, { enabled }, { granted: usageGranted }, { granted: overlayGranted }, { granted: vpnGranted }, { granted: batteryGranted }] = await Promise.all([
       dpc.isDeviceOwner(),
       hasAccessibilityAccess(),
+      hasUsageAccess(),
       dpc.canDrawOverlays(),
       dpc.hasVpnConsent(),
       dpc.isIgnoringBatteryOptimizations(),
     ])
-    setStatus({ deviceAdmin: isDeviceAdmin, accessibility: enabled, overlay: overlayGranted, vpn: vpnGranted, battery: batteryGranted })
+    setStatus({ deviceAdmin: isDeviceAdmin, accessibility: enabled, usage: usageGranted, overlay: overlayGranted, vpn: vpnGranted, battery: batteryGranted })
   }, [])
 
   useEffect(() => {
@@ -61,6 +63,15 @@ export default function SetupChecklistCard() {
       label: 'Enable Accessibility for VOICE',
       hint: 'Needed to block apps and track web activity',
       action: () => openAccessibilitySettings().then(refresh),
+      required: true,
+    },
+    {
+      key: 'usage',
+      done: status.usage,
+      icon: BarChart3,
+      label: 'Allow Usage access',
+      hint: 'Needed for daily screen-time limits and per-app time limits',
+      action: () => openUsageAccessSettings().then(refresh),
       required: true,
     },
     {

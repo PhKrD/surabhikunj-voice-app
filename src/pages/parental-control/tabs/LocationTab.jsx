@@ -14,6 +14,34 @@ import {
 
 const defaultForm = { name: '', latitude: '', longitude: '', radiusMeters: 200 }
 
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const r = 6_371_000
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLon = ((lon2 - lon1) * Math.PI) / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2
+  return 2 * r * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+/**
+ * Dependency-free map: an OpenStreetMap embed centred on a point, with a
+ * marker. Good enough to answer "where is my child right now" at a glance
+ * without pulling in a maps SDK; the coordinates link opens Google Maps.
+ */
+function MapEmbed({ latitude, longitude, zoomDelta = 0.01, height = 220 }) {
+  const bbox = [longitude - zoomDelta, latitude - zoomDelta * 0.6, longitude + zoomDelta, latitude + zoomDelta * 0.6].join(',')
+  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${latitude},${longitude}`
+  return (
+    <iframe
+      title="Map"
+      src={src}
+      style={{ width: '100%', height, border: 0 }}
+      className="rounded-xl"
+      loading="lazy"
+      referrerPolicy="no-referrer-when-downgrade"
+    />
+  )
+}
+
 export default function LocationTab({ childId }) {
   const { org } = useOrgStore()
   const toast = useToastStore()
@@ -115,31 +143,50 @@ export default function LocationTab({ childId }) {
         <CardBody className="py-4">
           <p className="text-sm font-semibold text-primary-token mb-2">Last known location</p>
           {latest ? (
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                <MapPin className="w-5 h-5 text-indigo-500" />
-              </div>
-              <div>
-                <a
-                  href={`https://www.google.com/maps?q=${latest.latitude},${latest.longitude}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm font-medium text-indigo-600 hover:underline"
-                >
-                  {latest.latitude.toFixed(5)}, {latest.longitude.toFixed(5)}
-                </a>
-                <p className="text-xs text-muted-token">{new Date(latest.recorded_at).toLocaleString()}</p>
+            <div className="space-y-3">
+              <MapEmbed latitude={latest.latitude} longitude={latest.longitude} />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-5 h-5 text-indigo-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <a
+                    href={`https://www.google.com/maps?q=${latest.latitude},${latest.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-medium text-indigo-600 hover:underline"
+                  >
+                    {latest.latitude.toFixed(5)}, {latest.longitude.toFixed(5)}
+                  </a>
+                  <p className="text-xs text-muted-token">
+                    {new Date(latest.recorded_at).toLocaleString()}
+                    {latest.accuracy_meters ? ` · ±${Math.round(latest.accuracy_meters)} m` : ''}
+                  </p>
+                </div>
+                {geofences.length > 0 && (() => {
+                  const inside = geofences.filter((gf) => haversineMeters(latest.latitude, latest.longitude, gf.latitude, gf.longitude) <= gf.radius_meters)
+                  return (
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${inside.length ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                      {inside.length ? `At ${inside.map((g) => g.name).join(', ')}` : 'Not at a saved place'}
+                    </span>
+                  )
+                })()}
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-token">No location reported yet.</p>
+            <p className="text-sm text-muted-token">
+              No location reported yet. Location permission must be granted to VOICE on the child device (Settings → Apps → VOICE → Permissions → Location → Allow all the time).
+            </p>
           )}
         </CardBody>
       </Card>
 
       {/* Geofences */}
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-primary-token">Safe zones</p>
+        <div>
+          <p className="text-sm font-semibold text-primary-token">Places</p>
+          <p className="text-xs text-muted-token">Home, school, grandma's… you get an alert when your child arrives or leaves.</p>
+        </div>
         <Button
           size="sm"
           icon={showForm ? X : Plus}
@@ -216,7 +263,7 @@ export default function LocationTab({ childId }) {
 
       <div className="space-y-2">
         {geofences.length === 0 && !showForm && (
-          <p className="text-sm text-muted-token text-center py-4">No safe zones yet.</p>
+          <p className="text-sm text-muted-token text-center py-4">No places yet. Add one and use "Use my current location" while you're there.</p>
         )}
         {geofences.map((gf) => (
           <Card key={gf.id}>

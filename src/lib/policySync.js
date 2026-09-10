@@ -67,7 +67,9 @@ export const POLICY_SYNC_META = {
 /** Human-readable reason for a device.enforcement_state.last_error code. */
 export const ENFORCEMENT_ERROR_LABEL = {
   not_device_admin: 'This device has not activated Device Admin yet, so screen lock and internet-pause cannot be enforced. Open VOICE on the device and finish setup.',
-  not_device_owner: 'This device is not set up as Device Owner, so app rules cannot be enforced. It must be re-provisioned.',
+  // Legacy code from builds before the native engine took over; a healthy
+  // Device Admin device clears it on its next enforcement pass.
+  not_device_owner: 'Stale status from an older app version — update VOICE on the child device. App rules are enforced without Device Owner.',
   partial_apply_failure: 'Some rules could not be applied. The device will retry automatically.',
   no_usage_access: 'Usage Access permission was revoked, so time-limit rules cannot be checked.',
 }
@@ -117,7 +119,7 @@ export function diagnosticChecklist(device, child, now = Date.now()) {
       // Informational only — Device Owner is an optional stronger mode,
       // never required, so its absence is never a checklist failure.
       ok: true,
-      label: state.device_owner ? 'Advanced mode: Device Owner active' : 'Standard mode (Device Admin) — Advanced mode not set up',
+      label: state.device_owner ? 'Advanced mode: Device Owner active' : 'Standard mode (Device Admin + Accessibility) — full protection, no factory reset needed',
     },
     {
       key: 'policy_sync',

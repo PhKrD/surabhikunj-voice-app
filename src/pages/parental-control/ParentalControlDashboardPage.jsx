@@ -4,7 +4,6 @@ import { Smartphone, Clock, AlertTriangle, ShieldCheck, ArrowRight, Activity } f
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
-import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
 import { listChildren, getTodayUsage, listAlerts, listDevices } from '@/lib/parentalControlApi'
 
@@ -22,19 +21,26 @@ function isOnline(lastSeenAt) {
   return diff < 2 * 60 * 1000 // 2 minutes
 }
 
-// Real, honest protection status derived from device_owner_mode (same field
-// DevicesTab uses) — never a fabricated "Protected" flag. See PLATFORM_LIMITATIONS.md.
+// Real, honest protection status derived from what the device itself last
+// reported (enforcement_state — Device Admin + Accessibility + Usage access
+// is the full, no-reset setup; Device Owner is an optional extra). Falls
+// back to device_owner_mode for devices that have never reported. Never a
+// fabricated "Protected" flag. See PLATFORM_LIMITATIONS.md.
 function protectionMeta(devices) {
-  if (devices.some((d) => d.device_owner_mode === 'device_owner')) {
-    return { label: 'Protected', variant: 'tulasi' }
-  }
-  if (devices.some((d) => d.device_owner_mode === 'device_admin')) {
-    return { label: 'Limited protection', variant: 'yellow' }
-  }
-  if (devices.length > 0) {
-    return { label: 'Setup needed', variant: 'saffron' }
-  }
-  return null
+  const active = devices.filter((d) => d.is_active)
+  if (active.length === 0) return null
+  const fullyProtected = active.every((d) => {
+    const s = d.enforcement_state
+    if (s) return s.device_admin !== false && s.accessibility_enabled !== false && s.usage_access !== false
+    return d.device_owner_mode === 'device_owner'
+  })
+  if (fullyProtected) return { label: 'Protected', variant: 'tulasi' }
+  const partly = active.some((d) => {
+    const s = d.enforcement_state
+    return s ? (s.device_admin || s.accessibility_enabled) : d.device_owner_mode === 'device_admin'
+  })
+  if (partly) return { label: 'Setup incomplete', variant: 'yellow' }
+  return { label: 'Setup needed', variant: 'saffron' }
 }
 
 export default function ParentalControlDashboardPage() {

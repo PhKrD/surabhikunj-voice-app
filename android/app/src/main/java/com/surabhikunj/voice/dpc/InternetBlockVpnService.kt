@@ -240,6 +240,13 @@ class InternetBlockVpnService : VpnService() {
                 return
             }
 
+            // 'alert' action (category or individual rule): resolve normally
+            // but tell the parent. Explicit allow-list wins over alert, same
+            // as it wins over block.
+            if (!allowed && DnsFilterEngine.matchesAny(domain, VoiceKidsPrefs.alertDomains(applicationContext))) {
+                maybeAlertVisited(domain)
+            }
+
             if (!allowed && VoiceKidsPrefs.enforceSafeSearch(applicationContext)) {
                 val alias = DnsFilterEngine.safeSearchAliasFor(domain)
                 if (alias != null) {
@@ -271,6 +278,27 @@ class InternetBlockVpnService : VpnService() {
         }
     }
 
+    /** Rate-limited (per-domain, 30 min) pc_alerts insert for the 'alert' web-filter action (allowed, but the parent is told). */
+    private fun maybeAlertVisited(domain: String) {
+        val now = System.currentTimeMillis()
+        if (now - VoiceKidsPrefs.lastWebsiteVisitAlertAt(applicationContext, domain) < 30 * 60_000L) return
+        VoiceKidsPrefs.setLastWebsiteVisitAlertAt(applicationContext, domain, now)
+
+        val deviceId = VoiceKidsPrefs.deviceId(applicationContext) ?: return
+        val childId = VoiceKidsPrefs.childId(applicationContext) ?: return
+        val row = org.json.JSONObject().apply {
+            put("device_id", deviceId)
+            put("child_id", childId)
+            put("alert_type", "website_alert")
+            put("severity", "info")
+            put("title", "Visited a flagged website")
+            put("body", "Opened $domain (allowed, flagged for your attention).")
+            put("metadata", org.json.JSONObject().put("domain", domain))
+        }
+        dnsDispatchExecutor?.execute { SupabaseRest.insert(applicationContext, "pc_alerts", row) }
+            ?: SupabaseRest.insert(applicationContext, "pc_alerts", row)
+    }
+
     /** Rate-limited (per-domain, 15 min) pc_alerts insert when alert_on_block is enabled — see pc_website_filter_settings. */
     private fun maybeAlertBlocked(domain: String) {
         if (!VoiceKidsPrefs.alertOnWebsiteBlock(applicationContext)) return
@@ -287,8 +315,12 @@ class InternetBlockVpnService : VpnService() {
             put("severity", "info")
             put("title", "Blocked website attempt")
             put("body", "Tried to visit a blocked website: $domain")
+            put("metadata", org.json.JSONObject().put("domain", domain))
         }
-        SupabaseRest.insert(applicationContext, "pc_alerts", row)
+        // Off the DNS read loop — a blocking HTTP insert there would stall
+        // every other DNS answer for the duration of the request.
+        dnsDispatchExecutor?.execute { SupabaseRest.insert(applicationContext, "pc_alerts", row) }
+            ?: SupabaseRest.insert(applicationContext, "pc_alerts", row)
     }
 
     private fun forwardToUpstream(datagram: DnsFilterEngine.UdpDatagram, dnsQuery: ByteArray, output: FileOutputStream, domain: String?) {

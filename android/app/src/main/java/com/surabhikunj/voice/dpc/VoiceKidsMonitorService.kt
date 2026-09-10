@@ -346,10 +346,30 @@ class VoiceKidsMonitorService : Service() {
         )
 
         val success = when (commandType) {
-            "lock_device" -> DpcActions.lockDevice(context)
-            "unlock_device" -> DpcActions.unlockDevice(context)
-            "pause_internet" -> DpcActions.pauseInternet(context)
-            "resume_internet" -> DpcActions.resumeInternet(context)
+            "lock_device" -> {
+                // Persistent parent lock (see VoiceKidsDpcPlugin.lockDevice) +
+                // an immediate screen lock. The persistent part never needs
+                // Device Admin, so the command "succeeds" as long as the
+                // Accessibility soft-lock can carry it; lockNow() is a bonus.
+                VoiceKidsPrefs.setParentLockActive(context, true)
+                DpcActions.lockDevice(context)
+                true
+            }
+            "unlock_device" -> {
+                VoiceKidsPrefs.setParentLockActive(context, false)
+                if (DpcActions.isDeviceAdmin(context)) DpcActions.unlockDevice(context)
+                true
+            }
+            "pause_internet" -> {
+                // Persistent until resume_internet — see VoiceKidsPrefs.manualInternetPause.
+                val paused = DpcActions.pauseInternet(context)
+                if (paused) VoiceKidsPrefs.setManualInternetPause(context, true)
+                paused
+            }
+            "resume_internet" -> {
+                VoiceKidsPrefs.setManualInternetPause(context, false)
+                DpcActions.resumeInternet(context)
+            }
             "grant_bonus_time" -> {
                 val expiresAt = cmd.optJSONObject("payload")?.optString("expires_at")?.takeIf { it.isNotEmpty() }
                 val epoch = expiresAt?.let { parseIsoToEpochMillis(it) }
@@ -375,6 +395,12 @@ class VoiceKidsMonitorService : Service() {
             },
         )
 
+        // Lock/bonus commands change what PolicyEnforcer should be doing —
+        // apply immediately instead of waiting for the next 4s tick. After
+        // the ack above so the parent sees "executed" without waiting for
+        // the (network-bound) enforcement pass.
+        if (success) runCatching { PolicyEnforcer.enforce(context) }
+
         if (!success && childId != null) {
             val alert = JSONObject().apply {
                 put("child_id", childId)
@@ -382,7 +408,7 @@ class VoiceKidsMonitorService : Service() {
                 put("alert_type", "device_offline")
                 put("severity", "warning")
                 put("title", "Command \"$commandType\" failed")
-                put("body", "Executed natively while app was backgrounded, but the action failed. The device may need to be re-enrolled as Device Owner.")
+                put("body", "The action failed on the device. Open VOICE on the child device and check the setup checklist (Device Admin / VPN permission).")
                 put("metadata", JSONObject().put("command_id", commandId).put("command_type", commandType))
             }
             SupabaseRest.insert(context, "pc_alerts", alert)

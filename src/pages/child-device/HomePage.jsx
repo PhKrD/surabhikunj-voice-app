@@ -22,21 +22,17 @@ import SetupChecklistCard from '../../components/child-device/SetupChecklistCard
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const { childName, bonusActive, setLastCommand } = useDeviceState()
+  const { childName, bonusActive, setLastCommand, screenTime } = useDeviceState()
   const [usageMinutes, setUsageMinutes] = useState(null)
   const [usageAccessGranted, setUsageAccessGranted] = useState(true)
 
-  // Command handler — updates UI when DPC commands arrive
+  // Command handler — updates UI when DPC commands arrive. Lock/unlock
+  // navigation is driven by the native enforcement snapshot in
+  // ChildDeviceShell, not by individual commands.
   useEffect(() => {
-    startCommandPoller((cmd) => {
-      setLastCommand(cmd)
-      // If the parent locked the device, show the lock screen
-      if (cmd.command_type === 'lock_device') {
-        navigate('/child/locked', { replace: true })
-      }
-    })
+    startCommandPoller((cmd) => setLastCommand(cmd))
     return () => stopCommandPoller()
-  }, [navigate, setLastCommand])
+  }, [setLastCommand])
 
   // Ensure the background monitoring service is (re)running — cheap no-op
   // if it's already alive, and handles the "service was killed" case.
@@ -87,9 +83,29 @@ export default function HomePage() {
           </div>
 
           {usageAccessGranted ? (
-            <p className="text-3xl font-bold text-indigo-600">
-              {usageMinutes === null ? '—' : formatMinutes(usageMinutes)}
-            </p>
+            <>
+              <p className="text-3xl font-bold text-indigo-600">
+                {usageMinutes === null ? '—' : formatMinutes(usageMinutes)}
+                {screenTime.limitMin != null && (
+                  <span className="text-base font-medium text-gray-400"> / {formatMinutes(screenTime.limitMin)}</span>
+                )}
+              </p>
+              {screenTime.limitMin != null && (
+                <div className="mt-3">
+                  <div className="h-2 w-full bg-indigo-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${(usageMinutes ?? 0) >= screenTime.limitMin ? 'bg-red-500' : 'bg-indigo-500'}`}
+                      style={{ width: `${screenTime.limitMin > 0 ? Math.min(100, Math.round(((usageMinutes ?? 0) / screenTime.limitMin) * 100)) : 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    {Math.max(0, screenTime.limitMin - (usageMinutes ?? 0)) > 0
+                      ? `${formatMinutes(Math.max(0, screenTime.limitMin - (usageMinutes ?? 0)))} left today`
+                      : "Today's limit reached"}
+                  </p>
+                </div>
+              )}
+            </>
           ) : (
             <button
               onClick={openUsageAccessSettings}

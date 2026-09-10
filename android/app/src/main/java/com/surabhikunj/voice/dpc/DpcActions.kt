@@ -247,6 +247,9 @@ object DpcActions {
                 }
             }
             InternetBlockVpnService.start(context)
+            // The tunnel is now in block-all mode, so the DNS-filter mode is
+            // no longer running whatever PolicyEnforcer last recorded.
+            VoiceKidsPrefs.setWebsiteFilterActive(context, false)
             Log.i(TAG, "pauseInternet: VPN started — internet blocked for all apps except self")
             true
         } catch (e: Exception) {
@@ -258,6 +261,7 @@ object DpcActions {
     fun resumeInternet(context: Context): Boolean {
         return try {
             InternetBlockVpnService.stop(context)
+            VoiceKidsPrefs.setWebsiteFilterActive(context, false) // tunnel is down; PolicyEnforcer re-establishes DNS filtering if still wanted
             if (isDeviceOwner(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 try {
                     dpm(context).setAlwaysOnVpnPackage(adminComponent(context), null, false)

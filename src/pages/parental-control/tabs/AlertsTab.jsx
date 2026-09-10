@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  ShieldAlert, MapPin, Clock, Ban, WifiOff, Gift, BatteryLow, Smartphone, Bell, CheckCircle, RefreshCw, ShieldOff,
+  ShieldAlert, MapPin, Clock, Ban, WifiOff, Gift, BatteryLow, Smartphone, Bell, CheckCircle, RefreshCw, ShieldOff, Globe, Hourglass,
 } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
@@ -20,14 +20,21 @@ const ALERT_ICONS = {
   low_battery: BatteryLow,
   device_enrolled: Smartphone,
   tamper_detected: ShieldOff,
+  website_blocked: Ban,
+  website_alert: Globe,
+  app_opened: Smartphone,
+  daily_limit_reached: Hourglass,
 }
 
 const SEVERITY_VARIANT = { info: 'blue', warning: 'yellow', critical: 'red' }
 
 const ALERT_SUGGESTIONS = {
-  screen_time_exceeded: 'Consider reducing the daily limit or granting bonus time.',
+  screen_time_exceeded: 'The device is now locked per your "when the limit is reached" setting. Use "Give extra time" if you want to allow more today.',
   app_time_limit_exceeded: 'Consider increasing the per-app time limit or blocking the app.',
-  blocked_app_attempt: 'The device may not be Device Owner. Re-enroll to enforce rules.',
+  blocked_app_attempt: 'Your child tried to open something that is blocked right now — the app was sent back to the home screen.',
+  website_blocked: 'A blocked website was requested and stopped at the network level. Adjust Web filtering if this was a mistake.',
+  website_alert: 'This site is allowed but you asked to be told when it is visited (Web filtering → Alert).',
+  app_opened: 'You asked to be alerted whenever this app is used (Games & Apps → bell icon).',
   device_offline: 'Check if the device is connected to the internet.',
   tamper_detected: 'A supervision permission was turned off on this device — the screen was locked automatically. Check the device and ask your child to re-enable it.',
 }

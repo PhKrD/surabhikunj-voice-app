@@ -29,8 +29,24 @@ See:
   conflict-resolution priority order, why block/unblock used to fail and
   how it's fixed, policy versioning.
 - `PLATFORM_LIMITATIONS.md` — capability matrix by OS; what is real vs.
-  schema-only (website filtering has no enforcement yet — do not present
-  it to users as functional).
+  best-effort, and the "Where enforcement decisions are made" section —
+  read it before touching anything under `dpc/` or `src/lib/*Engine.js`.
+- **The policy engine is native**: `android/.../dpc/PolicyEnforcer.kt`
+  (mirrors the pure, unit-tested `src/lib/policy.js` +
+  `src/lib/screenTimePolicy.js`). Keep the three in sync. The JS
+  `ruleEngine.js`/`screenTimeEngine.js` only detect revocation, nudge the
+  native engine (`dpc.enforceNow()`) and read its snapshot
+  (`dpc.getEnforcementSnapshot()`, polled by
+  `src/lib/useEnforcementSnapshot.js`) — they must never re-derive
+  enforcement decisions or publish `enforcement_state` themselves.
+- `supabase/70_qustodio_parity.sql` — per-weekday daily limits +
+  `limit_action`, `pc_restricted_times` (weekly hour grid),
+  `pc_app_rules.alert_on_use`/`daily_limits_by_dow`, web 'alert' action,
+  `app_opened`/`website_alert` alert types, `device_owner_mode` derived from
+  the device's own `enforcement_state` report, policy-version bump triggers
+  for the 69 tables, and the `pc_alerts` → `notify()` parent push bridge.
+  Parent UI: `src/pages/parental-control/tabs/{SummaryTab,UsageTab,
+  RestrictedTimesTab,RulesTab,SchedulesTab}.jsx`.
 - `supabase/61_policy_integrity.sql` — policy versioning, duplicate-rule
   prevention, lockout protection (dialer/settings/launcher/agent can never
   be blocked), device self-heal RLS. Additive only; migrations 52–60 stay
@@ -78,14 +94,36 @@ Device Owner status to the exact package name at provisioning time. See
 implementation. It is NOT deleted (data-safety default) but is superseded
 — do not add new features there.
 
+## Emulator smoke-testing the native engine
+The emulator needs a real device session in `VoiceKidsPrefs`
+(`shared_prefs/voice_kids_session.xml`: supabase_url, anon_key, device_id,
+child_id, org_id, access_token, refresh_token). Create a throwaway child +
+device + pairing code with the service-role key (mirror
+`pc-generate-pairing-code`), redeem it via the `pc-redeem-pairing-code`
+edge function, write the XML with `adb shell run-as com.surabhikunj.voice`,
+then start the app once and `adb shell am broadcast -a
+android.intent.action.BOOT_COMPLETED -p com.surabhikunj.voice` to start
+`VoiceKidsMonitorService`. Grant the three permissions from adb:
+`settings put secure enabled_accessibility_services
+com.surabhikunj.voice/com.surabhikunj.voice.dpc.VoiceKidsAccessibilityService`,
+`settings put secure accessibility_enabled 1`,
+`appops set com.surabhikunj.voice GET_USAGE_STATS allow`. Watch
+`logcat -s VoiceKidsPolicy VoiceKidsA11y VoiceKidsMonitor`. Delete the temp
+child (cascades) + its auth user afterwards. Note `adb install -r` can reset
+the accessibility toggle; the emulator clock also drifts, so device-written
+timestamps are unreliable there.
+
 ## Known gaps
-- Website "block" rules (`pc_website_rules`) ARE enforced on-device now,
-  via a local DNS-filtering VPN (`InternetBlockVpnService`'s
-  `MODE_DNS_FILTER` + `DnsFilterEngine.kt`, driven by `PolicyEnforcer.kt`)
-  — best-effort, bypassable by a browser hardwired to a DoH resolver
-  outside the short mitigated IP list. "Allow" rules are still stored
-  only, no enforcement effect. See PLATFORM_LIMITATIONS.md "Website
-  filtering" before presenting this as guaranteed.
+- Website "block"/"alert" rules (`pc_website_rules`, categories) ARE
+  enforced on-device now, via a local DNS-filtering VPN
+  (`InternetBlockVpnService`'s `MODE_DNS_FILTER` + `DnsFilterEngine.kt`,
+  driven by `PolicyEnforcer.kt`) — best-effort, bypassable by a browser
+  hardwired to a DoH resolver outside the short mitigated IP list. "Allow"
+  rules override category blocks and are the exception list for "block
+  unknown websites". See PLATFORM_LIMITATIONS.md "Website filtering"
+  before presenting this as guaranteed.
+- Not implemented vs. Qustodio: calls & SMS monitoring, YouTube in-app
+  monitoring, AI content alerts.
 - iOS/Windows/macOS parental control: not implemented (Apple/Microsoft MDM
   entitlements required; see PLATFORM_LIMITATIONS.md).
 - A child device can optionally be linked to a real org member account

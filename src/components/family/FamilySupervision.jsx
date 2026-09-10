@@ -15,23 +15,28 @@
  *      SAME mechanisms src/pages/child-device/HomePage.jsx used to own,
  *      just started globally instead of per-page now that there's no
  *      single "child home" route this device is confined to.
- *   2. Render a full-screen lock overlay ON TOP of whatever page is open
- *      (Sadhana, cleanliness, Dashboard, ...) when the parent locks the
- *      device or a blocking schedule is active — the JS-layer backup to
- *      VoiceKidsAccessibilityService's native soft-block, exactly like
- *      src/pages/child-device/LockedPage.jsx, just not tied to a specific
- *      route so it can appear regardless of what's on screen.
+ *   2. Mirror the native policy engine's lock state (daily limit reached,
+ *      restricted hour, schedule, parent "Lock now") via
+ *      useEnforcementSnapshot and render a full-screen lock overlay ON TOP
+ *      of whatever page is open (Sadhana, cleanliness, Dashboard, ...) —
+ *      the JS-layer backup to VoiceKidsAccessibilityService's native
+ *      soft-block, exactly like src/pages/child-device/LockedPage.jsx,
+ *      just not tied to a specific route.
  */
 
 import { useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Clock } from 'lucide-react'
+import { Clock, Moon, Lock, Hourglass, Plus } from 'lucide-react'
 import { useDeviceState } from '../../store/childDeviceState.js'
 import { startCommandPoller, stopCommandPoller } from '../../lib/commandPoller.js'
 import { syncSessionAndStartTracking } from '../../lib/locationPlugin.js'
 import { syncInstalledApps } from '../../lib/usageStatsPlugin.js'
+import { useEnforcementSnapshot } from '../../lib/useEnforcementSnapshot.js'
+import { LOCK_REASON_COPY, formatMinutes } from '../../lib/screenTimePolicy.js'
 
-function LockOverlay() {
+const ICONS = { daily_limit: Hourglass, restricted_time: Moon, schedule: Clock, parent_lock: Lock }
+
+function LockOverlay({ reason, label, screenTime }) {
   const navigate = useNavigate()
 
   // Block the back button while locked, same as LockedPage.jsx.
@@ -42,25 +47,40 @@ function LockOverlay() {
     return () => window.removeEventListener('popstate', handler)
   }, [])
 
+  const copy = LOCK_REASON_COPY[reason] ?? LOCK_REASON_COPY.schedule
+  const Icon = ICONS[reason] ?? Clock
+
   return (
     <div className="fixed inset-0 z-[9999] bg-gray-900 flex flex-col items-center justify-center px-8 gap-8 text-white">
       <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center">
-        <Clock size={48} className="text-indigo-400" />
+        <Icon size={48} className="text-indigo-400" />
       </div>
       <div className="text-center">
-        <h1 className="text-3xl font-bold">Screen time paused</h1>
-        <p className="text-gray-400 mt-3">
-          Your parents have scheduled a break. Come back later or ask for more time.
-        </p>
+        <h1 className="text-3xl font-bold">{copy.title}</h1>
+        <p className="text-gray-400 mt-3">{copy.body}</p>
+        {reason === 'schedule' && label && <p className="text-indigo-300 text-sm mt-2">Schedule: {label}</p>}
+        {reason === 'daily_limit' && screenTime?.limitMin != null && (
+          <p className="text-indigo-300 text-sm mt-2">
+            {formatMinutes(screenTime.usedMin ?? screenTime.limitMin)} used of today&apos;s {formatMinutes(screenTime.limitMin)}
+          </p>
+        )}
       </div>
-      {/* Only SOS is accessible during lock */}
+      {reason !== 'parent_lock' && (
+        <button
+          onClick={() => navigate('/family/bonus')}
+          className="w-full max-w-xs bg-indigo-500 hover:bg-indigo-600 text-white font-semibold rounded-2xl py-4 flex items-center justify-center gap-2"
+        >
+          <Plus size={20} /> Ask for more time
+        </button>
+      )}
+      {/* Only SOS (and the request page) is accessible during lock */}
       <button
         onClick={() => navigate('/family/sos')}
-        className="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl px-8 py-4 flex items-center gap-2"
+        className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl px-8 py-4 flex items-center gap-2"
       >
         SOS — I need help
       </button>
-      <p className="text-xs text-gray-600 text-center mt-4">
+      <p className="text-xs text-gray-600 text-center">
         The SOS button is always available for emergencies.
       </p>
     </div>
@@ -71,34 +91,30 @@ export default function FamilySupervision() {
   const enrolled = useDeviceState((s) => s.enrolled)
   const isOrgMember = useDeviceState((s) => s.isOrgMember)
   const isLocked = useDeviceState((s) => s.isLocked)
-  const setLocked = useDeviceState((s) => s.setLocked)
-  const setBonusActive = useDeviceState((s) => s.setBonusActive)
+  const lockReason = useDeviceState((s) => s.lockReason)
+  const lockLabel = useDeviceState((s) => s.lockLabel)
+  const screenTime = useDeviceState((s) => s.screenTime)
   const setLastCommand = useDeviceState((s) => s.setLastCommand)
   const location = useLocation()
 
   const active = enrolled && isOrgMember
 
+  useEnforcementSnapshot(active)
+
   useEffect(() => {
     if (!active) return
     syncSessionAndStartTracking().catch(() => {})
     syncInstalledApps().catch(() => {})
-    startCommandPoller((cmd) => {
-      setLastCommand(cmd)
-      if (cmd.command_type === 'lock_device' || cmd.command_type === 'pause_internet') {
-        setLocked(true)
-      } else if (cmd.command_type === 'unlock_device' || cmd.command_type === 'resume_internet' || cmd.command_type === 'sync_rules') {
-        setLocked(false)
-      } else if (cmd.command_type === 'grant_bonus_time') {
-        setBonusActive(true)
-      } else if (cmd.command_type === 'revoke_bonus_time') {
-        setBonusActive(false)
-      }
-    })
+    // Lock state comes from the native snapshot above (the parent's
+    // lock_device becomes a persistent parent_lock there); the poller only
+    // needs to keep running for command acks + bonus/SOS.
+    startCommandPoller((cmd) => setLastCommand(cmd))
     return () => stopCommandPoller()
-  }, [active, setLastCommand, setLocked, setBonusActive])
+  }, [active, setLastCommand])
 
-  // SOS must always be reachable even while locked — don't render the
-  // overlay on top of the SOS page itself.
-  if (!active || !isLocked || location.pathname === '/family/sos') return null
-  return <LockOverlay />
+  // SOS + request pages must stay reachable even while locked — don't
+  // render the overlay on top of them.
+  const reachable = ['/family/sos', '/family/bonus', '/family/request']
+  if (!active || !isLocked || reachable.includes(location.pathname)) return null
+  return <LockOverlay reason={lockReason} label={lockLabel} screenTime={screenTime} />
 }

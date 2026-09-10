@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { WifiOff, Wifi, Lock, LockOpen, Smartphone, RefreshCw, Info } from 'lucide-react'
+import { WifiOff, Wifi, Lock, LockOpen, Smartphone, RefreshCw, Info, Gift, X } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
-import { sendDeviceCommand, listRecentCommands, subscribeToDeviceCommands } from '@/lib/parentalControlApi'
+import { sendDeviceCommand, listRecentCommands, subscribeToDeviceCommands, grantExtraTime, revokeExtraTime } from '@/lib/parentalControlApi'
 import {
   deriveCommandState,
   isDeviceOnline,
@@ -17,8 +17,10 @@ const ACTIONS = [
   { type: 'pause_internet',  label: 'Pause internet',  icon: WifiOff,  capability: 'pauseInternet',  hover: 'hover:border-red-200 hover:text-red-600' },
   { type: 'resume_internet', label: 'Resume internet', icon: Wifi,     capability: 'resumeInternet', hover: 'hover:border-tulasi-200 hover:text-tulasi-600' },
   { type: 'lock_device',     label: 'Lock now',        icon: Lock,     capability: 'lockDevice',     hover: 'hover:border-slate-400' },
-  { type: 'unlock_device',   label: 'Unlock now',      icon: LockOpen, capability: 'unlockDevice',   hover: 'hover:border-emerald-200 hover:text-emerald-600' },
+  { type: 'unlock_device',   label: 'Unlock',          icon: LockOpen, capability: 'unlockDevice',   hover: 'hover:border-emerald-200 hover:text-emerald-600' },
 ]
+
+const EXTRA_TIME_PRESETS = [15, 30, 60, 120]
 
 function timeAgo(iso) {
   if (!iso) return ''
@@ -37,7 +39,7 @@ function timeAgo(iso) {
  * command's TRUE lifecycle state (pending → sent → executed/failed/timed-out)
  * instead of a premature success toast.
  */
-export default function CommandCenter({ devices }) {
+export default function CommandCenter({ devices, childId }) {
   const toast = useToastStore()
   const activeDevices = useMemo(() => devices.filter((d) => d.is_active), [devices])
 
@@ -46,6 +48,7 @@ export default function CommandCenter({ devices }) {
   const [sending, setSending] = useState(false)
   const [commands, setCommands] = useState([])
   const [nowTick, setNowTick] = useState(() => Date.now())
+  const [showExtraTime, setShowExtraTime] = useState(false)
 
   const deviceIds = useMemo(() => activeDevices.map((d) => d.id), [activeDevices])
   const deviceById = useMemo(() => Object.fromEntries(devices.map((d) => [d.id, d])), [devices])
@@ -110,6 +113,34 @@ export default function CommandCenter({ devices }) {
     }
   }
 
+  const giveExtraTime = async (minutes) => {
+    setSending(true)
+    try {
+      const res = await grantExtraTime(childId, minutes)
+      toast.success(`${minutes} extra minutes granted`, `Limits and restrictions pause on ${res.devices} device${res.devices === 1 ? '' : 's'} until then.`)
+      setShowExtraTime(false)
+      loadCommands()
+    } catch (error) {
+      toast.error('Could not grant extra time', error.message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const endExtraTime = async () => {
+    setSending(true)
+    try {
+      await revokeExtraTime(childId)
+      toast.info('Extra time ended')
+      setShowExtraTime(false)
+      loadCommands()
+    } catch (error) {
+      toast.error('Could not end extra time', error.message)
+    } finally {
+      setSending(false)
+    }
+  }
+
   if (activeDevices.length === 0) {
     return (
       <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] p-4 text-center text-sm text-muted-token">
@@ -142,17 +173,14 @@ export default function CommandCenter({ devices }) {
       <div className="flex flex-wrap gap-2">
         {ACTIONS.map((action) => {
           const Icon = action.icon
-          // "Unlock now" needs setKeyguardDisabled(), a Device-Owner-only
-          // API — the default no-reset setup (Device Admin) can never do
-          // this, so it's gated on the optional Advanced mode being active
-          // rather than just platform support. See PLATFORM_LIMITATIONS.md.
-          const platformSupported = targetDevices.some((d) => deviceSupports(d, action.capability))
-          const supported = action.type === 'unlock_device'
-            ? platformSupported && targetDevices.some((d) => d.enforcement_state?.device_owner === true)
-            : platformSupported
-          const title = action.type === 'unlock_device' && platformSupported && !supported
-            ? 'Unlock isn\u2019t available — this device uses the standard (Device Admin) setup, not the optional Advanced (Device Owner) mode required to dismiss an existing lock screen'
-            : supported ? action.label : `${action.label} not supported on this device`
+          const supported = targetDevices.some((d) => deviceSupports(d, action.capability))
+          const title = supported
+            ? action.type === 'lock_device'
+              ? 'Keeps every app off-screen (calls + VOICE stay available) until you tap Unlock'
+              : action.type === 'unlock_device'
+                ? 'Releases your lock. Cannot dismiss a PIN/pattern screen the child set — that is an Android restriction'
+                : action.label
+            : `${action.label} not supported on this device`
           return (
             <button
               key={action.type}
@@ -168,6 +196,19 @@ export default function CommandCenter({ devices }) {
             </button>
           )
         })}
+        {childId && (
+          <button
+            disabled={sending}
+            onClick={() => setShowExtraTime((v) => !v)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium disabled:opacity-50',
+              showExtraTime ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-[var(--surface)] border-[var(--border-color)] text-secondary-token hover:border-indigo-200 hover:text-indigo-600',
+            )}
+            title="Pause every limit, routine and restriction for a while"
+          >
+            <Gift className="w-4 h-4" /> Give extra time
+          </button>
+        )}
         <button
           onClick={loadCommands}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-sm font-medium text-muted-token hover:text-secondary-token"
@@ -177,16 +218,38 @@ export default function CommandCenter({ devices }) {
         </button>
       </div>
 
+      {showExtraTime && (
+        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-indigo-800 mr-1">Extra time for all devices:</span>
+          {EXTRA_TIME_PRESETS.map((m) => (
+            <button
+              key={m}
+              disabled={sending}
+              onClick={() => giveExtraTime(m)}
+              className="px-3 py-1.5 rounded-lg bg-white border border-indigo-200 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+            >
+              +{m >= 60 ? `${m / 60}h` : `${m}m`}
+            </button>
+          ))}
+          <button
+            disabled={sending}
+            onClick={endExtraTime}
+            className="ml-auto flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            <X className="w-3.5 h-3.5" /> End extra time now
+          </button>
+        </div>
+      )}
+
       {/* Real Android constraint, surfaced here rather than only in a doc no
-          parent will read: with the standard (Device Admin, no factory
-          reset) setup, "Unlock now" is unavailable entirely — dismissing an
-          EXISTING PIN/pattern/password needs a Device-Owner-only API. Only
-          the optional Advanced (Device Owner) mode, which does require a
-          factory reset, can do that. See PLATFORM_LIMITATIONS.md. */}
+          parent will read: "Lock now" keeps apps off-screen via the
+          Accessibility soft-lock (no reset needed) and locks the screen once.
+          Dismissing an EXISTING PIN/pattern/password from here needs a
+          Device-Owner-only API. See PLATFORM_LIMITATIONS.md. */}
       <p className="flex items-start gap-1.5 text-xs text-muted-token">
         <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-        "Unlock now" only works on devices set up in the optional Advanced (Device Owner) mode, and even
-        then can't remove an existing PIN/pattern/password — that's an Android restriction, not a bug here.
+        "Lock now" stays in force until you tap Unlock — only calls, SOS and VOICE remain usable. Unlock can't remove a
+        PIN/pattern the child set on the phone itself; that's an Android restriction, not a bug here.
       </p>
 
       {/* Live command status feed */}

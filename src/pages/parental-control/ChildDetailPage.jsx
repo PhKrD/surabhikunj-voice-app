@@ -1,14 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Smartphone, Sliders, MapPin, Bell, Gift, BarChart3, Clock, Globe, Send, ShieldAlert, History, Link2 } from 'lucide-react'
+import {
+  ArrowLeft, Smartphone, MapPin, Bell, Gift, Hourglass, Clock, Globe, Send, ShieldAlert, History, Link2,
+  LayoutDashboard, Moon, Gamepad2,
+} from 'lucide-react'
 import Avatar from '@/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
 import { getChild, listDevices, updateChild } from '@/lib/parentalControlApi'
 import MemberLinkPicker from '@/components/parental-control/MemberLinkPicker'
 import CommandCenter from './CommandCenter'
+import SummaryTab from './tabs/SummaryTab'
 import DevicesTab from './tabs/DevicesTab'
 import UsageTab from './tabs/UsageTab'
+import RestrictedTimesTab from './tabs/RestrictedTimesTab'
 import RulesTab from './tabs/RulesTab'
 import SchedulesTab from './tabs/SchedulesTab'
 import WebsiteRulesTab from './tabs/WebsiteRulesTab'
@@ -19,19 +24,31 @@ import RequestsTab from './tabs/RequestsTab'
 import AuditLogTab from './tabs/AuditLogTab'
 import BonusTab from './tabs/BonusTab'
 
-const TABS = [
-  { key: 'devices', label: 'Devices', icon: Smartphone, Component: DevicesTab },
-  { key: 'usage', label: 'Screen Time', icon: BarChart3, Component: UsageTab },
-  { key: 'schedules', label: 'Schedules', icon: Clock, Component: SchedulesTab },
-  { key: 'rules', label: 'App Rules', icon: Sliders, Component: RulesTab },
-  { key: 'websites', label: 'Websites', icon: Globe, Component: WebsiteRulesTab },
-  { key: 'webActivity', label: 'Web Activity', icon: History, Component: WebActivityTab },
-  { key: 'location', label: 'Location', icon: MapPin, Component: LocationTab },
-  { key: 'alerts', label: 'Alerts', icon: Bell, Component: AlertsTab },
-  { key: 'requests', label: 'Requests', icon: Send, Component: RequestsTab },
-  { key: 'audit', label: 'Audit Log', icon: ShieldAlert, Component: AuditLogTab },
-  { key: 'bonus', label: 'Bonus Time', icon: Gift, Component: BonusTab },
+// Grouped Qustodio-style: Summary first, then Rules, then Activity, then Admin.
+const TAB_GROUPS = [
+  { label: 'Overview', tabs: [
+    { key: 'summary', label: 'Summary', icon: LayoutDashboard, Component: SummaryTab },
+  ] },
+  { label: 'Rules', tabs: [
+    { key: 'usage', label: 'Daily limits', icon: Hourglass, Component: UsageTab },
+    { key: 'restricted', label: 'Restricted times', icon: Moon, Component: RestrictedTimesTab },
+    { key: 'schedules', label: 'Routines', icon: Clock, Component: SchedulesTab },
+    { key: 'rules', label: 'Games & Apps', icon: Gamepad2, Component: RulesTab },
+    { key: 'websites', label: 'Web filtering', icon: Globe, Component: WebsiteRulesTab },
+    { key: 'location', label: 'Location & Places', icon: MapPin, Component: LocationTab },
+  ] },
+  { label: 'Activity', tabs: [
+    { key: 'webActivity', label: 'Web activity', icon: History, Component: WebActivityTab },
+    { key: 'alerts', label: 'Alerts', icon: Bell, Component: AlertsTab },
+    { key: 'requests', label: 'Requests', icon: Send, Component: RequestsTab },
+    { key: 'bonus', label: 'Extra time', icon: Gift, Component: BonusTab },
+  ] },
+  { label: 'Admin', tabs: [
+    { key: 'devices', label: 'Devices', icon: Smartphone, Component: DevicesTab },
+    { key: 'audit', label: 'Audit log', icon: ShieldAlert, Component: AuditLogTab },
+  ] },
 ]
+const TABS = TAB_GROUPS.flatMap((g) => g.tabs)
 
 export default function ChildDetailPage() {
   const { childId } = useParams()
@@ -41,7 +58,7 @@ export default function ChildDetailPage() {
   const [child, setChild] = useState(null)
   const [devices, setDevices] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('devices')
+  const [activeTab, setActiveTab] = useState('summary')
   const [showLinkPicker, setShowLinkPicker] = useState(false)
   const [savingLink, setSavingLink] = useState(false)
 
@@ -128,30 +145,39 @@ export default function ChildDetailPage() {
       )}
 
       {/* Command center — per-device targeting + true command lifecycle */}
-      <CommandCenter devices={devices} />
+      <CommandCenter devices={devices} childId={childId} onRefreshDevices={load} />
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-[var(--border-color)] overflow-x-auto scrollbar-hide">
-        {TABS.map((tab) => {
-          const Icon = tab.icon
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={cn(
-                'flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
-                activeTab === tab.key
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-secondary-token hover:text-primary-token'
-              )}
-            >
-              <Icon className="w-4 h-4" /> {tab.label}
-            </button>
-          )
-        })}
+      {/* Tabs, grouped */}
+      <div className="border-b border-[var(--border-color)] overflow-x-auto scrollbar-hide">
+        <div className="flex items-end gap-3 min-w-max">
+          {TAB_GROUPS.map((group) => (
+            <div key={group.label} className="flex flex-col">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-muted-token px-3.5 pb-0.5">{group.label}</span>
+              <div className="flex gap-0.5">
+                {group.tabs.map((tab) => {
+                  const Icon = tab.icon
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
+                        activeTab === tab.key
+                          ? 'border-indigo-500 text-indigo-600'
+                          : 'border-transparent text-secondary-token hover:text-primary-token'
+                      )}
+                    >
+                      <Icon className="w-4 h-4" /> {tab.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {ActiveComponent && <ActiveComponent childId={childId} />}
+      {ActiveComponent && <ActiveComponent childId={childId} onNavigateTab={setActiveTab} />}
     </div>
   )
 }

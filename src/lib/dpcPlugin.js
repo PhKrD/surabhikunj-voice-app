@@ -154,4 +154,33 @@ export const dpc = {
     if (!isNative()) return webFallback()
     return NativeDpc.setBonusExpiry({ expiresAt: expiresAtIso ?? null })
   },
+
+  /**
+   * Asks the native PolicyEnforcer (the authoritative engine — see
+   * PolicyEnforcer.kt) for an immediate pass instead of waiting for its
+   * next 4s tick. Used right after the WebView processes a command that
+   * changes policy (bonus time, sync_rules).
+   */
+  async enforceNow() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.enforceNow()
+  },
+
+  /**
+   * Current enforcement state as decided natively: { locked, lockReason,
+   * lockLabel, screenTimeTodayMin, screenTimeLimitMin, bonusActive, ... }.
+   * Drives the child-facing "Time's up" / "Not now" screens. Resolves a
+   * neutral "not locked" shape on web so callers need no platform checks.
+   */
+  async getEnforcementSnapshot() {
+    if (!isNative()) {
+      return {
+        locked: false, lockReason: null, lockLabel: '', blockAllActive: false, allowListActive: false,
+        bonusActive: false, screenTimeTodayMin: null, screenTimeLimitMin: null, blockedPackageCount: 0,
+        websiteFilterActive: false, isDeviceAdmin: false, isDeviceOwner: false, accessibilityEnabled: false,
+        usageAccess: false, webPlatform: true,
+      }
+    }
+    return NativeDpc.getEnforcementSnapshot()
+  },
 }

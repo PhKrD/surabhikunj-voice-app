@@ -170,7 +170,19 @@ export async function getScreenTimeRule(childId) {
   return data
 }
 
-export async function upsertScreenTimeRule({ childId, orgId, dailyLimitMin, graceMin, isEnabled }) {
+/**
+ * Creates/updates the child's daily screen-time rule.
+ *  - dailyLimitMin      fallback limit for days without an override
+ *  - dailyLimitsByDow   optional { "0": 120, ..., "6": 180 } per-weekday
+ *                       minutes (JS getDay(); migration 70)
+ *  - limitAction        'lock_navigation' | 'lock_device' | 'alert_only'
+ *  - alertOnLimit       notify the parent when the limit is reached
+ * Columns from migration 70 are only sent when provided so a pre-70 DB
+ * keeps working.
+ */
+export async function upsertScreenTimeRule({
+  childId, orgId, dailyLimitMin, graceMin, isEnabled, dailyLimitsByDow, limitAction, alertOnLimit,
+}) {
   const { data: existing } = await supabase
     .from('pc_screen_time_rules')
     .select('id')
@@ -190,32 +202,114 @@ export async function upsertScreenTimeRule({ childId, orgId, dailyLimitMin, grac
     grace_min: graceMin ?? 0,
     is_enabled: isEnabled ?? true,
   }
+  if (dailyLimitsByDow !== undefined) payload.daily_limits_by_dow = dailyLimitsByDow
+  if (limitAction !== undefined) payload.limit_action = limitAction
+  if (alertOnLimit !== undefined) payload.alert_on_limit = alertOnLimit
 
-  if (existing?.id) {
-    const { data, error } = await supabase.from('pc_screen_time_rules').update(payload).eq('id', existing.id).select().single()
-    if (error) throw error
-
-    await recordAudit({
-      childId,
-      action: 'update_screen_time_rule',
-      target: `screen_time:${childId}`,
-      metadata: { daily_limit_min: dailyLimitMin ?? 120, grace_min: graceMin ?? 0, is_enabled: isEnabled ?? true },
-    })
-
-    return data
-  }
-
-  const { data, error } = await supabase.from('pc_screen_time_rules').insert(payload).select().single()
+  const query = existing?.id
+    ? supabase.from('pc_screen_time_rules').update(payload).eq('id', existing.id)
+    : supabase.from('pc_screen_time_rules').insert(payload)
+  const { data, error } = await query.select().single()
   if (error) throw error
 
   await recordAudit({
     childId,
-    action: 'create_screen_time_rule',
+    action: existing?.id ? 'update_screen_time_rule' : 'create_screen_time_rule',
     target: `screen_time:${childId}`,
-    metadata: { daily_limit_min: dailyLimitMin ?? 120, grace_min: graceMin ?? 0, is_enabled: isEnabled ?? true },
+    metadata: payload,
   })
 
   return data
+}
+
+// ---------------------------------------------------------------------
+// Restricted times (Qustodio-style weekly hour grid — migration 70)
+// ---------------------------------------------------------------------
+
+export async function getRestrictedTimes(childId) {
+  const { data, error } = await supabase
+    .from('pc_restricted_times')
+    .select('*')
+    .eq('child_id', childId)
+    .maybeSingle()
+  if (error) throw error
+  return data ?? { child_id: childId, cells: {}, action: 'lock_navigation', is_enabled: true }
+}
+
+/** cells: { "0": [22, 23], ... } hours (0-23) per JS weekday during which the device is restricted. */
+export async function upsertRestrictedTimes({ childId, cells, action, isEnabled }) {
+  const { data, error } = await supabase
+    .from('pc_restricted_times')
+    .upsert(
+      { child_id: childId, cells: cells ?? {}, action: action ?? 'lock_navigation', is_enabled: isEnabled ?? true },
+      { onConflict: 'child_id' },
+    )
+    .select()
+    .single()
+  if (error) throw error
+
+  await recordAudit({
+    childId,
+    action: 'update_restricted_times',
+    target: `restricted_times:${childId}`,
+    metadata: { action: action ?? 'lock_navigation', is_enabled: isEnabled ?? true, hours: Object.values(cells ?? {}).reduce((n, h) => n + h.length, 0) },
+  })
+  return data
+}
+
+// ---------------------------------------------------------------------
+// Screen-time history (for the Summary / Screen Time charts)
+// ---------------------------------------------------------------------
+
+/** Per-day total foreground ms for the last `days` days (oldest first), zero-filled. */
+export async function getUsageHistory(childId, { days = 7 } = {}) {
+  const start = new Date()
+  start.setDate(start.getDate() - (days - 1))
+  const startIso = start.toISOString().slice(0, 10)
+  const { data, error } = await supabase
+    .from('pc_app_usage_events')
+    .select('usage_date, package_name, app_name, total_foreground_ms')
+    .eq('child_id', childId)
+    .gte('usage_date', startIso)
+  if (error) throw error
+
+  const byDate = {}
+  for (let i = 0; i < days; i++) {
+    const d = new Date(start)
+    d.setDate(start.getDate() + i)
+    byDate[d.toISOString().slice(0, 10)] = { date: d.toISOString().slice(0, 10), totalMs: 0, apps: {} }
+  }
+  for (const row of data ?? []) {
+    const bucket = byDate[row.usage_date]
+    if (!bucket) continue
+    bucket.totalMs += row.total_foreground_ms || 0
+    bucket.apps[row.package_name] = {
+      name: row.app_name || row.package_name,
+      ms: (bucket.apps[row.package_name]?.ms ?? 0) + (row.total_foreground_ms || 0),
+    }
+  }
+  return Object.values(byDate)
+}
+
+/** Grants bonus/extra time directly (no child request needed) to every active device of the child. */
+export async function grantExtraTime(childId, minutes) {
+  const devices = await listDevices(childId)
+  const active = devices.filter((d) => d.is_active)
+  const expiresAt = new Date(Date.now() + minutes * 60_000).toISOString()
+  await Promise.all(
+    active.map((d) => sendDeviceCommand({ deviceId: d.id, commandType: 'grant_bonus_time', payload: { expires_at: expiresAt, minutes } })),
+  )
+  await recordAudit({ childId, action: 'grant_extra_time', target: `bonus:${childId}`, metadata: { minutes, expires_at: expiresAt } })
+  return { expiresAt, devices: active.length }
+}
+
+/** Revokes any active bonus/extra time on every active device of the child. */
+export async function revokeExtraTime(childId) {
+  const devices = await listDevices(childId)
+  const active = devices.filter((d) => d.is_active)
+  await Promise.all(active.map((d) => sendDeviceCommand({ deviceId: d.id, commandType: 'revoke_bonus_time' })))
+  await recordAudit({ childId, action: 'revoke_extra_time', target: `bonus:${childId}` })
+  return { devices: active.length }
 }
 
 // ---------------------------------------------------------------------
@@ -533,19 +627,21 @@ export async function listAppRules(childId) {
   return data ?? []
 }
 
-export async function createAppRule({ childId, deviceId, packageName, appName, action, dailyLimitMin }) {
-  const { data, error } = await supabase
-    .from('pc_app_rules')
-    .insert({
-      child_id: childId,
-      device_id: deviceId || null,
-      package_name: packageName,
-      app_name: appName || null,
-      action,
-      daily_limit_min: action === 'time_limit' ? dailyLimitMin : null,
-    })
-    .select()
-    .single()
+export async function createAppRule({ childId, deviceId, packageName, appName, action, dailyLimitMin, dailyLimitsByDow, alertOnUse }) {
+  const row = {
+    child_id: childId,
+    device_id: deviceId || null,
+    package_name: packageName,
+    app_name: appName || null,
+    action,
+    daily_limit_min: action === 'time_limit' ? dailyLimitMin : null,
+  }
+  // Migration-70 columns — only sent when the caller provides them so a
+  // pre-70 database keeps accepting plain rules.
+  if (dailyLimitsByDow !== undefined) row.daily_limits_by_dow = action === 'time_limit' ? dailyLimitsByDow : null
+  if (alertOnUse !== undefined) row.alert_on_use = Boolean(alertOnUse)
+
+  const { data, error } = await supabase.from('pc_app_rules').insert(row).select().single()
   if (error) throw error
 
   await recordAudit({
@@ -553,15 +649,58 @@ export async function createAppRule({ childId, deviceId, packageName, appName, a
     deviceId,
     action: 'create_app_rule',
     target: `app:${packageName}`,
-    metadata: { action, daily_limit_min: dailyLimitMin },
+    metadata: { action, daily_limit_min: dailyLimitMin, alert_on_use: alertOnUse ?? false },
   })
 
   return data
 }
 
 export async function updateAppRule(ruleId, patch) {
-  const { error } = await supabase.from('pc_app_rules').update(patch).eq('id', ruleId)
+  const { data, error } = await supabase.from('pc_app_rules').update(patch).eq('id', ruleId).select().single()
   if (error) throw error
+  await recordAudit({
+    childId: data.child_id,
+    deviceId: data.device_id,
+    action: 'update_app_rule',
+    target: `app:${data.package_name}`,
+    metadata: patch,
+  })
+  return data
+}
+
+/**
+ * Qustodio-style "set this app to Allowed / Blocked / Time limit / alert":
+ * upserts the child-wide rule for a package, or deletes it when `action`
+ * is null (back to "no rule" = allowed by default, no alert).
+ */
+export async function setAppRule({ childId, packageName, appName, action, dailyLimitMin, dailyLimitsByDow, alertOnUse }) {
+  const { data: existing } = await supabase
+    .from('pc_app_rules')
+    .select('id')
+    .eq('child_id', childId)
+    .eq('package_name', packageName)
+    .is('device_id', null)
+    .maybeSingle()
+
+  // "Allowed" is the default state — an allow rule without an alert flag is
+  // the same as no rule at all, so drop the row instead of keeping noise.
+  if ((!action || action === 'allow') && !alertOnUse) {
+    if (existing?.id) await deleteAppRule(existing.id)
+    return null
+  }
+
+  const resolvedAction = action ?? 'allow'
+  if (existing?.id) {
+    const patch = {
+      action: resolvedAction,
+      app_name: appName || null,
+      daily_limit_min: resolvedAction === 'time_limit' ? dailyLimitMin ?? 60 : null,
+    }
+    if (dailyLimitsByDow !== undefined) patch.daily_limits_by_dow = resolvedAction === 'time_limit' ? dailyLimitsByDow : null
+    if (alertOnUse !== undefined) patch.alert_on_use = Boolean(alertOnUse)
+    return updateAppRule(existing.id, patch)
+  }
+  return createAppRule({ childId, packageName, appName, action: resolvedAction, dailyLimitMin: dailyLimitMin ?? 60, dailyLimitsByDow, alertOnUse })
 }
 
 export async function deleteAppRule(ruleId) {

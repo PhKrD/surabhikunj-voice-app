@@ -22,7 +22,7 @@
 import { supabase } from './supabase.js'
 import { loadDeviceCreds, updateDeviceTokens } from './deviceStore.js'
 import { dpc } from './dpcPlugin.js'
-import { enforceScreenTime, resetScreenTimeEnforcement } from './screenTimeEngine.js'
+import { resetScreenTimeEnforcement } from './screenTimeEngine.js'
 import { enforceRules, resetRuleEngine } from './ruleEngine.js'
 import { invalidateDeviceIdentity } from './deviceIdentity.js'
 
@@ -118,12 +118,11 @@ export function startCommandPoller(onCommand) {
         return
       }
 
-      // Phase 2: enforce child-wide daily screen-time limit on every poll tick
-      // (cheap: UsageStatsManager cache + one Supabase row lookup).
-      enforceScreenTime().catch((err) => console.warn('[commandPoller] screen-time enforcement error:', err.message))
-
-      // Phase 3 + 4: enforce schedules and per-app rules
-      enforceRules().catch((err) => console.warn('[commandPoller] rule enforcement error:', err.message))
+      // Identity check (revocation / reassignment) + an occasional nudge of
+      // the native policy engine. Actual enforcement — schedules, app
+      // rules, daily limits, restricted times — runs natively in
+      // PolicyEnforcer.kt on its own cadence; see ruleEngine.js.
+      enforceRules().catch((err) => console.warn('[commandPoller] rule engine error:', err.message))
 
       if (!commands || commands.length === 0) return
 
@@ -211,21 +210,19 @@ async function handleCommand(cmd) {
       const { expires_at } = cmd.payload ?? {}
       if (expires_at) localStorage.setItem(BONUS_KEY, expires_at)
       // Mirror into native prefs so the background PolicyEnforcer (which
-      // cannot read localStorage) also lifts time_limit rules — see
-      // PolicyEnforcer.kt / VoiceKidsDpcPlugin.setBonusExpiry.
-      dpc.setBonusExpiry(expires_at ?? null).catch(() => {})
+      // cannot read localStorage) lifts schedules / time limits / the
+      // daily cap — see PolicyEnforcer.kt / VoiceKidsDpcPlugin.setBonusExpiry.
+      await dpc.setBonusExpiry(expires_at ?? null).catch(() => {})
       resetScreenTimeEnforcement()
-      enforceScreenTime().catch(() => {})
-      // Bonus time also lifts per-app time_limit rules (policy.js), so the
-      // app-rule engine must re-run, not just the child-wide screen-time cap.
+      // Bonus time changes every lock decision at once — ask the native
+      // engine for an immediate pass rather than waiting for its next tick.
       enforceRules({ force: true }).catch(() => {})
       return { success: true }
     }
     case 'revoke_bonus_time': {
       localStorage.removeItem(BONUS_KEY)
-      dpc.setBonusExpiry(null).catch(() => {})
+      await dpc.setBonusExpiry(null).catch(() => {})
       resetScreenTimeEnforcement()
-      enforceScreenTime().catch(() => {})
       enforceRules({ force: true }).catch(() => {})
       return { success: true }
     }
@@ -235,11 +232,9 @@ async function handleCommand(cmd) {
       resetScreenTimeEnforcement()
       resetRuleEngine()
       invalidateDeviceIdentity()
-      enforceScreenTime().catch(() => {})
-      // force:true guarantees a full installed-package reconcile sweep,
-      // not just "apply the diff since last signature" — this is what lets
-      // a parent-triggered sync heal a device whose applied-state cache
-      // drifted from reality (see ruleEngine.js / enforcementStore.js).
+      // force:true makes the native engine drop its input cache and re-read
+      // every policy table — this is what lets a parent-triggered sync heal
+      // a device that missed an update.
       enforceRules({ force: true }).catch(() => {})
       return { success: true }
     }
@@ -250,7 +245,11 @@ async function handleCommand(cmd) {
       return await dpc.resumeInternet()
 
     case 'lock_device':
-      return await dpc.lockDevice()
+      // Persistent parent lock (kept by the native engine until unlock) plus
+      // an immediate screen lock when Device Admin is active. The persistent
+      // part never needs Device Admin, so a missing admin grant is not a
+      // failure of the command itself.
+      return { ...(await dpc.lockDevice()), success: true }
 
     case 'unlock_device':
       return await dpc.unlockDevice()
@@ -284,7 +283,7 @@ async function reportCommandFailure(cmd, result) {
     alert_type: 'device_offline',
     severity: 'warning',
     title: `Command "${cmd.command_type}" failed`,
-    body: `Reason: ${result.reason ?? 'unknown'}. The device may need to be re-enrolled as Device Owner.`,
+    body: `Reason: ${result.reason ?? 'unknown'}. Open VOICE on the device and check the setup checklist (Device Admin / VPN permission).`,
     metadata: { command_id: cmd.id, command_type: cmd.command_type, reason: result.reason },
   })
 }

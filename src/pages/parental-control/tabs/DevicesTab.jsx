@@ -9,9 +9,26 @@ import { isDeviceOnline } from '@/lib/commandStatus'
 import { derivePolicySyncState, POLICY_SYNC_META, diagnosticChecklist } from '@/lib/policySync'
 
 const OWNER_MODE_META = {
-  device_owner: { label: 'Fully managed', icon: ShieldCheck, variant: 'tulasi' },
-  device_admin: { label: 'Limited (Device Admin)', icon: ShieldAlert, variant: 'yellow' },
-  none: { label: 'Not enrolled', icon: ShieldOff, variant: 'default' },
+  device_owner: { label: 'Advanced mode (Device Owner)', icon: ShieldCheck, variant: 'tulasi' },
+  device_admin: { label: 'Protected (Device Admin)', icon: ShieldCheck, variant: 'tulasi' },
+  none: { label: 'Setup needed', icon: ShieldOff, variant: 'yellow' },
+}
+
+/**
+ * Real protection badge from what the device itself last reported. A device
+ * that has never reported falls back to device_owner_mode (which migration 70
+ * now keeps in sync with the report anyway).
+ */
+function protectionMeta(device) {
+  const s = device.enforcement_state
+  if (!s) return OWNER_MODE_META[device.device_owner_mode] ?? OWNER_MODE_META.none
+  const missing = [
+    s.device_admin === false && 'Device Admin',
+    s.accessibility_enabled === false && 'Accessibility',
+    s.usage_access === false && 'Usage access',
+  ].filter(Boolean)
+  if (missing.length === 0) return s.device_owner ? OWNER_MODE_META.device_owner : OWNER_MODE_META.device_admin
+  return { label: `Setup incomplete: ${missing.join(', ')}`, icon: ShieldAlert, variant: 'yellow' }
 }
 
 export default function DevicesTab({ childId }) {
@@ -146,7 +163,7 @@ export default function DevicesTab({ childId }) {
           <p className="text-sm text-muted-token text-center py-6">No devices yet.</p>
         )}
         {devices.map((device) => {
-          const meta = OWNER_MODE_META[device.device_owner_mode] ?? OWNER_MODE_META.none
+          const meta = protectionMeta(device)
           const Icon = meta.icon
           const online = isDeviceOnline(device)
           const child = { policy_version: device.policy_version }
@@ -216,6 +233,18 @@ export default function DevicesTab({ childId }) {
                           <ol className="text-xs text-secondary-token list-decimal list-inside space-y-0.5">
                             <li>Open VOICE on the child's device.</li>
                             <li>Tap "Enable Accessibility for VOICE" in the setup checklist, then turn it on for VOICE.</li>
+                          </ol>
+                        </div>
+                      )}
+                      {checklist.some((row) => row.key === 'usage_access' && row.ok === false) && (
+                        <div className="mt-2 pt-2 border-t border-[var(--border-color)] space-y-1.5">
+                          <p className="text-xs font-semibold text-secondary-token">
+                            Daily limits and per-app time limits will NOT work until this is fixed:
+                          </p>
+                          <ol className="text-xs text-secondary-token list-decimal list-inside space-y-0.5">
+                            <li>Open VOICE on the child's device.</li>
+                            <li>Tap "Allow Usage access" in the setup checklist, find VOICE in the list and turn it on.</li>
+                            <li>Or manually: Settings → Apps → Special app access → Usage access → VOICE → Allow.</li>
                           </ol>
                         </div>
                       )}

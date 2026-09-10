@@ -216,6 +216,8 @@ class VoiceKidsDpcPlugin : Plugin() {
     @PluginMethod
     fun pauseInternet(call: PluginCall) {
         val success = DpcActions.pauseInternet(context)
+        // Persistent until resumeInternet — see VoiceKidsPrefs.manualInternetPause.
+        if (success) VoiceKidsPrefs.setManualInternetPause(context, true)
         val result = JSObject()
         result.put("success", success)
         if (!success) result.put("reason", "vpn_consent_needed")
@@ -224,7 +226,9 @@ class VoiceKidsDpcPlugin : Plugin() {
 
     @PluginMethod
     fun resumeInternet(call: PluginCall) {
+        VoiceKidsPrefs.setManualInternetPause(context, false)
         val success = DpcActions.resumeInternet(context)
+        enforceExecutor.execute { runCatching { PolicyEnforcer.enforce(context.applicationContext) } }
         val result = JSObject()
         result.put("success", success)
         call.resolve(result)
@@ -237,8 +241,17 @@ class VoiceKidsDpcPlugin : Plugin() {
     // Device Owner, since dismissing an EXISTING PIN needs that API — see
     // DpcActions.unlockDevice's doc comment.
 
+    /**
+     * Parent's "Lock now": a PERSISTENT lock (Qustodio semantics) — every
+     * app except the emergency dialer/VOICE is kept off-screen by
+     * VoiceKidsAccessibilityService until "Unlock now", plus one immediate
+     * lockNow() so the screen goes dark right away. The persistent part
+     * needs no Device Admin at all; only the lockNow() does.
+     */
     @PluginMethod
     fun lockDevice(call: PluginCall) {
+        VoiceKidsPrefs.setParentLockActive(context, true)
+        enforceExecutor.execute { runCatching { PolicyEnforcer.enforce(context.applicationContext) } }
         runDeviceAdminAction(call) {
             val success = DpcActions.lockDevice(context)
             val result = JSObject()
@@ -247,16 +260,21 @@ class VoiceKidsDpcPlugin : Plugin() {
         }
     }
 
+    /**
+     * Parent's "Unlock now": releases the persistent parent lock above.
+     * Dismissing an EXISTING PIN/pattern screen additionally needs Device
+     * Owner (setKeyguardDisabled) — reported as keyguardDisabled so the UI
+     * can be honest about it, but the release itself always succeeds.
+     */
     @PluginMethod
     fun unlockDevice(call: PluginCall) {
-        runDeviceAdminAction(call) {
-            val keyguardDisabled = DpcActions.unlockDevice(context)
-            val result = JSObject()
-            result.put("success", keyguardDisabled)
-            result.put("keyguardDisabled", keyguardDisabled)
-            if (!keyguardDisabled) result.put("reason", "not_device_owner")
-            call.resolve(result)
-        }
+        VoiceKidsPrefs.setParentLockActive(context, false)
+        enforceExecutor.execute { runCatching { PolicyEnforcer.enforce(context.applicationContext) } }
+        val keyguardDisabled = DpcActions.isDeviceAdmin(context) && DpcActions.unlockDevice(context)
+        val result = JSObject()
+        result.put("success", true)
+        result.put("keyguardDisabled", keyguardDisabled)
+        call.resolve(result)
     }
 
     /**
@@ -341,6 +359,55 @@ class VoiceKidsDpcPlugin : Plugin() {
         }
         VoiceKidsPrefs.setBonusExpiresAt(context, epoch)
         call.resolve(successResult())
+    }
+
+    // ── Native policy engine bridge ─────────────────────────────────────
+    // PolicyEnforcer (see PolicyEnforcer.kt) is THE enforcement engine —
+    // the JS layer no longer duplicates its decisions. These two methods let
+    // the WebView (a) ask for an immediate pass when it just processed a
+    // command such as grant_bonus_time, instead of waiting up to one
+    // POLICY_ENFORCE_INTERVAL_MS tick, and (b) read the resulting state so
+    // the child-facing UI can show the matching "Time's up" / "Not now" /
+    // "Screen time paused" screen with the real numbers.
+
+    private val enforceExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    @PluginMethod
+    fun enforceNow(call: PluginCall) {
+        val appContext = context.applicationContext
+        enforceExecutor.execute {
+            try {
+                PolicyEnforcer.invalidateCache()
+                PolicyEnforcer.enforce(appContext)
+            } catch (e: Exception) {
+                android.util.Log.w("VoiceKidsDpc", "enforceNow failed: ${e.message}")
+            }
+        }
+        call.resolve(successResult())
+    }
+
+    @PluginMethod
+    fun getEnforcementSnapshot(call: PluginCall) {
+        val result = JSObject()
+        val reason = VoiceKidsPrefs.lockReason(context)
+        result.put("locked", reason.isNotEmpty())
+        result.put("lockReason", if (reason.isEmpty()) JSObject.NULL else reason)
+        result.put("lockLabel", VoiceKidsPrefs.lockLabel(context))
+        result.put("blockAllActive", VoiceKidsPrefs.desiredBlockAllActive(context))
+        result.put("allowListActive", VoiceKidsPrefs.desiredAllowListPackages(context) != null)
+        result.put("bonusActive", VoiceKidsPrefs.isBonusActive(context))
+        result.put("bonusExpiresAt", VoiceKidsPrefs.bonusExpiresAt(context))
+        val used = VoiceKidsPrefs.screenTimeTodayMin(context)
+        val limit = VoiceKidsPrefs.screenTimeLimitMin(context)
+        result.put("screenTimeTodayMin", if (used < 0) JSObject.NULL else used)
+        result.put("screenTimeLimitMin", if (limit < 0) JSObject.NULL else limit)
+        result.put("blockedPackageCount", VoiceKidsPrefs.desiredBlockedPackages(context).size)
+        result.put("websiteFilterActive", VoiceKidsPrefs.websiteFilterActive(context))
+        result.put("isDeviceAdmin", dpm.isAdminActive(adminComponent))
+        result.put("isDeviceOwner", dpm.isDeviceOwnerApp(context.packageName))
+        result.put("accessibilityEnabled", AccessibilityStatus.isEnabled(context))
+        result.put("usageAccess", UsageStatsHelper.hasUsageAccess(context))
+        call.resolve(result)
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────

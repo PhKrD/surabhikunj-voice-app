@@ -9,11 +9,12 @@
 // lock/unlock commands with navigation, and handles server-side device
 // revocation by clearing local state and returning to pairing.
 import { useEffect } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { isEnrolled, updateDeviceTokens, clearDeviceCreds } from '@/lib/deviceStore.js'
 import { supabase } from '@/lib/supabase.js'
 import { syncSession } from '@/lib/locationPlugin.js'
 import { startCommandPoller, stopCommandPoller } from '@/lib/commandPoller.js'
+import { useEnforcementSnapshot } from '@/lib/useEnforcementSnapshot.js'
 import { useDeviceState } from '@/store/childDeviceState.js'
 import EnrollmentPage from '@/pages/child-device/EnrollmentPage.jsx'
 import HomePage from '@/pages/child-device/HomePage.jsx'
@@ -29,8 +30,24 @@ function RequireEnrollment({ children }) {
 
 export default function ChildDeviceShell() {
   const navigate = useNavigate()
+  const location = useLocation()
   const enrolled = useDeviceState((s) => s.enrolled)
+  const isLocked = useDeviceState((s) => s.isLocked)
   const setRevoked = useDeviceState((s) => s.setRevoked)
+
+  // Mirror the native engine's lock state (daily limit / restricted time /
+  // schedule / parent lock) into the store, then route on it: the lock
+  // screen appears the moment the device locks and goes away the moment it
+  // unlocks, regardless of which command or timer caused it. SOS, the
+  // request pages and enrollment stay reachable while locked.
+  useEnforcementSnapshot(enrolled)
+  useEffect(() => {
+    if (!enrolled) return
+    const path = location.pathname
+    const reachableWhileLocked = ['/child/locked', '/child/sos', '/child/bonus', '/child/request']
+    if (isLocked && !reachableWhileLocked.includes(path)) navigate('/child/locked', { replace: true })
+    else if (!isLocked && path === '/child/locked') navigate('/child/home', { replace: true })
+  }, [enrolled, isLocked, location.pathname, navigate])
 
   useEffect(() => {
     const onRevoked = () => {
@@ -57,15 +74,12 @@ export default function ChildDeviceShell() {
 
   useEffect(() => {
     if (!enrolled) return
-    startCommandPoller((cmd) => {
-      if (cmd.command_type === 'lock_device' || cmd.command_type === 'pause_internet') {
-        navigate('/child/locked', { replace: true })
-      } else if (cmd.command_type === 'unlock_device' || cmd.command_type === 'resume_internet') {
-        navigate('/child/home', { replace: true })
-      }
-    })
+    // Lock/unlock navigation is driven by the native snapshot above (the
+    // parent's lock_device becomes a persistent parent_lock there), so the
+    // poller only needs to keep running for command acks + bonus/SOS.
+    startCommandPoller(() => {})
     return () => stopCommandPoller()
-  }, [enrolled, navigate])
+  }, [enrolled])
 
   return (
     <Routes>

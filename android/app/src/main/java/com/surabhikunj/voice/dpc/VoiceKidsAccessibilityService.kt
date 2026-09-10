@@ -107,6 +107,11 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
         // WINDOW_STATE_CHANGED fires for the same still-foreground blocked
         // app (multiple events can fire per app open).
         private const val REBLOCK_COOLDOWN_MS = 1500L
+
+        // "Alert me when used" fires at most once per app per half hour;
+        // blocked-attempt telemetry at most once per app per 10 minutes.
+        private const val APP_OPENED_ALERT_COOLDOWN_MS = 30 * 60_000L
+        private const val BLOCKED_ATTEMPT_ALERT_COOLDOWN_MS = 10 * 60_000L
     }
 
     private data class ParsedBar(val raw: String, val host: String, val searchEngine: String?, val searchQuery: String?)
@@ -161,16 +166,77 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
             allowList != null -> !allowList.contains(pkg)
             else -> blockedSet.contains(pkg)
         }
-        if (!isBlocked) return
+        if (!isBlocked) {
+            maybeAlertAppOpened(pkg)
+            return
+        }
 
         val now = System.currentTimeMillis()
         if (pkg == lastBlockedPkg && now - lastBlockedAt < REBLOCK_COOLDOWN_MS) return
         lastBlockedPkg = pkg
         lastBlockedAt = now
 
-        Log.i(TAG, "Blocking foreground app: $pkg")
+        // Pick the child-facing explanation: a whole-device lock (daily
+        // limit / restricted time / schedule) reads differently from "this
+        // one app is blocked".
+        val reason = if (blockAllActive || allowList != null) {
+            VoiceKidsPrefs.lockReason(applicationContext).ifEmpty { "schedule" }
+        } else "app_blocked"
+        Log.i(TAG, "Blocking foreground app: $pkg (reason=$reason)")
         performGlobalAction(GLOBAL_ACTION_HOME)
-        BlockOverlay.show(applicationContext)
+        BlockOverlay.show(applicationContext, reason, appLabel(pkg))
+        maybeAlertBlockedAttempt(pkg, reason)
+    }
+
+    /** pc_app_rules.alert_on_use — "tell me when this app is used" (Qustodio-style), rate-limited per app. */
+    private fun maybeAlertAppOpened(pkg: String) {
+        if (!VoiceKidsPrefs.alertOnUsePackages(applicationContext).contains(pkg)) return
+        val now = System.currentTimeMillis()
+        if (now - VoiceKidsPrefs.lastAppOpenedAlertAt(applicationContext, pkg) < APP_OPENED_ALERT_COOLDOWN_MS) return
+        VoiceKidsPrefs.setLastAppOpenedAlertAt(applicationContext, pkg, now)
+        val label = appLabel(pkg)
+        ioExecutor.execute {
+            insertAlert("app_opened", "info", "$label opened", "$label is being used right now.", JSONObject().put("package_name", pkg))
+        }
+    }
+
+    /** Blocked-attempt telemetry for the parent's activity timeline, rate-limited per app so a persistent child can't flood pc_alerts. */
+    private fun maybeAlertBlockedAttempt(pkg: String, reason: String) {
+        val now = System.currentTimeMillis()
+        if (now - VoiceKidsPrefs.lastAppOpenedAlertAt(applicationContext, "blocked:$pkg") < BLOCKED_ATTEMPT_ALERT_COOLDOWN_MS) return
+        VoiceKidsPrefs.setLastAppOpenedAlertAt(applicationContext, "blocked:$pkg", now)
+        val label = appLabel(pkg)
+        val why = when (reason) {
+            "daily_limit" -> "daily screen-time limit reached"
+            "restricted_time" -> "restricted time"
+            "schedule" -> "a scheduled break is active"
+            else -> "the app is blocked"
+        }
+        ioExecutor.execute {
+            insertAlert("blocked_app_attempt", "info", "Tried to open $label", "Blocked because $why.", JSONObject().put("package_name", pkg).put("reason", reason))
+        }
+    }
+
+    private fun appLabel(pkg: String): String = try {
+        val pm = applicationContext.packageManager
+        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+    } catch (e: Exception) {
+        pkg
+    }
+
+    private fun insertAlert(type: String, severity: String, title: String, body: String, metadata: JSONObject) {
+        val deviceId = VoiceKidsPrefs.deviceId(applicationContext) ?: return
+        val childId = VoiceKidsPrefs.childId(applicationContext) ?: return
+        val row = JSONObject().apply {
+            put("device_id", deviceId)
+            put("child_id", childId)
+            put("alert_type", type)
+            put("severity", severity)
+            put("title", title)
+            put("body", body)
+            put("metadata", metadata)
+        }
+        if (!SupabaseRest.insert(applicationContext, "pc_alerts", row)) Log.w(TAG, "Failed to insert $type alert")
     }
 
     private fun checkAddressBar(pkg: String) {

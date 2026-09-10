@@ -7,14 +7,18 @@ cannot find code for.
 | Feature                        | Android | iOS | Windows | macOS | Web (browser) |
 |---------------------------------|:-------:|:---:|:-------:|:-----:|:--------------:|
 | App block / allow                | FULL, no reset required (Accessibility soft-block; Device Owner adds a harder OS-level suspend as an optional bonus — see below) | NONE | NONE | NONE | NONE |
-| App daily time limit              | FULL, no reset required (same mechanism as app block) | NONE | NONE | NONE | NONE |
-| Schedules (block_all / kiosk)     | SOFT LOCK, no reset required — see "Soft lock vs. hard kiosk" below | NONE | NONE | NONE | NONE |
-| Schedules (internet-only block)   | FULL, no reset required (one-time VPN consent — see below) | NONE | NONE | NONE | NONE |
-| Device lock                       | FULL, no reset required (`lockNow()` works under plain Device Admin) — real deterrent only if the child device has NO lock-screen PIN/pattern set | NONE | NONE | NONE | NONE |
-| Device unlock (remote)            | ADVANCED MODE ONLY — requires the optional Device Owner setup (factory reset); unavailable in the default setup at all (see below) | NONE | NONE | NONE | NONE |
-| Internet pause / resume           | FULL, no reset required (local VPN + one-time consent) | NONE | NONE | NONE | NONE |
-| Screen-time daily cap             | FULL, no reset required | NONE | NONE | NONE | NONE |
-| Website allow/block list          | BEST-EFFORT enforcement (DNS-filtering VPN, no reset required — see below); bypassable by hardwired DoH resolvers outside the mitigated list | NONE | NONE | NONE | NONE |
+| App daily time limit (same every day OR per weekday) | FULL, no reset required (same mechanism as app block; needs Usage access) | NONE | NONE | NONE | NONE |
+| "Alert me when this app is used" | FULL, no reset required (Accessibility foreground events → `app_opened` alert, rate-limited 30 min/app) | NONE | NONE | NONE | NONE |
+| Routines / schedules (block_all / allow-list) | SOFT LOCK, no reset required — see "Soft lock vs. hard kiosk" below | NONE | NONE | NONE | NONE |
+| Routines (internet-only block)    | FULL, no reset required (one-time VPN consent — see below) | NONE | NONE | NONE | NONE |
+| Restricted times (weekly hour grid) | SOFT LOCK, no reset required — same mechanism as routines; `lock_device` additionally calls `lockNow()` once on entry | NONE | NONE | NONE | NONE |
+| Daily screen-time limit (per weekday, lock navigation / lock device / alert only) | FULL, no reset required — enforced natively (`PolicyEnforcer.kt`); needs Usage access | NONE | NONE | NONE | NONE |
+| Device lock ("Lock now")          | FULL, no reset required — PERSISTENT: every app except dialer/VOICE is kept off-screen until "Unlock" (Accessibility soft-lock) + one `lockNow()` (Device Admin). The screen-off part is a real deterrent only if the child device has NO lock-screen PIN/pattern set | NONE | NONE | NONE | NONE |
+| Device unlock (remote)            | FULL for releasing OUR lock, no reset required. Dismissing an EXISTING PIN/pattern the child set is ADVANCED MODE ONLY (Device Owner, factory reset) — see below | NONE | NONE | NONE | NONE |
+| Internet pause / resume           | FULL, no reset required (local VPN + one-time consent). Persistent until resumed — a routine ending never silently undoes a manual pause | NONE | NONE | NONE | NONE |
+| Extra time ("Give extra time")    | FULL, no reset required — pauses every limit/routine/restriction/parent lock until it expires | NONE | NONE | NONE | NONE |
+| Parent push notifications for alerts | FULL (DB trigger → `notify()` backbone → push/in-app; migration 70) | n/a | n/a | n/a | n/a |
+| Website allow/block/alert (categories + individual sites) | BEST-EFFORT enforcement (DNS-filtering VPN, no reset required — see below); bypassable by hardwired DoH resolvers outside the mitigated list. 'Alert' resolves normally and raises a rate-limited `website_alert` | NONE | NONE | NONE | NONE |
 | Website visit / search monitoring | BEST-EFFORT (Accessibility Service, requires a manual one-time grant — see below) | NONE | NONE | NONE | NONE |
 | Location tracking                 | FULL    | PARTIAL (native MDM/Screen Time API would be required) | NONE | NONE | NONE |
 | Geofencing                        | FULL    | NONE | NONE | NONE | NONE |
@@ -25,6 +29,37 @@ cannot find code for.
 | Remote device diagnostics         | FULL (this release) | NONE | NONE | NONE | NONE |
 | Tamper detection (Accessibility/Device Admin turned off) | DETECTION + ALERT + AUTO-LOCK, no reset required — see below. Cannot PREVENT it, only react. | NONE | NONE | NONE | NONE |
 | Child device can also use org features (Sadhana, cleanliness, etc.) | FULL, when the child is linked to a real VOICE member account — see below | N/A | N/A | N/A | N/A |
+
+## Where enforcement decisions are made (read this first)
+
+`android/.../dpc/PolicyEnforcer.kt` is THE policy engine. It runs inside
+`VoiceKidsMonitorService` every 4 seconds regardless of whether the WebView is
+alive, reads every `pc_*` policy table (cached until `pc_children.policy_version`
+changes — one cheap GET per pass), and writes the desired state into
+`VoiceKidsPrefs` for `VoiceKidsAccessibilityService` to enforce. Lock priority
+(mirrors `src/lib/screenTimePolicy.js resolveLockState`):
+
+  bonus/extra time  >  parent "Lock now"  >  active routine  >  restricted-time
+  cell  >  daily limit reached
+
+The JS layer (`src/lib/ruleEngine.js`, `screenTimeEngine.js`) no longer makes
+enforcement decisions — it only detects revocation/reassignment, nudges the
+native engine (`dpc.enforceNow()`) after a command, and reads
+`dpc.getEnforcementSnapshot()` to show the matching child-facing screen
+("Time's up for today" / "Not now" / "Screen time paused" / "Locked by your
+parents"). The earlier JS engine still ran the pre-rewrite Device-Owner-only
+model and kept reporting `last_error: not_device_owner` on healthy Device
+Admin devices — that was the red "Enforcement error" parents used to see.
+
+**Qustodio parity (as of migration 70), what is NOT covered:** Calls & SMS
+monitoring, YouTube in-app monitoring, and AI/social content alerts are not
+implemented. Everything else in Qustodio's Android rule set (daily limits per
+weekday with lock navigation/lock device/alert-only, restricted-times grid,
+routines, games & apps with per-app limits + "alert when used", web filtering
+categories with allow/alert/block + safe search + unsupported/unknown-site
+blocking, places/geofences with arrive/leave alerts, panic button, extra time,
+pause internet, lock device, activity summary/timeline, parent push
+notifications) has an equivalent here, enforced without a factory reset.
 
 ## Enforcement model: Device Admin + Accessibility (default), Device Owner (optional "Advanced" mode)
 
@@ -56,7 +91,13 @@ control at all.** The default enforcement model is:
   — the standard system "Allow VOICE to set up a VPN connection?" dialog,
   needed once for internet-pause to work.
 
-All three are ordinary Android permission grants a parent can complete
+- **Usage access** (`UsageStatsHelper.hasUsageAccess`) — Settings > Apps >
+  Special app access > Usage access. Required for the daily screen-time
+  limit and per-app time limits (they fail OPEN without it — never lock a
+  child out because a permission is missing). Listed as required in the
+  setup checklist.
+
+All four are ordinary Android permission grants a parent can complete
 entirely within the app's setup checklist (`SetupChecklistCard.jsx`, shown
 on the child device's home screen) — no computer, no adb, no factory
 reset, no QR code.

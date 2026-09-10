@@ -14,7 +14,14 @@ import { WEB_CATEGORIES } from '@/lib/webCategories'
 
 const ACTION_META = {
   allow: { label: 'Allowed', variant: 'tulasi', icon: CheckCircle },
+  alert: { label: 'Alert', variant: 'yellow', icon: AlertTriangle },
   block: { label: 'Blocked', variant: 'red', icon: Ban },
+}
+
+const ACTION_SELECT_CLASS = {
+  block: 'bg-red-50 border-red-200 text-red-700',
+  alert: 'bg-amber-50 border-amber-200 text-amber-700',
+  allow: 'bg-emerald-50 border-emerald-200 text-emerald-700',
 }
 
 function CategoryRow({ category, action, onChange }) {
@@ -29,13 +36,10 @@ function CategoryRow({ category, action, onChange }) {
       <select
         value={effective}
         onChange={(e) => onChange(category.key, e.target.value)}
-        className={`text-sm font-medium rounded-lg border px-2.5 py-1.5 ${
-          effective === 'block'
-            ? 'bg-red-50 border-red-200 text-red-700'
-            : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-        }`}
+        className={`text-sm font-medium rounded-lg border px-2.5 py-1.5 ${ACTION_SELECT_CLASS[effective] ?? ACTION_SELECT_CLASS.allow}`}
       >
         <option value="allow">Allowed</option>
+        <option value="alert">Alert me</option>
         <option value="block">Blocked</option>
       </select>
     </div>
@@ -324,7 +328,8 @@ export default function WebsiteRulesTab({ childId }) {
                     className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                   >
                     <option value="block">Block</option>
-                    <option value="allow">Allow (whitelist)</option>
+                    <option value="alert">Allow, but alert me when visited</option>
+                    <option value="allow">Allow (whitelist — overrides category blocks)</option>
                   </select>
                 </label>
                 {formError && <p className="text-sm text-red-600">{formError}</p>}

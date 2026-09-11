@@ -115,7 +115,8 @@ timestamps are unreliable there.
 
 ## Known gaps
 - Website "block"/"alert" rules (`pc_website_rules`, categories) ARE
-  enforced on-device now, via a local DNS-filtering VPN
+  enforced on-device now, via accessibility service (browser URL blocking)
+  and optionally via a local DNS-filtering VPN
   (`InternetBlockVpnService`'s `MODE_DNS_FILTER` + `DnsFilterEngine.kt`,
   driven by `PolicyEnforcer.kt`) — best-effort, bypassable by a browser
   hardwired to a DoH resolver outside the short mitigated IP list. "Allow"
@@ -132,3 +133,22 @@ timestamps are unreliable there.
   etc.) AND parental-control supervision — see PLATFORM_LIMITATIONS.md
   "Child device can also use org features" and `src/App.jsx`. Unlinked
   children keep the original fully-isolated device-only experience.
+
+## Recent Parental Control Updates (Migration 71+)
+- **Parent PIN protection**: `SettingsGuard.kt` + `PinGateActivity.kt` prevent
+  children from disabling Device Admin, Accessibility, Usage Access, or VPN
+  without entering the parent's PIN. The guard is triggered when the child
+  opens protected Settings screens.
+- **VPN opt-in**: VPN filtering is now off by default (`vpn_filtering_enabled`).
+  Web filtering primarily works via the accessibility service (browser URL
+  blocking). Parents can opt into VPN filtering for stronger DNS-level blocking.
+- **Sequential permission onboarding**: `PermissionWizardPage.jsx` guides
+  children through granting Device Admin, Accessibility, and Usage Access
+  permissions after enrollment.
+- **Redesigned UI**: Parent dashboard, child detail page, and all child-facing
+  screens now use a modern design with gradient headers, rounded-3xl corners,
+  and consistent spacing matching the child home screen aesthetic.
+- **SOS button fix**: Fixed tap-swallowing issue where the progress SVG overlay
+  prevented the HOLD button from responding.
+- **Web policy engine**: Shared `WebPolicy.kt` for consistent DNS and browser-URL
+  blocking logic across VPN and accessibility service.

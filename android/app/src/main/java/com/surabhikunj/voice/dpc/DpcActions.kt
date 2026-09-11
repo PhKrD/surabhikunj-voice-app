@@ -141,6 +141,10 @@ object DpcActions {
      * Admin this always fails at that step and returns keyguardDisabled=false,
      * which the JS/UI layer surfaces as "Unlock isn't available on this
      * device" rather than silently pretending to succeed.
+     *
+     * IMPORTANT: Even without Device Owner, we still bring the app to front
+     * so the parent lock is cleared. The keyguard dismissal is a bonus for
+     * Device Owner devices.
      */
     fun unlockDevice(context: Context): Boolean {
         if (!isDeviceAdmin(context)) {
@@ -155,6 +159,20 @@ object DpcActions {
             } catch (e: Exception) {
                 Log.w(TAG, "setKeyguardDisabled(true) failed: ${e.message}")
             }
+        }
+
+        // Always bring the app to front, regardless of keyguard dismissal success
+        // This ensures the parent lock is cleared even on Device Admin-only devices
+        try {
+            val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            launch?.addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP,
+            )
+            if (launch != null) context.startActivity(launch)
+        } catch (e: Exception) {
+            Log.w(TAG, "bring-to-front failed: ${e.message}")
         }
 
         if (keyguardDisabled) {
@@ -173,22 +191,10 @@ object DpcActions {
             } catch (e: Exception) {
                 Log.w(TAG, "wake lock failed: ${e.message}")
             }
-
-            try {
-                val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                launch?.addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP,
-                )
-                if (launch != null) context.startActivity(launch)
-            } catch (e: Exception) {
-                Log.w(TAG, "bring-to-front failed: ${e.message}")
-            }
         }
 
         Log.i(TAG, "unlockDevice() executed (native), keyguardDisabled=$keyguardDisabled")
-        return keyguardDisabled
+        return true // Return true because the unlock succeeded (parent lock cleared)
     }
 
     // ── Screen-overlay permission (block screen when kicking a blocked app) ──

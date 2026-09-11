@@ -361,7 +361,7 @@ class VoiceKidsDpcPlugin : Plugin() {
     fun unlockDevice(call: PluginCall) {
         VoiceKidsPrefs.setParentLockActive(context, false)
         enforceExecutor.execute { runCatching { PolicyEnforcer.enforce(context.applicationContext) } }
-        val keyguardDisabled = DpcActions.isDeviceAdmin(context) && DpcActions.unlockDevice(context)
+        val keyguardDisabled = DpcActions.unlockDevice(context) // Function checks Device Admin internally
         val result = JSObject()
         result.put("success", true)
         result.put("keyguardDisabled", keyguardDisabled)

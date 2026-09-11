@@ -357,7 +357,7 @@ class VoiceKidsMonitorService : Service() {
             }
             "unlock_device" -> {
                 VoiceKidsPrefs.setParentLockActive(context, false)
-                if (DpcActions.isDeviceAdmin(context)) DpcActions.unlockDevice(context)
+                DpcActions.unlockDevice(context) // This function checks Device Admin internally
                 true
             }
             "pause_internet" -> {

@@ -32,6 +32,7 @@ class VoiceKidsUsageStatsPlugin : Plugin() {
     /** Opens Settings > Apps > Special app access > Usage access so the parent can grant it once. */
     @PluginMethod
     fun openUsageAccessSettings(call: PluginCall) {
+        SettingsGuard.allowAppInitiatedVisit(context)
         val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
         intent.data = Uri.parse("package:${context.packageName}")
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

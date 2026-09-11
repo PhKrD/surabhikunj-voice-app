@@ -32,6 +32,7 @@ export const useDeviceState = create((set) => ({
   lockLabel: '',
   screenTime: { usedMin: null, limitMin: null },
   bonusActive: isBonusActive(),
+  internetPaused: false,
   pendingSOS: false,
   sosError: null,
   lastCommand: null,
@@ -56,6 +57,7 @@ export const useDeviceState = create((set) => ({
       lockLabel: snap?.locked ? (snap.lockLabel ?? '') : '',
       screenTime: { usedMin: snap?.screenTimeTodayMin ?? null, limitMin: snap?.screenTimeLimitMin ?? null },
       bonusActive: Boolean(snap?.bonusActive) || isBonusActive(),
+      internetPaused: Boolean(snap?.internetPaused),
     }),
 
   setBonusActive: (active) => set({ bonusActive: active }),

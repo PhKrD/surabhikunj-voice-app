@@ -32,6 +32,7 @@ class VoiceKidsAccessibilityPlugin : Plugin() {
     @PluginMethod
     fun openSettings(call: PluginCall) {
         try {
+            SettingsGuard.allowAppInitiatedVisit(context)
             context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             val result = JSObject()
             result.put("success", true)

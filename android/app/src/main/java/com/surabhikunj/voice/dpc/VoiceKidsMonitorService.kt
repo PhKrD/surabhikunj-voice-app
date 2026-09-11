@@ -408,7 +408,7 @@ class VoiceKidsMonitorService : Service() {
                 put("alert_type", "device_offline")
                 put("severity", "warning")
                 put("title", "Command \"$commandType\" failed")
-                put("body", "The action failed on the device. Open VOICE on the child device and check the setup checklist (Device Admin / VPN permission).")
+                put("body", "The action failed on the device. Open VOICE on the child device and finish the setup checklist — Device admin and Accessibility are what carry these actions.")
                 put("metadata", JSONObject().put("command_id", commandId).put("command_type", commandType))
             }
             SupabaseRest.insert(context, "pc_alerts", alert)

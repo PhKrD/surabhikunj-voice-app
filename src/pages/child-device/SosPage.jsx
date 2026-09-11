@@ -1,14 +1,26 @@
 /**
  * SosPage.jsx
  * Full-screen SOS confirmation + send flow.
- * Two-step: press once to arm → hold 3 seconds to fire.
- * Prevents accidental taps.
+ * Hold the button to fire — long enough to prevent a pocket tap, short
+ * enough for an actual emergency.
+ *
+ * WHY THE RING HAS pointer-events-none: the progress <svg> is absolutely
+ * positioned over the button and, being a positioned element later in the
+ * paint order, it hit-tested ABOVE the (statically positioned) button and
+ * swallowed every touch. Pressing HOLD did literally nothing. Any overlay
+ * added here must stay non-interactive for the same reason.
  */
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShieldAlert, ArrowLeft, CheckCircle } from 'lucide-react'
+import { ShieldAlert, ArrowLeft, CheckCircle, Loader2, PhoneCall } from 'lucide-react'
 import { fireSOS } from '../../lib/sosApi.js'
+
+const TICK_MS = 50
+const HOLD_MS = 1500
+const TICKS_TO_FULL = HOLD_MS / TICK_MS
+const RADIUS = 76
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
 export default function SosPage() {
   const navigate = useNavigate()
@@ -16,12 +28,14 @@ export default function SosPage() {
   const [progress, setProgress] = useState(0)
   const [errorMsg, setErrorMsg] = useState('')
   const intervalRef = useRef(null)
-  const TICK_MS = 50
-  const HOLD_MS = 3000
-  const TICKS_TO_FULL = HOLD_MS / TICK_MS
 
+  useEffect(() => () => clearInterval(intervalRef.current), [])
+
+  // `phase` is read straight from this render's closure: pointer handlers
+  // are re-bound on every render, so they always see the current value.
   function startHold() {
     if (phase !== 'armed') return
+    clearInterval(intervalRef.current)
     let ticks = 0
     intervalRef.current = setInterval(() => {
       ticks += 1
@@ -44,6 +58,7 @@ export default function SosPage() {
     try {
       await fireSOS()
       setPhase('sent')
+      navigator.vibrate?.([80, 60, 80])
     } catch (err) {
       setErrorMsg(err.message)
       setPhase('error')
@@ -51,12 +66,11 @@ export default function SosPage() {
   }
 
   return (
-    <div className="min-h-screen bg-red-600 flex flex-col text-white">
-      {/* Back (only before sending) */}
+    <div className="min-h-screen bg-gradient-to-b from-red-600 to-red-700 flex flex-col text-white">
       {phase === 'armed' && (
         <button
           onClick={() => navigate(-1)}
-          className="absolute top-12 left-6 flex items-center gap-1 text-red-100"
+          className="absolute top-12 left-6 flex items-center gap-1 text-red-100 z-10"
         >
           <ArrowLeft size={20} /> Back
         </button>
@@ -65,14 +79,20 @@ export default function SosPage() {
       <div className="flex-1 flex flex-col items-center justify-center px-8 gap-8">
         {phase === 'sent' ? (
           <>
-            <CheckCircle size={80} className="text-white" />
-            <h1 className="text-3xl font-bold text-center">Alert sent!</h1>
-            <p className="text-red-100 text-center">
-              Your parents have been notified and can see your location. Stay calm — help is coming.
+            <CheckCircle size={80} />
+            <h1 className="text-3xl font-bold text-center">Alert sent</h1>
+            <p className="text-red-100 text-center leading-relaxed">
+              Your parents have been notified and can see your location. Stay where you are if it&apos;s safe.
             </p>
+            <a
+              href="tel:112"
+              className="w-full max-w-xs bg-white/15 border border-white/30 text-white font-semibold rounded-2xl py-4 flex items-center justify-center gap-2"
+            >
+              <PhoneCall size={20} /> Call emergency services
+            </a>
             <button
               onClick={() => navigate('/child/home', { replace: true })}
-              className="mt-4 bg-white text-red-600 font-bold rounded-2xl px-8 py-4"
+              className="w-full max-w-xs bg-white text-red-600 font-bold rounded-2xl py-4"
             >
               Go back home
             </button>
@@ -81,49 +101,66 @@ export default function SosPage() {
           <>
             <ShieldAlert size={80} />
             <h1 className="text-2xl font-bold text-center">Could not send SOS</h1>
-            <p className="text-red-200 text-sm text-center">{errorMsg}</p>
+            <p className="text-red-100 text-sm text-center">{errorMsg}</p>
+            <a
+              href="tel:112"
+              className="w-full max-w-xs bg-white text-red-600 font-bold rounded-2xl py-4 flex items-center justify-center gap-2"
+            >
+              <PhoneCall size={20} /> Call emergency services
+            </a>
             <button
-              onClick={() => { setPhase('armed'); setProgress(0) }}
-              className="mt-4 bg-white text-red-600 font-bold rounded-2xl px-8 py-4"
+              onClick={() => { setPhase('armed'); setProgress(0); setErrorMsg('') }}
+              className="w-full max-w-xs bg-white/15 border border-white/30 text-white font-semibold rounded-2xl py-4"
             >
               Try again
             </button>
           </>
         ) : (
           <>
-            <ShieldAlert size={72} />
+            <ShieldAlert size={64} />
             <div className="text-center">
               <h1 className="text-3xl font-bold">SOS</h1>
-              <p className="text-red-200 mt-2">
-                {phase === 'sending' ? 'Sending alert…' : 'Hold the button for 3 seconds to send'}
+              <p className="text-red-100 mt-2">
+                {phase === 'sending' ? 'Sending alert…' : 'Press and hold to alert your parents'}
               </p>
             </div>
 
-            {/* Hold button */}
-            <div className="relative">
-              {/* Progress ring */}
-              <svg width={160} height={160} className="absolute inset-0 -rotate-90">
-                <circle cx={80} cy={80} r={72} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={8} />
+            <div className="relative w-44 h-44 flex items-center justify-center">
+              {/* Non-interactive by design — see the file header. */}
+              <svg
+                width={176}
+                height={176}
+                viewBox="0 0 176 176"
+                className="absolute inset-0 -rotate-90 pointer-events-none"
+                aria-hidden="true"
+              >
+                <circle cx={88} cy={88} r={RADIUS} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={8} />
                 <circle
-                  cx={80} cy={80} r={72}
+                  cx={88} cy={88} r={RADIUS}
                   fill="none"
                   stroke="white"
                   strokeWidth={8}
-                  strokeDasharray={`${2 * Math.PI * 72}`}
-                  strokeDashoffset={`${2 * Math.PI * 72 * (1 - progress / 100)}`}
-                  className="transition-all duration-50"
+                  strokeLinecap="round"
+                  strokeDasharray={CIRCUMFERENCE}
+                  strokeDashoffset={CIRCUMFERENCE * (1 - progress / 100)}
                 />
               </svg>
               <button
                 onPointerDown={startHold}
                 onPointerUp={endHold}
+                onPointerCancel={endHold}
                 onPointerLeave={endHold}
                 disabled={phase === 'sending'}
-                className="w-40 h-40 rounded-full bg-white text-red-600 font-black text-xl shadow-2xl active:scale-95 transition-transform select-none"
+                style={{ touchAction: 'none' }}
+                className="w-36 h-36 rounded-full bg-white text-red-600 font-black text-lg shadow-2xl active:bg-red-50 select-none flex items-center justify-center"
               >
-                {phase === 'sending' ? '…' : 'HOLD'}
+                {phase === 'sending' ? <Loader2 size={32} className="animate-spin" /> : 'HOLD'}
               </button>
             </div>
+
+            <p className="text-xs text-red-200 text-center max-w-xs">
+              Only for real emergencies. Your parents get an instant notification with your location.
+            </p>
           </>
         )}
       </div>

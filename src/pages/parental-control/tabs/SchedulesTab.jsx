@@ -11,7 +11,7 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const ACTIONS = [
   { value: 'block_all', label: 'Block everything', icon: ShieldAlert, desc: 'Lock the device — only calls, VOICE and any apps you pick below stay available' },
   { value: 'allow_list_only', label: 'Only selected apps', icon: Sun, desc: 'Homework mode: only the apps you pick below can be used' },
-  { value: 'block_internet', label: 'Internet off', icon: Smartphone, desc: 'Apps still work, no network (needs the one-time VPN permission)' },
+  { value: 'block_internet', label: 'Internet off', icon: Smartphone, desc: 'Blocks every app that needs the internet. Offline apps still work' },
 ]
 
 const TEMPLATES = [

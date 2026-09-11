@@ -127,7 +127,7 @@ export default function SummaryTab({ childId, onNavigateTab }) {
   if (loading) return <div className="text-center py-8 text-muted-token text-sm">Loading...</div>
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Status strip */}
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant={onlineCount > 0 ? 'tulasi' : 'default'} dot>
@@ -135,53 +135,53 @@ export default function SummaryTab({ childId, onNavigateTab }) {
         </Badge>
         {lockReason && (
           <Badge variant="red">
-            <Lock className="w-3 h-3 mr-1" />
+            <Lock className="w-3.5 h-3.5 mr-1" />
             {lockReason === 'daily_limit' ? 'Locked — daily limit' : lockReason === 'restricted_time' ? 'Locked — restricted time' : lockReason === 'parent_lock' ? 'Locked by you' : `Locked — ${anyState?.active_schedule ?? 'routine'}`}
           </Badge>
         )}
-        {internetPaused && <Badge variant="yellow"><WifiOff className="w-3 h-3 mr-1" /> Internet paused</Badge>}
-        {!internetPaused && onlineCount > 0 && !lockReason && <Badge variant="default"><Wifi className="w-3 h-3 mr-1" /> Internet on</Badge>}
-        <button onClick={() => { setRefreshing(true); load() }} className="ml-auto p-1.5 rounded-lg text-muted-token hover:text-indigo-600" title="Refresh">
-          <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
+        {internetPaused && <Badge variant="yellow"><WifiOff className="w-3.5 h-3.5 mr-1" /> Internet paused</Badge>}
+        {!internetPaused && onlineCount > 0 && !lockReason && <Badge variant="default"><Wifi className="w-3.5 h-3.5 mr-1" /> Internet on</Badge>}
+        <button onClick={() => { setRefreshing(true); load() }} className="ml-auto p-2 rounded-lg text-muted-token hover:text-indigo-600" title="Refresh">
+          <RefreshCw className={cn('w-5 h-5', refreshing && 'animate-spin')} />
         </button>
       </div>
 
       {setupIssues.length > 0 && (
-        <button onClick={() => onNavigateTab?.('devices')} className="w-full rounded-2xl border border-amber-200 bg-amber-50 p-3.5 flex items-center gap-3 text-left">
-          <AlertTriangle className="w-4.5 h-4.5 text-amber-600 flex-shrink-0" />
-          <p className="text-xs text-amber-800 flex-1">
+        <button onClick={() => onNavigateTab?.('devices')} className="w-full rounded-3xl border border-amber-200 bg-amber-50 p-4 flex items-center gap-3 text-left">
+          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+          <p className="text-sm text-amber-800 flex-1">
             <span className="font-semibold">Setup incomplete on {setupIssues.length === 1 ? setupIssues[0].device_name || 'a device' : `${setupIssues.length} devices`}.</span>{' '}
             Some rules can't be enforced until Device Admin, Accessibility and Usage access are all turned on. Tap to see what's missing.
           </p>
-          <ChevronRight className="w-4 h-4 text-amber-600" />
+          <ChevronRight className="w-5 h-5 text-amber-600" />
         </button>
       )}
 
       {/* Screen time today + week */}
       <Card>
-        <CardBody className="py-4">
-          <div className="flex items-start justify-between gap-4">
+        <CardBody className="py-5">
+          <div className="flex items-start justify-between gap-5">
             <div>
-              <p className="text-xs text-secondary-token">Screen time today</p>
-              <p className="text-3xl font-extrabold text-primary-token">
+              <p className="text-sm text-secondary-token">Screen time today</p>
+              <p className="text-4xl font-extrabold text-primary-token">
                 {formatMinutes(totalMin)}
-                {limitMin !== null && <span className="text-sm font-medium text-muted-token"> / {formatMinutes(limitMin)}</span>}
+                {limitMin !== null && <span className="text-base font-medium text-muted-token"> / {formatMinutes(limitMin)}</span>}
               </p>
               {limitMin !== null ? (
-                <p className={cn('text-xs mt-1', overLimit ? 'text-red-600 font-semibold' : 'text-secondary-token')}>
+                <p className={cn('text-sm mt-2', overLimit ? 'text-red-600 font-semibold' : 'text-secondary-token')}>
                   {overLimit ? "Today's limit reached" : `${formatMinutes(limitMin - totalMin)} left today`}
                 </p>
               ) : (
-                <button onClick={() => onNavigateTab?.('usage')} className="text-xs text-indigo-600 mt-1 hover:underline">No daily limit set — add one</button>
+                <button onClick={() => onNavigateTab?.('usage')} className="text-sm text-indigo-600 mt-2 hover:underline">No daily limit set — add one</button>
               )}
             </div>
-            <div className="w-40 h-20">
+            <div className="w-44 h-24">
               {chartData.some((d) => d.minutes > 0) && (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-                    <XAxis dataKey="label" tick={{ fontSize: 9 }} interval={0} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} axisLine={false} tickLine={false} />
                     <Tooltip formatter={(v) => [formatMinutes(v), 'Screen time']} cursor={{ fill: 'transparent' }} />
-                    <Bar dataKey="minutes" radius={[3, 3, 0, 0]}>
+                    <Bar dataKey="minutes" radius={[4, 4, 0, 0]}>
                       {chartData.map((d, i) => <Cell key={i} fill={d.over ? '#ef4444' : i === chartData.length - 1 ? '#6366f1' : '#c7d2fe'} />)}
                     </Bar>
                   </BarChart>
@@ -190,7 +190,7 @@ export default function SummaryTab({ childId, onNavigateTab }) {
             </div>
           </div>
           {limitMin !== null && (
-            <div className="h-2 w-full bg-[var(--surface-muted)] rounded-full overflow-hidden mt-3">
+            <div className="h-2.5 w-full bg-[var(--surface-muted)] rounded-full overflow-hidden mt-4">
               <div className={cn('h-full rounded-full', overLimit ? 'bg-red-500' : 'bg-indigo-500')} style={{ width: `${limitMin === 0 ? 100 : pct}%` }} />
             </div>
           )}
@@ -198,36 +198,36 @@ export default function SummaryTab({ childId, onNavigateTab }) {
       </Card>
 
       {/* Stat tiles */}
-      <div className="grid grid-cols-3 gap-2">
-        <button onClick={() => onNavigateTab?.('rules')} className="rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] p-3 text-left">
-          <Smartphone className="w-4 h-4 text-indigo-500 mb-1" />
-          <p className="text-lg font-bold text-primary-token">{usage.length}</p>
-          <p className="text-[11px] text-muted-token">apps used</p>
+      <div className="grid grid-cols-3 gap-3">
+        <button onClick={() => onNavigateTab?.('rules')} className="rounded-3xl border border-[var(--border-color)] bg-[var(--surface)] p-4 text-left">
+          <Smartphone className="w-5 h-5 text-indigo-500 mb-2" />
+          <p className="text-2xl font-bold text-primary-token">{usage.length}</p>
+          <p className="text-xs text-muted-token">apps used</p>
         </button>
-        <button onClick={() => onNavigateTab?.('webActivity')} className="rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] p-3 text-left">
-          <Globe className="w-4 h-4 text-blue-500 mb-1" />
-          <p className="text-lg font-bold text-primary-token">{topDomains.length}<span className="text-xs font-medium text-muted-token"> sites</span></p>
-          <p className="text-[11px] text-muted-token">{searchesToday.length} search{searchesToday.length === 1 ? '' : 'es'}</p>
+        <button onClick={() => onNavigateTab?.('webActivity')} className="rounded-3xl border border-[var(--border-color)] bg-[var(--surface)] p-4 text-left">
+          <Globe className="w-5 h-5 text-blue-500 mb-2" />
+          <p className="text-2xl font-bold text-primary-token">{topDomains.length}<span className="text-sm font-medium text-muted-token"> sites</span></p>
+          <p className="text-xs text-muted-token">{searchesToday.length} search{searchesToday.length === 1 ? '' : 'es'}</p>
         </button>
-        <button onClick={() => onNavigateTab?.('alerts')} className="rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] p-3 text-left">
-          <Ban className={cn('w-4 h-4 mb-1', blockedToday.length ? 'text-red-500' : 'text-muted-token')} />
-          <p className="text-lg font-bold text-primary-token">{blockedToday.length}</p>
-          <p className="text-[11px] text-muted-token">blocked attempts</p>
+        <button onClick={() => onNavigateTab?.('alerts')} className="rounded-3xl border border-[var(--border-color)] bg-[var(--surface)] p-4 text-left">
+          <Ban className={cn('w-5 h-5 mb-2', blockedToday.length ? 'text-red-500' : 'text-muted-token')} />
+          <p className="text-2xl font-bold text-primary-token">{blockedToday.length}</p>
+          <p className="text-xs text-muted-token">blocked attempts</p>
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Top apps */}
         <Card>
-          <CardBody className="py-4">
-            <div className="flex items-center justify-between mb-2">
+          <CardBody className="py-5">
+            <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-semibold text-primary-token">Top apps today</p>
-              <button onClick={() => onNavigateTab?.('rules')} className="text-xs text-indigo-600 hover:underline">Manage</button>
+              <button onClick={() => onNavigateTab?.('rules')} className="text-sm text-indigo-600 hover:underline">Manage</button>
             </div>
             {usage.length === 0 ? (
-              <p className="text-xs text-muted-token py-3">No app usage reported yet today.</p>
+              <p className="text-sm text-muted-token py-4">No app usage reported yet today.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {usage.slice(0, 5).map((app) => {
                   const w = Math.max(4, Math.round(((app.total_foreground_ms || 0) / (usage[0].total_foreground_ms || 1)) * 100))
                   return (
@@ -236,7 +236,7 @@ export default function SummaryTab({ childId, onNavigateTab }) {
                         <span className="truncate text-primary-token">{app.app_name || app.package_name}</span>
                         <span className="text-xs text-secondary-token whitespace-nowrap ml-2">{formatMinutes(Math.round((app.total_foreground_ms || 0) / 60_000))}</span>
                       </div>
-                      <div className="h-1.5 bg-[var(--surface-muted)] rounded-full overflow-hidden mt-1">
+                      <div className="h-2 bg-[var(--surface-muted)] rounded-full overflow-hidden mt-1.5">
                         <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${w}%` }} />
                       </div>
                     </div>
@@ -249,24 +249,24 @@ export default function SummaryTab({ childId, onNavigateTab }) {
 
         {/* Web */}
         <Card>
-          <CardBody className="py-4">
-            <div className="flex items-center justify-between mb-2">
+          <CardBody className="py-5">
+            <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-semibold text-primary-token">Web today</p>
-              <button onClick={() => onNavigateTab?.('websites')} className="text-xs text-indigo-600 hover:underline">Filters</button>
+              <button onClick={() => onNavigateTab?.('websites')} className="text-sm text-indigo-600 hover:underline">Filters</button>
             </div>
             {topDomains.length === 0 && searchesToday.length === 0 ? (
-              <p className="text-xs text-muted-token py-3">No browsing seen yet today (needs Accessibility enabled on the device).</p>
+              <p className="text-sm text-muted-token py-4">No browsing seen yet today (needs Accessibility enabled on the device).</p>
             ) : (
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {topDomains.map(([domain, n]) => (
                   <div key={domain} className="flex items-center justify-between text-sm">
-                    <span className="flex items-center gap-2 truncate text-primary-token"><Globe className="w-3.5 h-3.5 text-muted-token flex-shrink-0" />{domain}</span>
+                    <span className="flex items-center gap-2 truncate text-primary-token"><Globe className="w-4 h-4 text-muted-token flex-shrink-0" />{domain}</span>
                     <span className="text-xs text-muted-token">{n}×</span>
                   </div>
                 ))}
                 {searchesToday.slice(0, 3).map((s) => (
                   <div key={s.id} className="flex items-center gap-2 text-sm text-secondary-token truncate">
-                    <Search className="w-3.5 h-3.5 text-muted-token flex-shrink-0" /> "{s.search_query}"
+                    <Search className="w-4 h-4 text-muted-token flex-shrink-0" /> "{s.search_query}"
                   </div>
                 ))}
               </div>
@@ -277,34 +277,34 @@ export default function SummaryTab({ childId, onNavigateTab }) {
 
       {/* Location */}
       <Card hover onClick={() => onNavigateTab?.('location')}>
-        <CardBody className="py-3.5 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
-            <MapPin className="w-5 h-5 text-indigo-500" />
+        <CardBody className="py-4 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
+            <MapPin className="w-6 h-6 text-indigo-500" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-primary-token">Last known location</p>
-            <p className="text-xs text-muted-token truncate">
+            <p className="text-sm text-muted-token truncate">
               {location ? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)} · ${timeAgo(location.recorded_at)}` : 'No location reported yet'}
             </p>
           </div>
-          <ChevronRight className="w-4 h-4 text-muted-token" />
+          <ChevronRight className="w-5 h-5 text-muted-token" />
         </CardBody>
       </Card>
 
       {/* Timeline */}
       <Card>
-        <CardBody className="py-4">
-          <div className="flex items-center justify-between mb-3">
+        <CardBody className="py-5">
+          <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-semibold text-primary-token">Today's activity</p>
-            <button onClick={() => onNavigateTab?.('alerts')} className="text-xs text-indigo-600 hover:underline">All alerts</button>
+            <button onClick={() => onNavigateTab?.('alerts')} className="text-sm text-indigo-600 hover:underline">All alerts</button>
           </div>
           {timeline.length === 0 ? (
-            <div className="text-center py-6">
-              <CheckCircle2 className="w-7 h-7 text-muted-token mx-auto mb-2" />
-              <p className="text-xs text-muted-token">Nothing to report yet today.</p>
+            <div className="text-center py-8">
+              <CheckCircle2 className="w-8 h-8 text-muted-token mx-auto mb-3" />
+              <p className="text-sm text-muted-token">Nothing to report yet today.</p>
             </div>
           ) : (
-            <ol className="relative border-l border-[var(--border-color)] ml-2 space-y-3">
+            <ol className="relative border-l border-[var(--border-color)] ml-2 space-y-4">
               {timeline.map((item) => {
                 const Icon = item.kind === 'web' ? (item.type === 'search' ? Search : Globe) : (ALERT_ICONS[item.type] ?? Bell)
                 const tone = item.kind === 'alert'
@@ -312,12 +312,12 @@ export default function SummaryTab({ childId, onNavigateTab }) {
                   : 'text-slate-500 bg-slate-100'
                 return (
                   <li key={item.id} className="ml-4">
-                    <span className={cn('absolute -left-[13px] w-6 h-6 rounded-full flex items-center justify-center ring-4 ring-[var(--surface)]', tone)}>
-                      <Icon className="w-3 h-3" />
+                    <span className={cn('absolute -left-[15px] w-7 h-7 rounded-full flex items-center justify-center ring-4 ring-[var(--surface)]', tone)}>
+                      <Icon className="w-3.5 h-3.5" />
                     </span>
                     <div className="pl-2">
                       <p className="text-sm text-primary-token">{item.title}</p>
-                      <p className="text-[11px] text-muted-token">{fmtTime(item.at)}{item.body ? ` · ${item.body}` : ''}</p>
+                      <p className="text-xs text-muted-token">{fmtTime(item.at)}{item.body ? ` · ${item.body}` : ''}</p>
                     </div>
                   </li>
                 )
@@ -327,9 +327,9 @@ export default function SummaryTab({ childId, onNavigateTab }) {
         </CardBody>
       </Card>
 
-      <p className="text-[11px] text-muted-token text-center">
+      <p className="text-xs text-muted-token text-center">
         Tip: use the buttons above the tabs to pause internet, lock the device, or give extra time right now.{' '}
-        <button onClick={() => navigate('/parental-control/dashboard')} className="text-indigo-600 hover:underline">Family dashboard</button>
+        <button onClick={() => navigate('/parental-control')} className="text-indigo-600 hover:underline">Family dashboard</button>
       </p>
     </div>
   )

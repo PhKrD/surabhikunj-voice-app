@@ -1,14 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Smartphone, MapPin, Bell, Gift, Hourglass, Clock, Globe, Send, ShieldAlert, History, Link2,
-  LayoutDashboard, Moon, Gamepad2,
+  ArrowLeft, Smartphone, MapPin, Bell, Gift, Hourglass, Clock, Globe, Send, ShieldAlert, History,
+  LayoutDashboard, Moon, Gamepad2, ShieldCheck, Lock, WifiOff,
 } from 'lucide-react'
 import Avatar from '@/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
-import { getChild, listDevices, updateChild } from '@/lib/parentalControlApi'
-import MemberLinkPicker from '@/components/parental-control/MemberLinkPicker'
+import { getChild, listDevices } from '@/lib/parentalControlApi'
+import { isDeviceOnline } from '@/lib/commandStatus'
 import CommandCenter from './CommandCenter'
 import SummaryTab from './tabs/SummaryTab'
 import DevicesTab from './tabs/DevicesTab'
@@ -24,31 +24,60 @@ import RequestsTab from './tabs/RequestsTab'
 import AuditLogTab from './tabs/AuditLogTab'
 import BonusTab from './tabs/BonusTab'
 
-// Grouped Qustodio-style: Summary first, then Rules, then Activity, then Admin.
+// Three groups, wrapped pills — the old single scrolling strip of 13 tabs
+// hid half of them off the right edge on a phone.
 const TAB_GROUPS = [
-  { label: 'Overview', tabs: [
-    { key: 'summary', label: 'Summary', icon: LayoutDashboard, Component: SummaryTab },
-  ] },
   { label: 'Rules', tabs: [
+    { key: 'summary', label: 'Summary', icon: LayoutDashboard, Component: SummaryTab },
     { key: 'usage', label: 'Daily limits', icon: Hourglass, Component: UsageTab },
     { key: 'restricted', label: 'Restricted times', icon: Moon, Component: RestrictedTimesTab },
     { key: 'schedules', label: 'Routines', icon: Clock, Component: SchedulesTab },
     { key: 'rules', label: 'Games & Apps', icon: Gamepad2, Component: RulesTab },
     { key: 'websites', label: 'Web filtering', icon: Globe, Component: WebsiteRulesTab },
-    { key: 'location', label: 'Location & Places', icon: MapPin, Component: LocationTab },
   ] },
   { label: 'Activity', tabs: [
-    { key: 'webActivity', label: 'Web activity', icon: History, Component: WebActivityTab },
     { key: 'alerts', label: 'Alerts', icon: Bell, Component: AlertsTab },
     { key: 'requests', label: 'Requests', icon: Send, Component: RequestsTab },
+    { key: 'webActivity', label: 'Web activity', icon: History, Component: WebActivityTab },
+    { key: 'location', label: 'Places', icon: MapPin, Component: LocationTab },
     { key: 'bonus', label: 'Extra time', icon: Gift, Component: BonusTab },
   ] },
-  { label: 'Admin', tabs: [
-    { key: 'devices', label: 'Devices', icon: Smartphone, Component: DevicesTab },
+  { label: 'Setup', tabs: [
+    { key: 'devices', label: 'Devices & protection', icon: Smartphone, Component: DevicesTab },
     { key: 'audit', label: 'Audit log', icon: ShieldAlert, Component: AuditLogTab },
   ] },
 ]
 const TABS = TAB_GROUPS.flatMap((g) => g.tabs)
+
+/** Live status chips straight from what the devices last reported. */
+function statusChips(devices, child) {
+  const active = devices.filter((d) => d.is_active)
+  if (active.length === 0) return [{ key: 'nodev', label: 'No device paired', variant: 'saffron', icon: Smartphone }]
+
+  const chips = []
+  const missing = new Set()
+  for (const d of active) {
+    const s = d.enforcement_state
+    if (!s) { if (d.device_owner_mode !== 'device_owner') missing.add('setup'); continue }
+    if (s.device_admin === false) missing.add('Device admin')
+    if (s.accessibility_enabled === false) missing.add('Accessibility')
+    if (s.usage_access === false) missing.add('Usage access')
+    if (s.lock_reason === 'parent_lock') chips.push({ key: 'lock', label: 'Locked by you', variant: 'red', icon: Lock })
+    else if (s.lock_reason) chips.push({ key: 'lock', label: LOCK_LABEL[s.lock_reason] ?? 'Locked', variant: 'yellow', icon: Hourglass })
+    if (s.internet_paused || s.manual_internet_pause) chips.push({ key: 'net', label: 'Internet paused', variant: 'yellow', icon: WifiOff })
+  }
+
+  if (missing.size === 0) chips.unshift({ key: 'prot', label: 'Protected', variant: 'tulasi', icon: ShieldCheck })
+  else if (missing.has('setup') && missing.size === 1) chips.unshift({ key: 'prot', label: 'Setup needed', variant: 'saffron', icon: ShieldAlert })
+  else chips.unshift({ key: 'prot', label: `Missing ${[...missing].filter((m) => m !== 'setup').join(', ')}`, variant: 'yellow', icon: ShieldAlert })
+
+  if (!child?.parent_pin_hash) {
+    chips.push({ key: 'pin', label: 'No protection PIN', variant: 'saffron', icon: ShieldAlert })
+  }
+  return [...new Map(chips.map((c) => [c.key, c])).values()]
+}
+
+const LOCK_LABEL = { daily_limit: "Time's up", restricted_time: 'Restricted time', schedule: 'On a break' }
 
 export default function ChildDetailPage() {
   const { childId } = useParams()
@@ -59,8 +88,6 @@ export default function ChildDetailPage() {
   const [devices, setDevices] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('summary')
-  const [showLinkPicker, setShowLinkPicker] = useState(false)
-  const [savingLink, setSavingLink] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -80,91 +107,75 @@ export default function ChildDetailPage() {
     return () => clearTimeout(id)
   }, [load])
 
-  const activeDevices = devices.filter((d) => d.is_active)
+  const chips = useMemo(() => statusChips(devices, child), [devices, child])
 
-  const handleLinkChange = async (profileId) => {
-    setSavingLink(true)
-    try {
-      const updated = await updateChild(childId, { linked_profile_id: profileId })
-      setChild(updated)
-      setShowLinkPicker(false)
-      toast.success(profileId ? 'Linked to VOICE member' : 'Unlinked — device-only again')
-    } catch (error) {
-      toast.error('Could not update link', error.message)
-    } finally {
-      setSavingLink(false)
-    }
-  }
-
-  if (loading) return <div className="text-center py-12 text-muted-token text-sm">Loading...</div>
+  if (loading) return <div className="text-center py-12 text-muted-token text-sm">Loading…</div>
   if (!child) return <div className="text-center py-12 text-muted-token text-sm">Child not found.</div>
 
   const ActiveComponent = TABS.find((t) => t.key === activeTab)?.Component
+  const activeDevices = devices.filter((d) => d.is_active)
+  const onlineCount = activeDevices.filter((d) => isDeviceOnline(d)).length
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
+    <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <button
-        onClick={() => navigate('/parental-control')}
-        className="flex items-center gap-1.5 text-sm text-secondary-token hover:text-primary-token"
-      >
-        <ArrowLeft className="w-4 h-4" /> All children
-      </button>
+      <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white px-6 pt-14 pb-8 rounded-b-[2rem]">
+        <div className="max-w-3xl mx-auto">
+          <button
+            onClick={() => navigate('/parental-control')}
+            className="flex items-center gap-1.5 text-sm text-indigo-200 hover:text-white mb-4"
+          >
+            <ArrowLeft className="w-4 h-4" /> Family
+          </button>
 
-      <div className="flex items-center gap-3">
-        <Avatar name={child.display_name} size="lg" />
-        <div className="flex-1">
-          <h2 className="text-lg font-bold text-primary-token">{child.display_name}</h2>
-          <p className="text-sm text-muted-token">
-            {activeDevices.length} active device{activeDevices.length === 1 ? '' : 's'}
-          </p>
+          <div className="flex items-center gap-4">
+            <Avatar name={child.display_name} size="lg" />
+            <div className="flex-1 min-w-0">
+              <h2 className="text-2xl font-bold truncate">{child.display_name}</h2>
+              <p className="text-sm text-indigo-200 mt-1">
+                {activeDevices.length === 0
+                  ? 'No device paired yet'
+                  : `${onlineCount > 0 ? 'Online' : 'Offline'} · ${activeDevices.length} device${activeDevices.length === 1 ? '' : 's'}`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mt-5">
+            {chips.map((c) => (
+              <button
+                key={c.key}
+                onClick={() => setActiveTab('devices')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/12 border border-white/15 text-sm font-semibold hover:bg-white/20 transition-colors"
+              >
+                <c.icon className="w-3.5 h-3.5" /> {c.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <button
-          onClick={() => setShowLinkPicker((v) => !v)}
-          className={cn(
-            'flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border transition-colors',
-            child.linked_profile_id
-              ? 'border-tulasi-200 bg-tulasi-50 text-tulasi-700'
-              : 'border-[var(--border-color)] text-secondary-token hover:bg-[var(--surface-muted)]'
-          )}
-        >
-          <Link2 className="w-3.5 h-3.5" />
-          {child.linked_profile_id ? 'Linked to member' : 'Link to member'}
-        </button>
       </div>
 
-      {showLinkPicker && (
-        <div className="rounded-2xl border border-[var(--border-color)] p-4">
-          <MemberLinkPicker value={child.linked_profile_id} onChange={handleLinkChange} />
-          {savingLink && <p className="text-xs text-muted-token mt-2">Saving...</p>}
-          <p className="text-xs text-muted-token mt-2">
-            Changing this only affects the NEXT time a device is paired (or re-paired) for this child —
-            it does not retroactively change already-paired devices' sessions.
-          </p>
-        </div>
-      )}
+      <div className="max-w-3xl mx-auto px-6 py-6 space-y-5">
+        {/* Quick actions */}
+        <CommandCenter devices={devices} childId={childId} onRefreshDevices={load} />
 
-      {/* Command center — per-device targeting + true command lifecycle */}
-      <CommandCenter devices={devices} childId={childId} onRefreshDevices={load} />
-
-      {/* Tabs, grouped */}
-      <div className="border-b border-[var(--border-color)] overflow-x-auto scrollbar-hide">
-        <div className="flex items-end gap-3 min-w-max">
+        {/* Tabs */}
+        <nav className="rounded-3xl border border-[var(--border-color)] bg-[var(--surface)] p-4 space-y-3">
           {TAB_GROUPS.map((group) => (
-            <div key={group.label} className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-wide text-muted-token px-3.5 pb-0.5">{group.label}</span>
-              <div className="flex gap-0.5">
+            <div key={group.label}>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-token px-1 pb-2">{group.label}</p>
+              <div className="flex flex-wrap gap-2">
                 {group.tabs.map((tab) => {
                   const Icon = tab.icon
+                  const active = activeTab === tab.key
                   return (
                     <button
                       key={tab.key}
                       onClick={() => setActiveTab(tab.key)}
                       className={cn(
-                        'flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
-                        activeTab === tab.key
-                          ? 'border-indigo-500 text-indigo-600'
-                          : 'border-transparent text-secondary-token hover:text-primary-token'
+                        'inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors',
+                        active
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-[var(--surface-muted)] text-secondary-token hover:text-primary-token',
                       )}
                     >
                       <Icon className="w-4 h-4" /> {tab.label}
@@ -174,10 +185,12 @@ export default function ChildDetailPage() {
               </div>
             </div>
           ))}
-        </div>
-      </div>
+        </nav>
 
-      {ActiveComponent && <ActiveComponent childId={childId} onNavigateTab={setActiveTab} />}
+        {ActiveComponent && (
+          <ActiveComponent childId={childId} onNavigateTab={setActiveTab} onChildUpdated={setChild} />
+        )}
+      </div>
     </div>
   )
 }

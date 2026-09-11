@@ -46,6 +46,8 @@ object BlockOverlay {
         "restricted_time" -> Triple("\uD83C\uDF19", "Not now", "This is a restricted time set by your parents.\nTap here to ask for an exception.")
         "schedule" -> Triple("\u23F8", "Screen time paused", "Your parents have scheduled a break.\nTap here to ask for more time.")
         "parent_lock" -> Triple("\uD83D\uDD12", "Locked by your parents", "Your parents locked this device for now.")
+        "internet_paused" -> Triple("\uD83D\uDCF6", "Internet is paused", "Your parents paused the internet on this device.\nTap here to ask them to turn it back on.")
+        "website_blocked" -> Triple("\uD83C\uDF10", "This site is blocked", "${appLabel ?: "That website"} isn't allowed.\nTap here to ask your parents for access.")
         else -> Triple("\uD83D\uDEAB", "${appLabel ?: "This app"} is blocked", "Your parents have blocked this app.\nTap here to ask for access.")
     }
 

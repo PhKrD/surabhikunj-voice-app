@@ -69,6 +69,17 @@
 
         <!-- ── Device Policy Controller components (child-device mode only) ── -->
 
+        <!-- Shown by SettingsGuard when the child opens a Settings screen
+             that could disable supervision. excludeFromRecents keeps it out
+             of the task switcher; NOT noHistory, which raced the launch and
+             finished the gate before it could draw. -->
+        <activity
+            android:name="com.surabhikunj.voice.dpc.PinGateActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
         <receiver
             android:name="com.surabhikunj.voice.dpc.VoiceKidsDeviceAdminReceiver"
             android:exported="true"

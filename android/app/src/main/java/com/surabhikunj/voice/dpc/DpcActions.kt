@@ -233,10 +233,23 @@ object DpcActions {
     /** Returns the system consent Intent to launch, or null if already granted. */
     fun vpnConsentIntent(context: Context): Intent? = VpnService.prepare(context)
 
+    /**
+     * Puts the internet pause in force. The pause itself is carried by
+     * VoiceKidsPrefs.internetPauseActive + VoiceKidsAccessibilityService,
+     * which keeps every internet-using app off screen and needs NO VPN —
+     * that's why this returns true even without VPN consent, where it used
+     * to report failure and leave the parent's "Pause internet" silently
+     * doing nothing.
+     *
+     * When the parent HAS granted VPN consent we additionally raise the
+     * drop-everything tunnel, which also stops background traffic
+     * (notifications, syncs) that app-blocking alone can't.
+     */
     fun pauseInternet(context: Context): Boolean {
+        VoiceKidsPrefs.setInternetPauseActive(context, true)
         if (!hasVpnConsent(context)) {
-            Log.e(TAG, "pauseInternet: VPN consent not granted yet")
-            return false
+            Log.i(TAG, "pauseInternet: no VPN consent — app-level pause only")
+            return true
         }
         return try {
             if (isDeviceOwner(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -253,12 +266,13 @@ object DpcActions {
             Log.i(TAG, "pauseInternet: VPN started — internet blocked for all apps except self")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "pauseInternet failed: ${e.message}")
-            false
+            Log.e(TAG, "pauseInternet failed (app-level pause still in force): ${e.message}")
+            true
         }
     }
 
     fun resumeInternet(context: Context): Boolean {
+        VoiceKidsPrefs.setInternetPauseActive(context, false)
         return try {
             InternetBlockVpnService.stop(context)
             VoiceKidsPrefs.setWebsiteFilterActive(context, false) // tunnel is down; PolicyEnforcer re-establishes DNS filtering if still wanted
@@ -290,6 +304,10 @@ object DpcActions {
     // calling this while a block_internet/block_all schedule is active.
 
     fun startWebsiteFilter(context: Context): Boolean {
+        if (!VoiceKidsPrefs.useVpnFiltering(context)) {
+            Log.i(TAG, "startWebsiteFilter: VPN filtering not enabled by the parent — accessibility-based blocking only")
+            return false
+        }
         if (!hasVpnConsent(context)) {
             Log.w(TAG, "startWebsiteFilter: VPN consent not granted yet")
             return false

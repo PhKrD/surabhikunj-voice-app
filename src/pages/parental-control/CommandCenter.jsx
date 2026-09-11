@@ -143,14 +143,14 @@ export default function CommandCenter({ devices, childId }) {
 
   if (activeDevices.length === 0) {
     return (
-      <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] p-4 text-center text-sm text-muted-token">
+      <div className="rounded-3xl border border-[var(--border-color)] bg-[var(--surface)] p-5 text-center text-sm text-muted-token">
         No active devices. Add a device from the Devices tab to send commands.
       </div>
     )
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Target selector */}
       <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
         <TargetChip
@@ -188,11 +188,11 @@ export default function CommandCenter({ devices, childId }) {
               onClick={() => fire(action)}
               title={title}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-sm font-medium text-secondary-token disabled:opacity-50 disabled:cursor-not-allowed',
+                'flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[var(--surface)] border border-[var(--border-color)] text-sm font-medium text-secondary-token disabled:opacity-50 disabled:cursor-not-allowed',
                 action.hover,
               )}
             >
-              <Icon className="w-4 h-4" /> {action.label}
+              <Icon className="w-4.5 h-4.5" /> {action.label}
             </button>
           )
         })}
@@ -201,32 +201,32 @@ export default function CommandCenter({ devices, childId }) {
             disabled={sending}
             onClick={() => setShowExtraTime((v) => !v)}
             className={cn(
-              'flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium disabled:opacity-50',
+              'flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-sm font-medium disabled:opacity-50',
               showExtraTime ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-[var(--surface)] border-[var(--border-color)] text-secondary-token hover:border-indigo-200 hover:text-indigo-600',
             )}
             title="Pause every limit, routine and restriction for a while"
           >
-            <Gift className="w-4 h-4" /> Give extra time
+            <Gift className="w-4.5 h-4.5" /> Give extra time
           </button>
         )}
         <button
           onClick={loadCommands}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-sm font-medium text-muted-token hover:text-secondary-token"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[var(--surface)] border border-[var(--border-color)] text-sm font-medium text-muted-token hover:text-secondary-token"
           title="Refresh command status"
         >
-          <RefreshCw className="w-4 h-4" />
+          <RefreshCw className="w-4.5 h-4.5" />
         </button>
       </div>
 
       {showExtraTime && (
-        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-3 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-indigo-800 mr-1">Extra time for all devices:</span>
+        <div className="rounded-3xl border border-indigo-200 bg-indigo-50/60 p-4 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-indigo-800 mr-1">Extra time for all devices:</span>
           {EXTRA_TIME_PRESETS.map((m) => (
             <button
               key={m}
               disabled={sending}
               onClick={() => giveExtraTime(m)}
-              className="px-3 py-1.5 rounded-lg bg-white border border-indigo-200 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+              className="px-4 py-2 rounded-xl bg-white border border-indigo-200 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
             >
               +{m >= 60 ? `${m / 60}h` : `${m}m`}
             </button>
@@ -234,9 +234,9 @@ export default function CommandCenter({ devices, childId }) {
           <button
             disabled={sending}
             onClick={endExtraTime}
-            className="ml-auto flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+            className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
           >
-            <X className="w-3.5 h-3.5" /> End extra time now
+            <X className="w-4 h-4" /> End extra time now
           </button>
         </div>
       )}
@@ -246,16 +246,18 @@ export default function CommandCenter({ devices, childId }) {
           Accessibility soft-lock (no reset needed) and locks the screen once.
           Dismissing an EXISTING PIN/pattern/password from here needs a
           Device-Owner-only API. See PLATFORM_LIMITATIONS.md. */}
-      <p className="flex items-start gap-1.5 text-xs text-muted-token">
-        <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-        "Lock now" stays in force until you tap Unlock — only calls, SOS and VOICE remain usable. Unlock can't remove a
-        PIN/pattern the child set on the phone itself; that's an Android restriction, not a bug here.
+      <p className="flex items-start gap-2 text-sm text-muted-token">
+        <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+        &quot;Lock now&quot; and &quot;Pause internet&quot; both stay in force until you undo them. Pausing the internet keeps every
+        app that needs a connection off screen (offline apps and calls still work); if the device also has the optional
+        VPN permission, background traffic stops too. Unlock can&apos;t remove a PIN/pattern the child set on the phone
+        itself — that&apos;s an Android restriction, not a bug here.
       </p>
 
       {/* Live command status feed */}
       {commands.length > 0 && (
-        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] divide-y divide-[var(--border-color)]">
-          <p className="px-4 pt-3 pb-1 text-xs font-bold uppercase tracking-wide text-muted-token">
+        <div className="rounded-3xl border border-[var(--border-color)] bg-[var(--surface)] divide-y divide-[var(--border-color)]">
+          <p className="px-5 pt-4 pb-2 text-xs font-bold uppercase tracking-wide text-muted-token">
             Recent commands
           </p>
           {commands.map((cmd) => {
@@ -264,14 +266,14 @@ export default function CommandCenter({ devices, childId }) {
             const dev = deviceById[cmd.device_id]
             const pending = !isTerminalState(state)
             return (
-              <div key={cmd.id} className="px-4 py-2.5 flex items-center gap-3">
-                <Smartphone className="w-4 h-4 text-muted-token flex-shrink-0" />
+              <div key={cmd.id} className="px-5 py-3 flex items-center gap-3">
+                <Smartphone className="w-4.5 h-4.5 text-muted-token flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-primary-token truncate">
                     {commandTypeLabel(cmd.command_type)}
                     <span className="text-muted-token font-normal"> · {dev?.device_name || 'device'}</span>
                   </p>
-                  <p className="text-[11px] text-muted-token truncate">
+                  <p className="text-xs text-muted-token truncate">
                     {timeAgo(cmd.created_at)}
                     {state === 'failed' && cmd.error_message ? ` · ${cmd.error_message}` : ''}
                   </p>

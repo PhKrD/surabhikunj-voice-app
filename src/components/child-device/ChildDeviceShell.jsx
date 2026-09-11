@@ -22,6 +22,7 @@ import SosPage from '@/pages/child-device/SosPage.jsx'
 import BonusTimePage from '@/pages/child-device/BonusTimePage.jsx'
 import RequestPage from '@/pages/child-device/RequestPage.jsx'
 import LockedPage from '@/pages/child-device/LockedPage.jsx'
+import PermissionWizardPage from '@/pages/child-device/PermissionWizardPage.jsx'
 
 function RequireEnrollment({ children }) {
   const enrolled = useDeviceState((s) => s.enrolled)
@@ -44,7 +45,7 @@ export default function ChildDeviceShell() {
   useEffect(() => {
     if (!enrolled) return
     const path = location.pathname
-    const reachableWhileLocked = ['/child/locked', '/child/sos', '/child/bonus', '/child/request']
+    const reachableWhileLocked = ['/child/locked', '/child/sos', '/child/bonus', '/child/request', '/child/setup']
     if (isLocked && !reachableWhileLocked.includes(path)) navigate('/child/locked', { replace: true })
     else if (!isLocked && path === '/child/locked') navigate('/child/home', { replace: true })
   }, [enrolled, isLocked, location.pathname, navigate])
@@ -89,6 +90,7 @@ export default function ChildDeviceShell() {
       <Route path="/child/bonus" element={<RequireEnrollment><BonusTimePage /></RequireEnrollment>} />
       <Route path="/child/request" element={<RequireEnrollment><RequestPage /></RequireEnrollment>} />
       <Route path="/child/locked" element={<RequireEnrollment><LockedPage /></RequireEnrollment>} />
+      <Route path="/child/setup" element={<RequireEnrollment><PermissionWizardPage /></RequireEnrollment>} />
       <Route path="*" element={<Navigate to={isEnrolled() ? '/child/home' : '/child/enroll'} replace />} />
     </Routes>
   )

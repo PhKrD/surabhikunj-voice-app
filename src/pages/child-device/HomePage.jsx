@@ -2,17 +2,16 @@
  * HomePage.jsx
  * The child's main screen after enrollment.
  *
- * Deliberately minimal — the child sees:
- *   • Their name + a friendly greeting
- *   • Real screen time today (UsageStatsManager, refreshed on mount + focus)
- *   • A large SOS button
- *   • A "Request more time" button
+ * Deliberately calm and small: a screen-time ring, whatever is currently
+ * in force (bonus time, paused internet), two ways to ask a parent for
+ * something, and SOS. Anything the child can't change isn't shown as a
+ * control.
  *
  * The command poller is started here and runs for the app's lifetime.
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { ShieldAlert, Clock, Plus, Settings, Send } from 'lucide-react'
+import { ShieldAlert, Plus, Settings, Send, WifiOff, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useDeviceState } from '../../store/childDeviceState.js'
 import { startCommandPoller, stopCommandPoller } from '../../lib/commandPoller.js'
@@ -20,9 +19,12 @@ import { syncSessionAndStartTracking } from '../../lib/locationPlugin.js'
 import { getTodayUsage, hasUsageAccess, openUsageAccessSettings, syncInstalledApps } from '../../lib/usageStatsPlugin.js'
 import SetupChecklistCard from '../../components/child-device/SetupChecklistCard.jsx'
 
+const RING_RADIUS = 68
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
+
 export default function HomePage() {
   const navigate = useNavigate()
-  const { childName, bonusActive, setLastCommand, screenTime } = useDeviceState()
+  const { childName, bonusActive, internetPaused, setLastCommand, screenTime } = useDeviceState()
   const [usageMinutes, setUsageMinutes] = useState(null)
   const [usageAccessGranted, setUsageAccessGranted] = useState(true)
 
@@ -60,103 +62,121 @@ export default function HomePage() {
     }
   }, [refreshUsage])
 
-  const greeting = getGreeting()
+  const used = usageMinutes ?? 0
+  const limit = screenTime.limitMin
+  const pct = limit && limit > 0 ? Math.min(100, (used / limit) * 100) : 0
+  const over = limit != null && used >= limit
+  const remaining = limit != null ? Math.max(0, limit - used) : null
 
   return (
-    <div className="min-h-screen bg-indigo-50 flex flex-col">
-      {/* Header */}
-      <div className="bg-indigo-600 text-white px-6 pt-12 pb-8">
-        <p className="text-indigo-200 text-sm">{greeting}</p>
-        <h1 className="text-2xl font-bold mt-1">{childName || 'Hi there!'}</h1>
-      </div>
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      {/* Header + screen-time ring */}
+      <div className="bg-gradient-to-b from-indigo-600 to-indigo-700 text-white px-6 pt-14 pb-10 rounded-b-[2rem]">
+        <p className="text-indigo-200 text-sm">{getGreeting()}</p>
+        <h1 className="text-2xl font-bold mt-0.5">{childName || 'Hi there!'}</h1>
 
-      {/* Body */}
-      <div className="flex-1 px-6 py-8 flex flex-col gap-6">
-        {/* Outstanding permissions needed for parental control to actually work */}
-        <SetupChecklistCard />
-
-        {/* Screen time card */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center gap-3 mb-2">
-            <Clock size={20} className="text-indigo-500" />
-            <span className="font-semibold text-gray-700">Screen time today</span>
-          </div>
-
+        <div className="flex items-center justify-center mt-6">
           {usageAccessGranted ? (
-            <>
-              <p className="text-3xl font-bold text-indigo-600">
-                {usageMinutes === null ? '—' : formatMinutes(usageMinutes)}
-                {screenTime.limitMin != null && (
-                  <span className="text-base font-medium text-gray-400"> / {formatMinutes(screenTime.limitMin)}</span>
+            <div className="relative w-40 h-40 flex flex-col items-center justify-center">
+              <svg width={160} height={160} viewBox="0 0 160 160" className="absolute inset-0 -rotate-90 pointer-events-none">
+                <circle cx={80} cy={80} r={RING_RADIUS} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth={10} />
+                {limit != null && (
+                  <circle
+                    cx={80} cy={80} r={RING_RADIUS}
+                    fill="none"
+                    stroke={over ? '#FCA5A5' : '#A5B4FC'}
+                    strokeWidth={10}
+                    strokeLinecap="round"
+                    strokeDasharray={RING_CIRCUMFERENCE}
+                    strokeDashoffset={RING_CIRCUMFERENCE * (1 - pct / 100)}
+                    className="transition-[stroke-dashoffset] duration-700"
+                  />
                 )}
+              </svg>
+              <p className="text-4xl font-bold tabular-nums">{usageMinutes === null ? '—' : formatMinutes(used)}</p>
+              <p className="text-xs text-indigo-200 mt-1">
+                {limit == null ? 'used today' : over ? "today's limit reached" : `of ${formatMinutes(limit)}`}
               </p>
-              {screenTime.limitMin != null && (
-                <div className="mt-3">
-                  <div className="h-2 w-full bg-indigo-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${(usageMinutes ?? 0) >= screenTime.limitMin ? 'bg-red-500' : 'bg-indigo-500'}`}
-                      style={{ width: `${screenTime.limitMin > 0 ? Math.min(100, Math.round(((usageMinutes ?? 0) / screenTime.limitMin) * 100)) : 100}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1.5">
-                    {Math.max(0, screenTime.limitMin - (usageMinutes ?? 0)) > 0
-                      ? `${formatMinutes(Math.max(0, screenTime.limitMin - (usageMinutes ?? 0)))} left today`
-                      : "Today's limit reached"}
-                  </p>
-                </div>
-              )}
-            </>
+            </div>
           ) : (
             <button
               onClick={openUsageAccessSettings}
-              className="flex items-center gap-2 text-sm text-indigo-600 font-medium mt-1"
+              className="flex items-center gap-2 text-sm bg-white/10 border border-white/20 rounded-2xl px-4 py-3 my-6"
             >
               <Settings size={16} />
-              Tap to enable screen time tracking
+              Turn on screen time tracking
             </button>
-          )}
-
-          {bonusActive && (
-            <div className="mt-3 bg-green-50 text-green-700 rounded-xl px-3 py-2 text-sm font-medium">
-              Bonus time is active
-            </div>
           )}
         </div>
 
-        {/* Request more time */}
+        {usageAccessGranted && limit != null && !over && (
+          <p className="text-center text-sm text-indigo-100 mt-1">{formatMinutes(remaining)} left today</p>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 px-5 py-5 flex flex-col gap-3">
+        <SetupChecklistCard />
+
+        {bonusActive && (
+          <StatusPill tone="emerald" icon={Sparkles} text="Bonus time is active right now" />
+        )}
+        {internetPaused && (
+          <StatusPill tone="amber" icon={WifiOff} text="Your parents have paused the internet" />
+        )}
+
         <button
           onClick={() => navigate('/child/bonus')}
-          className="w-full bg-white border-2 border-indigo-200 hover:border-indigo-400 text-indigo-700 font-semibold rounded-2xl py-4 flex items-center justify-center gap-2 transition-colors shadow-sm"
+          className="w-full bg-white rounded-3xl px-5 py-4 flex items-center gap-3 shadow-sm active:bg-slate-100 transition-colors"
         >
-          <Plus size={20} />
-          Request more screen time
+          <span className="w-10 h-10 rounded-2xl bg-indigo-100 flex items-center justify-center shrink-0">
+            <Plus size={20} className="text-indigo-600" />
+          </span>
+          <span className="text-left">
+            <span className="block font-semibold text-slate-800">Ask for more screen time</span>
+            <span className="block text-xs text-slate-500">Your parents get a notification</span>
+          </span>
         </button>
 
-        {/* General request */}
         <button
           onClick={() => navigate('/child/request')}
-          className="w-full bg-white border-2 border-slate-200 hover:border-slate-400 text-slate-700 font-semibold rounded-2xl py-4 flex items-center justify-center gap-2 transition-colors shadow-sm"
+          className="w-full bg-white rounded-3xl px-5 py-4 flex items-center gap-3 shadow-sm active:bg-slate-100 transition-colors"
         >
-          <Send size={20} />
-          Ask for something else
+          <span className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center shrink-0">
+            <Send size={18} className="text-slate-600" />
+          </span>
+          <span className="text-left">
+            <span className="block font-semibold text-slate-800">Ask for something else</span>
+            <span className="block text-xs text-slate-500">Unblock an app, a website, anything</span>
+          </span>
         </button>
 
-        {/* Spacer */}
-        <div className="flex-1" />
+        <div className="flex-1 min-h-4" />
 
-        {/* SOS Button */}
         <button
           onClick={() => navigate('/child/sos')}
-          className="w-full bg-red-500 hover:bg-red-600 active:scale-95 text-white font-bold text-xl rounded-3xl py-6 flex items-center justify-center gap-3 shadow-lg transition-all"
+          className="w-full bg-red-500 active:bg-red-600 text-white font-bold text-lg rounded-3xl py-5 flex items-center justify-center gap-3 shadow-lg shadow-red-500/25 transition-colors"
         >
-          <ShieldAlert size={28} />
+          <ShieldAlert size={26} />
           SOS — I need help
         </button>
-
-        <p className="text-xs text-gray-400 text-center">
-          Press SOS only in an emergency. Your parents will be notified immediately.
+        <p className="text-xs text-slate-400 text-center pb-2">
+          Only in an emergency. Your parents are alerted straight away.
         </p>
       </div>
+    </div>
+  )
+}
+
+function StatusPill({ tone, icon: Icon, text }) {
+  const tones = {
+    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+    amber: 'bg-amber-50 border-amber-200 text-amber-800',
+  }
+  return (
+    <div className={`flex items-center gap-2.5 rounded-2xl border px-4 py-3 text-sm font-medium ${tones[tone]}`}>
+      <Icon size={17} className="shrink-0" />
+      {text}
     </div>
   )
 }

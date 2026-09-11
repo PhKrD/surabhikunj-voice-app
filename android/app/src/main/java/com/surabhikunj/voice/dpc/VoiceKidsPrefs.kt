@@ -332,4 +332,70 @@ object VoiceKidsPrefs {
     fun setLastWebsiteVisitAlertAt(context: Context, domain: String, epochMillis: Long) {
         prefs(context).edit().putLong("last_website_visit_alert_$domain", epochMillis).apply()
     }
+
+    /**
+     * pc_website_filter_settings.use_vpn — the parent's opt-in to the local
+     * DNS-filtering VPN. OFF by default: website filtering works through
+     * VoiceKidsAccessibilityService (browser URL) without it, and routing
+     * every DNS lookup on the phone through a tunnel is a real risk to
+     * ordinary browsing that a parent should choose knowingly.
+     */
+    fun useVpnFiltering(context: Context): Boolean =
+        prefs(context).getBoolean("use_vpn_filtering", false)
+
+    fun setUseVpnFiltering(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean("use_vpn_filtering", enabled).apply()
+    }
+
+    // ── Internet pause without a VPN ────────────────────────────────────
+    // "Pause internet" used to be VPN-only, so it silently did nothing on
+    // a device where the parent hadn't granted VPN consent. The primary
+    // mechanism is now VoiceKidsAccessibilityService blocking every
+    // internet-using app (see its internetPauseBlocks()); the VPN tunnel,
+    // when consented, is an extra layer on top that also stops background
+    // traffic.
+
+    /** True while internet should be unavailable to the child (parent's pause, or a block_internet routine). */
+    fun internetPauseActive(context: Context): Boolean =
+        prefs(context).getBoolean("internet_pause_active", false)
+
+    fun setInternetPauseActive(context: Context, active: Boolean) {
+        prefs(context).edit().putBoolean("internet_pause_active", active).apply()
+    }
+
+    // ── Parent PIN + Settings guard (see SettingsGuard.kt) ──────────────
+
+    /** SHA-256 of the parent's PIN as set in the parent app (pc_children.parent_pin_hash). Empty = no PIN configured. */
+    fun parentPinHash(context: Context): String = prefs(context).getString("parent_pin_hash", "") ?: ""
+
+    fun setParentPinHash(context: Context, hash: String?) {
+        prefs(context).edit().putString("parent_pin_hash", hash ?: "").apply()
+    }
+
+    /** pc_children.protect_settings — guard the Settings screens that can disable supervision. */
+    fun protectSettings(context: Context): Boolean =
+        prefs(context).getBoolean("protect_settings", true)
+
+    fun setProtectSettings(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean("protect_settings", enabled).apply()
+    }
+
+    /**
+     * Until this instant the guard stands down, so a parent who just
+     * entered the PIN can actually reach the screens they came for
+     * (turning a permission back on, uninstalling during handover, ...).
+     */
+    fun settingsGraceUntil(context: Context): Long = prefs(context).getLong("settings_grace_until", 0L)
+
+    fun setSettingsGraceUntil(context: Context, epochMillis: Long) {
+        prefs(context).edit().putLong("settings_grace_until", epochMillis).apply()
+    }
+
+    fun isSettingsGraceActive(context: Context): Boolean = settingsGraceUntil(context) > System.currentTimeMillis()
+
+    fun lastSettingsBlockAlertAt(context: Context): Long = prefs(context).getLong("last_settings_block_alert", 0L)
+
+    fun setLastSettingsBlockAlertAt(context: Context, epochMillis: Long) {
+        prefs(context).edit().putLong("last_settings_block_alert", epochMillis).apply()
+    }
 }

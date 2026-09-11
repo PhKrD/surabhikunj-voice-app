@@ -115,6 +115,22 @@ export function diagnosticChecklist(device, child, now = Date.now()) {
       label: state.usage_access === false ? 'Usage Access permission missing (time limits inactive)' : 'Usage Access granted',
     },
     {
+      key: 'overlay_granted',
+      ok: state.overlay_granted !== false,
+      label: state.overlay_granted === false
+        ? '"Display over other apps" off — blocking still works, but the child gets no explanation'
+        : 'Block explanation screen enabled',
+    },
+    {
+      key: 'settings_protected',
+      // The parent PIN + on-device settings guard. Informational: without
+      // it everything still enforces, the child can just switch it off.
+      ok: child?.parent_pin_hash ? true : null,
+      label: child?.parent_pin_hash
+        ? 'Protection PIN set — Settings screens that disable VOICE are guarded'
+        : 'No protection PIN — the child can turn supervision off from Settings',
+    },
+    {
       key: 'device_owner',
       // Informational only — Device Owner is an optional stronger mode,
       // never required, so its absence is never a checklist failure.

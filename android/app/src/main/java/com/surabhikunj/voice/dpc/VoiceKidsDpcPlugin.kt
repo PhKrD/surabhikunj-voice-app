@@ -12,6 +12,8 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import com.getcapacitor.annotation.Permission
+import com.getcapacitor.annotation.PermissionCallback
 
 /**
  * VoiceKidsDpcPlugin
@@ -35,7 +37,16 @@ import com.getcapacitor.annotation.CapacitorPlugin
  *     do NOT depend on these — see VoiceKidsAccessibilityService, which is
  *     the primary mechanism for both tiers.
  */
-@CapacitorPlugin(name = "VoiceKidsDpc")
+@CapacitorPlugin(
+    name = "VoiceKidsDpc",
+    permissions = [
+        Permission(strings = [Manifest.permission.POST_NOTIFICATIONS], alias = "notifications"),
+        Permission(
+            strings = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION],
+            alias = "location",
+        ),
+    ],
+)
 class VoiceKidsDpcPlugin : Plugin() {
 
     private lateinit var dpm: DevicePolicyManager
@@ -65,6 +76,7 @@ class VoiceKidsDpcPlugin : Plugin() {
     @PluginMethod
     fun requestDeviceAdmin(call: PluginCall) {
         try {
+            SettingsGuard.allowAppInitiatedVisit(context)
             activity?.startActivityForResult(DpcActions.requestDeviceAdminIntent(context), 0)
                 ?: context.startActivity(DpcActions.requestDeviceAdminIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             call.resolve(successResult())
@@ -85,6 +97,79 @@ class VoiceKidsDpcPlugin : Plugin() {
         call.resolve(json)
     }
 
+    // ── Runtime permissions (notifications, location) ───────────────────
+    // Requested one at a time by the child device's setup wizard
+    // (src/pages/child-device/PermissionWizardPage.jsx) so the child sees
+    // the standard system prompts in a sensible order instead of all at
+    // once — or, as before, never at all.
+
+    @PluginMethod
+    fun hasNotificationPermission(call: PluginCall) {
+        val result = JSObject()
+        // areNotificationsEnabled() is the honest check on every API level:
+        // POST_NOTIFICATIONS only exists from 33, but a user can switch
+        // notifications off from Settings on any version.
+        result.put("granted", androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled())
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun requestNotificationPermission(call: PluginCall) {
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            requestPermissionForAlias("notifications", call, "notificationPermCallback")
+            return
+        }
+        // Pre-13 there's no runtime prompt — the only way back from a
+        // user-disabled state is the app's notification settings screen.
+        try {
+            SettingsGuard.allowAppInitiatedVisit(context)
+            context.startActivity(
+                Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (e: Exception) {
+            // Nothing else to try; the wizard's status check will show it as still missing.
+        }
+        call.resolve(successResult())
+    }
+
+    @PermissionCallback
+    private fun notificationPermCallback(call: PluginCall) {
+        val result = JSObject()
+        result.put("success", true)
+        result.put("granted", androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled())
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun hasLocationPermission(call: PluginCall) {
+        val result = JSObject()
+        result.put("granted", locationGranted())
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun requestLocationPermission(call: PluginCall) {
+        if (locationGranted()) {
+            call.resolve(successResult())
+            return
+        }
+        requestPermissionForAlias("location", call, "locationPermCallback")
+    }
+
+    @PermissionCallback
+    private fun locationPermCallback(call: PluginCall) {
+        val result = JSObject()
+        result.put("success", true)
+        result.put("granted", locationGranted())
+        call.resolve(result)
+    }
+
+    private fun locationGranted(): Boolean =
+        context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
     // ── Overlay permission (block-screen shown when kicking a blocked app) ──
 
     @PluginMethod
@@ -97,6 +182,7 @@ class VoiceKidsDpcPlugin : Plugin() {
     @PluginMethod
     fun requestOverlayPermission(call: PluginCall) {
         try {
+            SettingsGuard.allowAppInitiatedVisit(context)
             context.startActivity(DpcActions.overlayPermissionIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             call.resolve(successResult())
         } catch (e: Exception) {
@@ -116,6 +202,7 @@ class VoiceKidsDpcPlugin : Plugin() {
     @PluginMethod
     fun requestIgnoreBatteryOptimizations(call: PluginCall) {
         try {
+            SettingsGuard.allowAppInitiatedVisit(context)
             context.startActivity(DpcActions.batteryOptimizationIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             call.resolve(successResult())
         } catch (e: Exception) {
@@ -141,6 +228,7 @@ class VoiceKidsDpcPlugin : Plugin() {
             return
         }
         try {
+            SettingsGuard.allowAppInitiatedVisit(context)
             activity?.startActivityForResult(intent, 0)
                 ?: context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             call.resolve(successResult())
@@ -215,12 +303,15 @@ class VoiceKidsDpcPlugin : Plugin() {
 
     @PluginMethod
     fun pauseInternet(call: PluginCall) {
-        val success = DpcActions.pauseInternet(context)
         // Persistent until resumeInternet — see VoiceKidsPrefs.manualInternetPause.
-        if (success) VoiceKidsPrefs.setManualInternetPause(context, true)
+        VoiceKidsPrefs.setManualInternetPause(context, true)
+        val success = DpcActions.pauseInternet(context)
+        enforceExecutor.execute { runCatching { PolicyEnforcer.enforce(context.applicationContext) } }
         val result = JSObject()
         result.put("success", success)
-        if (!success) result.put("reason", "vpn_consent_needed")
+        // The pause is in force either way; this only tells the UI whether
+        // background traffic is covered too (VPN) or just apps on screen.
+        result.put("vpnTunnel", DpcActions.hasVpnConsent(context))
         call.resolve(result)
     }
 
@@ -403,10 +494,62 @@ class VoiceKidsDpcPlugin : Plugin() {
         result.put("screenTimeLimitMin", if (limit < 0) JSObject.NULL else limit)
         result.put("blockedPackageCount", VoiceKidsPrefs.desiredBlockedPackages(context).size)
         result.put("websiteFilterActive", VoiceKidsPrefs.websiteFilterActive(context))
+        result.put("vpnFilteringEnabled", VoiceKidsPrefs.useVpnFiltering(context))
+        result.put("internetPaused", VoiceKidsPrefs.internetPauseActive(context))
         result.put("isDeviceAdmin", dpm.isAdminActive(adminComponent))
         result.put("isDeviceOwner", dpm.isDeviceOwnerApp(context.packageName))
         result.put("accessibilityEnabled", AccessibilityStatus.isEnabled(context))
         result.put("usageAccess", UsageStatsHelper.hasUsageAccess(context))
+        result.put("settingsProtected", VoiceKidsPrefs.protectSettings(context) && SettingsGuard.hasPin(context))
+        call.resolve(result)
+    }
+
+    // ── SOS ─────────────────────────────────────────────────────────────
+
+    /**
+     * Native SOS path, used as a fallback by src/lib/sosApi.js.
+     *
+     * The WebView's own Supabase session can be stale or refused (expired
+     * refresh token, offline at the wrong moment) exactly when SOS matters
+     * most. SupabaseRest re-authenticates from the device's stored refresh
+     * token independently of the WebView, so this keeps working when the
+     * JS path can't. Runs off the caller thread — HTTP on the WebView's
+     * bridge thread would block the UI.
+     */
+    @PluginMethod
+    fun fireSos(call: PluginCall) {
+        val notes = call.getString("notes").orEmpty()
+        val latitude = call.getDouble("latitude")
+        val longitude = call.getDouble("longitude")
+        val appContext = context.applicationContext
+        enforceExecutor.execute {
+            val ok = SosReporter.fire(appContext, notes, latitude, longitude)
+            val result = JSObject()
+            result.put("success", ok)
+            if (!ok) result.put("reason", "insert_failed")
+            call.resolve(result)
+        }
+    }
+
+    // ── Parent PIN / settings guard (see SettingsGuard.kt) ──────────────
+
+    @PluginMethod
+    fun getGuardStatus(call: PluginCall) {
+        val result = JSObject()
+        result.put("hasPin", SettingsGuard.hasPin(context))
+        result.put("protectSettings", VoiceKidsPrefs.protectSettings(context))
+        result.put("graceActive", VoiceKidsPrefs.isSettingsGraceActive(context))
+        call.resolve(result)
+    }
+
+    /** Verifies the parent PIN and, on success, stands the settings guard down for SettingsGuard.GRACE_MS. */
+    @PluginMethod
+    fun verifyParentPin(call: PluginCall) {
+        val pin = call.getString("pin").orEmpty()
+        val ok = SettingsGuard.verify(context, pin)
+        if (ok) VoiceKidsPrefs.setSettingsGraceUntil(context, System.currentTimeMillis() + SettingsGuard.GRACE_MS)
+        val result = JSObject()
+        result.put("success", ok)
         call.resolve(result)
     }
 

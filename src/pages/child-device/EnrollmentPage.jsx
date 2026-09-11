@@ -95,7 +95,11 @@ export default function EnrollmentPage() {
       // re-renders into the normal <Routes> tree the instant isOrgMember
       // flips true, which has no /child/* routes at all, so send it to the
       // Family section's real path instead of the (now unreachable) one.
-      navigate(data.is_org_member ? '/family' : '/child/home', { replace: true })
+      // Straight into the one-at-a-time permission wizard: every grant
+      // below is a manual system prompt, and asking for them right after
+      // pairing (while a parent is still holding the phone) is the only
+      // moment they reliably get done.
+      navigate(data.is_org_member ? '/family' : '/child/setup', { replace: true })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -104,11 +108,11 @@ export default function EnrollmentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-indigo-50 flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8 flex flex-col gap-6">
+    <div className="min-h-screen bg-indigo-950 flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 flex flex-col gap-6">
         {/* Logo / title */}
         <div className="text-center">
-          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-600/30">
             <span className="text-white text-2xl font-bold">V</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">VOICE</h1>
@@ -142,7 +146,7 @@ export default function EnrollmentPage() {
           <button
             type="submit"
             disabled={loading || code.trim().length < 4}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold rounded-xl py-3 transition-colors"
+            className="w-full bg-indigo-600 active:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold rounded-2xl py-3.5 transition-colors"
           >
             {loading ? 'Pairing…' : 'Pair this device'}
           </button>

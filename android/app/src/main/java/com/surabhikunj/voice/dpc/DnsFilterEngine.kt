@@ -90,36 +90,6 @@ object DnsFilterEngine {
         return if (sb.isEmpty()) null else sb.toString().lowercase()
     }
 
-    /** True if `domain` (or any parent domain of it) is in `domainSet` — so blocking/allowing "youtube.com" also matches "www.youtube.com". */
-    fun isBlocked(domain: String, domainSet: Set<String>): Boolean {
-        if (domainSet.isEmpty()) return false
-        var d = domain
-        while (true) {
-            if (domainSet.contains(d)) return true
-            val dot = d.indexOf('.')
-            if (dot < 0) return false
-            d = d.substring(dot + 1)
-        }
-    }
-
-    /** Same parent-domain-walk membership test as isBlocked — named separately at call sites for readability (allow-list / known-domain checks). */
-    fun matchesAny(domain: String, domainSet: Set<String>): Boolean = isBlocked(domain, domainSet)
-
-    // ── Safe Search (DNS-based, see buildSafeSearchResponsePacket) ──────
-    // (host-suffix match, safe alias hostname to resolve instead). Real
-    // technique documented by each provider for router/DNS-level filters.
-    val SAFE_SEARCH_ALIASES: List<Pair<String, String>> = listOf(
-        "google." to "forcesafesearch.google.com",
-        "bing.com" to "strict.bing.com",
-        "duckduckgo.com" to "safe.duckduckgo.com",
-        "youtube.com" to "restrict.youtube.com",
-        "ytimg.com" to "restrict.youtube.com",
-    )
-
-    /** Returns the safe alias hostname to resolve-and-substitute for, or null if `domain` isn't a known search/video engine. */
-    fun safeSearchAliasFor(domain: String): String? =
-        SAFE_SEARCH_ALIASES.firstOrNull { (suffix, _) -> domain == suffix.trimEnd('.') || domain.endsWith(".$suffix") || domain.contains(suffix) }?.second
-
     /**
      * Builds a synthetic NXDOMAIN DNS response for a blocked query,
      * wrapped in an IPv4/UDP packet addressed back to the original
@@ -131,6 +101,60 @@ object DnsFilterEngine {
         dnsResponse[2] = (dnsResponse[2].toInt() or 0x80).toByte()
         // RCODE=3 (NXDOMAIN), preserve RA/Z bits (always 0 on an outgoing query anyway).
         dnsResponse[3] = ((dnsResponse[3].toInt() and 0xF0) or 0x03).toByte()
+        return buildIpv4UdpPacket(
+            srcIp = query.dstIp, srcPort = DNS_PORT,
+            dstIp = query.srcIp, dstPort = query.srcPort,
+            payload = dnsResponse,
+        )
+    }
+
+    const val TYPE_A = 1
+
+    /** QTYPE of the first question, or null if unreadable. Safe Search only substitutes A records — see buildNoDataPacket. */
+    fun extractQuestionType(dns: ByteArray, length: Int): Int? {
+        if (length < 12) return null
+        var pos = 12
+        while (pos < length) {
+            val labelLen = dns[pos].toInt() and 0xFF
+            if (labelLen == 0) { pos += 1; break }
+            if (labelLen and 0xC0 == 0xC0) return null
+            pos += 1 + labelLen
+        }
+        if (pos + 2 > length) return null
+        return readU16(dns, pos)
+    }
+
+    /**
+     * NOERROR with zero answers. Used for the AAAA half of a Safe Search
+     * host: we can only substitute an IPv4 alias, and answering an AAAA
+     * question with an A record would be malformed, so we tell the client
+     * "this name has no IPv6 address" and it falls back to the (filtered)
+     * IPv4 answer instead of racing to an unfiltered v6 address.
+     */
+    fun buildNoDataPacket(query: UdpDatagram, dnsQuery: ByteArray, dnsQueryLength: Int): ByteArray {
+        val dnsResponse = dnsQuery.copyOf(dnsQueryLength)
+        dnsResponse[2] = (dnsResponse[2].toInt() or 0x80).toByte() // QR=1
+        dnsResponse[3] = (dnsResponse[3].toInt() and 0xF0).toByte() // RCODE=0
+        writeU16(dnsResponse, 6, 0) // ANCOUNT=0
+        return buildIpv4UdpPacket(
+            srcIp = query.dstIp, srcPort = DNS_PORT,
+            dstIp = query.srcIp, dstPort = query.srcPort,
+            payload = dnsResponse,
+        )
+    }
+
+    /**
+     * SERVFAIL (RCODE=2) for a query we could not resolve upstream.
+     * Deliberately NOT silence: dropping the packet leaves the client's
+     * stub resolver retrying until its own multi-second timeout on every
+     * single lookup, which is what "the internet is broken but nothing is
+     * blocked" feels like. A real SERVFAIL fails fast and lets the client
+     * try its next configured resolver.
+     */
+    fun buildServFailPacket(query: UdpDatagram, dnsQuery: ByteArray, dnsQueryLength: Int): ByteArray {
+        val dnsResponse = dnsQuery.copyOf(dnsQueryLength)
+        dnsResponse[2] = (dnsResponse[2].toInt() or 0x80).toByte()
+        dnsResponse[3] = ((dnsResponse[3].toInt() and 0xF0) or 0x02).toByte()
         return buildIpv4UdpPacket(
             srcIp = query.dstIp, srcPort = DNS_PORT,
             dstIp = query.srcIp, dstPort = query.srcPort,

@@ -413,6 +413,10 @@ const DEFAULT_FILTER_SETTINGS = {
   block_unknown_websites: false,
   enforce_safe_search: false,
   alert_on_block: true,
+  // Off by default — website blocking runs through the child device's
+  // accessibility service reading the browser address bar, which needs no
+  // tunnel. See supabase/71_parent_pin_and_no_vpn_filtering.sql.
+  use_vpn: false,
 }
 
 export async function getWebsiteFilterSettings(childId) {
@@ -422,18 +426,37 @@ export async function getWebsiteFilterSettings(childId) {
     .eq('child_id', childId)
     .maybeSingle()
   if (error) throw error
-  return data ?? { child_id: childId, ...DEFAULT_FILTER_SETTINGS }
+  return { ...DEFAULT_FILTER_SETTINGS, ...(data ?? { child_id: childId }) }
+}
+
+/** PostgREST reports an unknown column as PGRST204 / SQLSTATE 42703, naming it in the message. */
+function unknownColumnFrom(error) {
+  if (!error) return null
+  if (error.code !== 'PGRST204' && error.code !== '42703') return null
+  return error.message?.match(/'([a-z0-9_]+)' column/i)?.[1]
+    ?? error.message?.match(/column "([a-z0-9_]+)"/i)?.[1]
+    ?? null
 }
 
 export async function updateWebsiteFilterSettings(childId, patch) {
   const current = await getWebsiteFilterSettings(childId)
-  const { data, error } = await supabase
-    .from('pc_website_filter_settings')
-    .upsert({ ...current, child_id: childId, ...patch }, { onConflict: 'child_id' })
-    .select()
-    .single()
-  if (error) throw error
-  return data
+  const row = { ...current, ...patch, child_id: childId }
+
+  // Degrade gracefully on a database that hasn't had the latest migration
+  // applied yet: drop the column PostgREST doesn't know about and retry,
+  // rather than failing the whole save.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data, error } = await supabase
+      .from('pc_website_filter_settings')
+      .upsert(row, { onConflict: 'child_id' })
+      .select()
+      .single()
+    if (!error) return data
+    const missing = unknownColumnFrom(error)
+    if (!missing || !(missing in row)) throw error
+    delete row[missing]
+  }
+  throw new Error('Could not save website filter settings')
 }
 
 export async function deleteWebsiteRule(ruleId) {
@@ -483,7 +506,10 @@ export async function listChildRequests(childId) {
  * so parents don't think approval alone changes the device; they still
  * need to go make the matching change in Rules / Website Rules.
  */
-export async function resolveChildRequest(requestId, { approve, expiresAt }) {
+export async function resolveChildRequest(requestId, { approve, bonusMinutes = 30 }) {
+  // Computed here rather than in the component: it's a clock read, which
+  // has no business happening in a render-scoped function body.
+  const expiresAt = approve ? new Date(Date.now() + bonusMinutes * 60 * 1000).toISOString() : null
   const { data: userData } = await supabase.auth.getUser()
   const patch = {
     status: approve ? 'approved' : 'denied',

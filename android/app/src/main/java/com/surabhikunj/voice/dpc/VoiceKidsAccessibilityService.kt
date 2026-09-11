@@ -16,9 +16,13 @@ import org.json.JSONObject
 /**
  * VoiceKidsAccessibilityService
  *
- * Does two independent jobs, both keyed off the same TYPE_WINDOW_STATE_CHANGED
+ * Does four independent jobs, all keyed off the same TYPE_WINDOW_STATE_CHANGED
  * events (this service now watches ALL apps, not just browsers — see
  * accessibility_service_config.xml, which no longer restricts packageNames):
+ *
+ * 0. SETTINGS GUARD (SettingsGuard.kt) — sends the child back out of any
+ *    Settings screen that could disable supervision and asks for the
+ *    parent's PIN.
  *
  * 1. APP BLOCKING / SCHEDULES (see enforceForegroundApp below) — the
  *    PRIMARY app-block mechanism for the default, no-factory-reset
@@ -44,6 +48,12 @@ import org.json.JSONObject
  *    "VOICE" under Settings > Accessibility on the CHILD device — same
  *    category of manual step as Usage Access. See PLATFORM_LIMITATIONS.md
  *    before presenting either of these as exhaustive/unbypassable.
+ *
+ * 3. WEBSITE BLOCKING off that same address-bar read (WebPolicy.evaluate)
+ *    — the DEFAULT web-filtering path. It needs no VPN, no VPN consent,
+ *    and doesn't touch the device's DNS, which is why the DNS-filtering
+ *    tunnel is now opt-in. Blocked page → straight back out of it, plus
+ *    the BlockOverlay explanation.
  */
 class VoiceKidsAccessibilityService : AccessibilityService() {
 
@@ -112,6 +122,13 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
         // blocked-attempt telemetry at most once per app per 10 minutes.
         private const val APP_OPENED_ALERT_COOLDOWN_MS = 30 * 60_000L
         private const val BLOCKED_ATTEMPT_ALERT_COOLDOWN_MS = 10 * 60_000L
+
+        private const val INTERNET_PKG_CACHE_MS = 10 * 60_000L
+
+        // Don't re-kick the same blocked site every time the address bar
+        // re-fires while the browser is still unwinding the navigation.
+        private const val REBLOCK_HOST_COOLDOWN_MS = 4000L
+        private const val WEBSITE_BLOCK_ALERT_COOLDOWN_MS = 15 * 60_000L
     }
 
     private data class ParsedBar(val raw: String, val host: String, val searchEngine: String?, val searchQuery: String?)
@@ -122,11 +139,16 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
     private val lastLoggedByPackage = HashMap<String, String>()
     private var lastBlockedPkg: String? = null
     private var lastBlockedAt = 0L
+    private var internetPkgsCache: Set<String>? = null
+    private var internetPkgsCacheAt = 0L
+    private var lastBlockedHost: String? = null
+    private var lastBlockedHostAt = 0L
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val pkg = event?.packageName?.toString() ?: return
 
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            if (guardSettingsScreen(pkg, event)) return
             enforceForegroundApp(pkg)
         }
 
@@ -146,6 +168,21 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
     }
 
     /**
+     * Sends the child back out of a Settings screen that could disable
+     * supervision. Returns true when it acted, so the caller skips the
+     * normal app-block pass for this event (Settings is in NEVER_BLOCK
+     * anyway, but the guard already moved the user).
+     */
+    private fun guardSettingsScreen(pkg: String, event: AccessibilityEvent): Boolean {
+        // Package check first — rootInActiveWindow is a cross-process call
+        // and this runs on every app switch on the device.
+        if (!SettingsGuard.isGuardedPackage(applicationContext, pkg)) return false
+        if (!SettingsGuard.shouldBlock(applicationContext, event, rootInActiveWindow)) return false
+        SettingsGuard.block(applicationContext, this)
+        return true
+    }
+
+    /**
      * Primary app-block enforcement for the default (Device Admin only, no
      * factory reset) model. See PolicyEnforcer.kt for what writes the
      * desired* state this reads, and DpcActions.kt's doc comment for the
@@ -160,11 +197,19 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
         val blockAllActive = VoiceKidsPrefs.desiredBlockAllActive(applicationContext)
         val allowList = VoiceKidsPrefs.desiredAllowListPackages(applicationContext)
         val blockedSet = VoiceKidsPrefs.desiredBlockedPackages(applicationContext)
+        // "Pause internet" no longer depends on the VPN: an app that needs
+        // the internet is simply not allowed on screen while the pause is
+        // on. See VoiceKidsPrefs.internetPauseActive.
+        val internetPaused = VoiceKidsPrefs.internetPauseActive(applicationContext)
+
+        val internetBlocked = internetPaused && !blockAllActive && allowList == null &&
+            !blockedSet.contains(pkg) && internetPackages().contains(pkg)
 
         val isBlocked = when {
             blockAllActive -> true
             allowList != null -> !allowList.contains(pkg)
-            else -> blockedSet.contains(pkg)
+            blockedSet.contains(pkg) -> true
+            else -> internetBlocked
         }
         if (!isBlocked) {
             maybeAlertAppOpened(pkg)
@@ -179,13 +224,38 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
         // Pick the child-facing explanation: a whole-device lock (daily
         // limit / restricted time / schedule) reads differently from "this
         // one app is blocked".
-        val reason = if (blockAllActive || allowList != null) {
-            VoiceKidsPrefs.lockReason(applicationContext).ifEmpty { "schedule" }
-        } else "app_blocked"
+        val reason = when {
+            internetBlocked -> "internet_paused"
+            blockAllActive || allowList != null -> VoiceKidsPrefs.lockReason(applicationContext).ifEmpty { "schedule" }
+            else -> "app_blocked"
+        }
         Log.i(TAG, "Blocking foreground app: $pkg (reason=$reason)")
         performGlobalAction(GLOBAL_ACTION_HOME)
         BlockOverlay.show(applicationContext, reason, appLabel(pkg))
         maybeAlertBlockedAttempt(pkg, reason)
+    }
+
+    /**
+     * Every installed package that declares INTERNET, cached — the set an
+     * internet pause has to cover. Recomputed at most every 10 minutes;
+     * an app installed mid-pause is picked up on the next refresh.
+     */
+    private fun internetPackages(): Set<String> {
+        val now = System.currentTimeMillis()
+        val cached = internetPkgsCache
+        if (cached != null && now - internetPkgsCacheAt < INTERNET_PKG_CACHE_MS) return cached
+        val pkgs = try {
+            applicationContext.packageManager
+                .getPackagesHoldingPermissions(arrayOf(android.Manifest.permission.INTERNET), 0)
+                .map { it.packageName }
+                .toSet()
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not enumerate internet apps: ${e.message}")
+            emptySet()
+        }
+        internetPkgsCache = pkgs
+        internetPkgsCacheAt = now
+        return pkgs
     }
 
     /** pc_app_rules.alert_on_use — "tell me when this app is used" (Qustodio-style), rate-limited per app. */
@@ -259,10 +329,61 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
         if (text.isNullOrBlank()) return
 
         val parsed = normalizeAddressBarText(text) ?: return
+
+        // Enforce BEFORE the dedupe below: a child who keeps re-entering
+        // the same blocked address must be blocked every time, even though
+        // we only log the visit once.
+        if (enforceWebsiteRule(parsed.host)) return
+
         if (lastLoggedByPackage[pkg] == parsed.raw) return
         lastLoggedByPackage[pkg] = parsed.raw
 
         ioExecutor.execute { report(pkg, parsed) }
+    }
+
+    /**
+     * The default (no-VPN) website block. Returns true when the page was
+     * blocked, so the visit isn't also logged as a normal one.
+     *
+     * BACK rather than HOME: it leaves the child in their browser on the
+     * previous page instead of throwing them out of the app entirely,
+     * which is both less punishing for a mistyped URL and what every
+     * mainstream filter does. The overlay explains why.
+     */
+    private fun enforceWebsiteRule(host: String): Boolean {
+        val normalized = WebPolicy.normalizeHost(host) ?: return false
+        when (WebPolicy.evaluate(applicationContext, normalized)) {
+            WebPolicy.Verdict.BLOCK -> Unit
+            WebPolicy.Verdict.ALERT -> {
+                maybeAlertWebsite(normalized, "website_alert", "Visited a flagged website",
+                    "Opened $normalized (allowed, flagged for your attention).")
+                return false
+            }
+            WebPolicy.Verdict.ALLOW -> return false
+        }
+
+        val now = System.currentTimeMillis()
+        if (normalized == lastBlockedHost && now - lastBlockedHostAt < REBLOCK_HOST_COOLDOWN_MS) return true
+        lastBlockedHost = normalized
+        lastBlockedHostAt = now
+
+        Log.i(TAG, "Blocking website: $normalized")
+        performGlobalAction(GLOBAL_ACTION_BACK)
+        BlockOverlay.show(applicationContext, "website_blocked", normalized)
+        if (VoiceKidsPrefs.alertOnWebsiteBlock(applicationContext)) {
+            maybeAlertWebsite(normalized, "website_blocked", "Blocked website attempt",
+                "Tried to visit a blocked website: $normalized")
+        }
+        return true
+    }
+
+    private fun maybeAlertWebsite(domain: String, type: String, title: String, body: String) {
+        val now = System.currentTimeMillis()
+        if (now - VoiceKidsPrefs.lastWebsiteBlockAlertAt(applicationContext, "$type:$domain") < WEBSITE_BLOCK_ALERT_COOLDOWN_MS) return
+        VoiceKidsPrefs.setLastWebsiteBlockAlertAt(applicationContext, "$type:$domain", now)
+        ioExecutor.execute {
+            insertAlert(type, "info", title, body, JSONObject().put("domain", domain))
+        }
     }
 
     /**

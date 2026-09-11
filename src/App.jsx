@@ -35,7 +35,6 @@ const MentorshipPage = lazy(() => import('@/pages/mentorship/MentorshipPage'))
 const ReportsPage   = lazy(() => import('@/pages/reports/ReportsPage'))
 const BroadcastPage = lazy(() => import('@/pages/admin/BroadcastPage'))
 const ParentalControlPage = lazy(() => import('@/pages/parental-control/ParentalControlPage'))
-const ParentalControlDashboardPage = lazy(() => import('@/pages/parental-control/ParentalControlDashboardPage'))
 const ChildDetailPage = lazy(() => import('@/pages/parental-control/ChildDetailPage'))
 const FamilyHomePage = lazy(() => import('@/pages/family/FamilyHomePage'))
 const FamilySosPage = lazy(() => import('@/pages/family/FamilySosPage'))
@@ -216,7 +215,8 @@ function AppRoutes() {
           <Route path="resources/*" element={<ResourcesPage />} />
           <Route path="mentorship/*" element={<MentorshipPage />} />
           <Route path="parental-control" element={<ParentalControlPage />} />
-          <Route path="parental-control/dashboard" element={<ParentalControlDashboardPage />} />
+          {/* The dashboard merged into /parental-control — keep the old link working. */}
+          <Route path="parental-control/dashboard" element={<Navigate to="/parental-control" replace />} />
           <Route path="parental-control/:childId" element={<ChildDetailPage />} />
           <Route path="reports"     element={<ReportsPage />} />
           <Route

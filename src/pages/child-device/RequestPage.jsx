@@ -54,17 +54,17 @@ export default function RequestPage() {
   const Icon = typeConfig.icon
 
   return (
-    <div className="min-h-screen bg-indigo-50 flex flex-col">
-      <div className="bg-indigo-600 text-white px-6 pt-12 pb-6">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="bg-gradient-to-b from-indigo-600 to-indigo-700 text-white px-6 pt-14 pb-8 rounded-b-[2rem]">
         <button onClick={() => navigate('/child/home')} className="flex items-center gap-1.5 text-sm text-indigo-200 mb-4">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
-        <h1 className="text-2xl font-bold">Request</h1>
-        <p className="text-indigo-200 text-sm mt-1">Ask for extra time or access</p>
+        <h1 className="text-2xl font-bold">Ask a parent</h1>
+        <p className="text-indigo-200 text-sm mt-1">Extra time, an app, or a website</p>
       </div>
 
-      <div className="flex-1 px-6 py-6 space-y-6">
-        <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
+      <div className="flex-1 px-5 py-6 space-y-5">
+        <div className="bg-white rounded-3xl p-5 shadow-sm space-y-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
             <Icon className="w-4 h-4 text-indigo-500" />
             Request type
@@ -77,10 +77,10 @@ export default function RequestPage() {
                   key={t.value}
                   type="button"
                   onClick={() => setType(t.value)}
-                  className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
+                  className={`flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-colors ${
                     type === t.value
                       ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                      : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                      : 'border-slate-200 text-slate-700'
                   }`}
                 >
                   <TIcon className="w-5 h-5" />
@@ -118,7 +118,7 @@ export default function RequestPage() {
           <button
             onClick={handleSubmit}
             disabled={sending || !reason.trim()}
-            className="w-full bg-indigo-600 text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-60"
+            className="w-full bg-indigo-600 text-white font-semibold rounded-2xl py-3.5 flex items-center justify-center gap-2 active:bg-indigo-700 disabled:opacity-60"
           >
             <Send className="w-4 h-4" /> {sending ? 'Sending...' : 'Send request'}
           </button>
@@ -128,7 +128,7 @@ export default function RequestPage() {
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-slate-700">Your requests</h3>
             {requests.map((req) => (
-              <div key={req.id} className="bg-white rounded-xl p-4 shadow-sm">
+              <div key={req.id} className="bg-white rounded-2xl p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium text-slate-800 capitalize">{req.request_type.replace('_', ' ')}</p>

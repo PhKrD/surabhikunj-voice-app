@@ -188,52 +188,72 @@ Keep `PolicyEnforcer.kt`'s decision logic in sync with `policy.js` (protected
 package list, schedule severity order, allow-overrides-block) if either
 changes.
 
-## Website filtering — real DNS-based enforcement (best-effort)
+## Website filtering — browser-level by default, VPN optional
 
-`pc_website_rules` stores block domain rules (allow rules are stored but
-have no enforcement effect yet — there's no default-deny allow-list mode
-implemented). Enforcement is a local DNS-filtering VPN
-(`InternetBlockVpnService`'s `MODE_DNS_FILTER`, driven by
-`PolicyEnforcer.kt`/`DnsFilterEngine.kt`), the same technique consumer
-ad-blockers/DNS filters like DNS66/AdGuard use on Android without root:
+There are two independent enforcement paths. Both ask the same question
+through the same code (`android/.../dpc/WebPolicy.kt`, mirrored and
+unit-tested as `src/lib/webPolicy.js` — keep the two in sync).
+
+### 1. Browser address-bar blocking — the DEFAULT, no VPN
+
+`VoiceKidsAccessibilityService` already reads the browser's own address
+bar for activity logging; it now also evaluates the host against
+`WebPolicy` and, on a block, sends the child straight back out of the page
+(`GLOBAL_ACTION_BACK`) with a `BlockOverlay` explaining why.
+
+- **Needs no VPN, no VPN consent, and does not touch the device's DNS.**
+  Nothing else on the phone can break as a side effect.
+- Works in incognito/private browsing — it reads what's on screen.
+- Blocking a domain blocks its subdomains (`youtube.com` covers
+  `www.youtube.com`, `m.youtube.com`, ...).
+- **Limits:** only the browsers in `BROWSER_URL_BAR_IDS` (Chrome, Firefox,
+  Samsung Internet, Edge, Opera, Brave, Mi Browser, DuckDuckGo) — turn on
+  "Block unsupported browsers" to close that. It cannot see inside a
+  non-browser app, and a browser UI redesign can silently break the
+  address-bar read. There is a sub-second window between the page starting
+  to load and the block firing.
+
+### 2. Local DNS-filtering VPN — OPT-IN, off by default
+
+`pc_website_filter_settings.use_vpn` (migration 71). Same technique
+consumer DNS filters like DNS66/AdGuard use without root:
 
 - Only DNS-port (53) UDP traffic — plus a short list of known public DoH
-  resolver IPs (Cloudflare, Google, Quad9, OpenDNS), for the mitigation
-  below — is ever routed into the VPN's tunnel at all.  **Every other
-  packet, on every other address/port, bypasses the tunnel completely**
-  and is untouched — normal browsing, streaming, etc. see zero difference
-  in behavior or speed except for the specific blocked domains.
-- A blocked domain gets an immediate synthetic NXDOMAIN reply (no real
-  network round-trip). Everything else is forwarded to a real public
-  resolver (Cloudflare `1.1.1.1`) and the reply relayed back verbatim.
-- Blocking a domain also blocks its subdomains (`youtube.com` blocks
-  `www.youtube.com`, `m.youtube.com`, etc.) via suffix matching.
-- Needs the same one-time VPN consent as pause/resume internet — no
-  separate permission, no reset.
-- Never runs at the same time as a `block_internet` schedule (that
-  already blocks everything via the drop-all VPN mode; domain filtering
-  would be moot underneath it, and only one VPN mode can hold the single
-  tunnel Android allows an app at a time) — `PolicyEnforcer` coordinates
-  this so the two never fight over the tunnel.
+  resolver IPs, for the mitigation below — is routed into the tunnel.
+  Every other packet bypasses it entirely.
+- A blocked domain gets an immediate synthetic NXDOMAIN. Everything else
+  is forwarded to the **underlying network's own resolvers** (read from
+  the non-VPN network's `LinkProperties`), falling back to 1.1.1.1 /
+  8.8.8.8 / 9.9.9.9 in turn, with SERVFAIL — never silence — if they all
+  fail.
+- Also covers non-browser apps, which path 1 cannot.
+- Never runs at the same time as a `block_internet` schedule or an
+  internet pause (only one VPN mode can hold the single tunnel Android
+  allows an app); `PolicyEnforcer` coordinates this.
 
-**Honest limitation — DNS-over-HTTPS bypass:** a browser hardwired to use
-its own DoH resolver (e.g. Chrome/Firefox defaulting to Cloudflare/Google)
-ignores the device's system DNS server entirely, bypassing this filter
-for that browser. We mitigate this by also routing the well-known public
-DoH resolver IPs into the tunnel and dropping their non-port-53 traffic
-outright, which forces that specific DoH connection closed and makes a
-well-behaved browser fall back to system DNS (which we DO filter) — but
-this list is short and best-effort, not exhaustive. A resolver IP outside
-it is not intercepted at all. **Never present this to a parent as
-"guaranteed" blocking** — label it "best-effort" in the UI, same as web
-activity monitoring.
+**Why it is off by default.** It puts *every* DNS lookup on the phone
+through this app, so a bug here breaks unrelated browsing rather than
+just the blocked sites — which is exactly what happened: the Safe Search
+host matcher used a substring test, so every `*.google.com` host (mail,
+drive, play, accounts, photos) was answered with
+`forcesafesearch.google.com`'s address and stopped loading, and
+`ytimg.com` — YouTube's image CDN — was pointed at `restrict.youtube.com`,
+killing every thumbnail. `src/lib/webPolicy.test.js` now pins that
+behaviour. Only turn the VPN on knowingly, for the app-coverage it adds.
 
-**Incognito/private browsing does NOT bypass any of this.** DNS filtering
-happens at the network layer, before the browser ever gets a response —
-incognito mode has no effect on it. Web-activity monitoring (below) reads
-the browser's own on-screen address bar, which Chrome/Firefox/etc. still
-render normally in incognito, so visits are logged there too. The only
-real bypass vector is the DoH one above, unrelated to incognito.
+**Honest limitation — DNS-over-HTTPS bypass (path 2 only):** a browser
+hardwired to its own DoH resolver ignores the system DNS server entirely.
+We mitigate by routing the well-known public DoH resolver IPs into the
+tunnel and dropping their non-port-53 traffic, which forces that
+connection closed so a well-behaved browser falls back to system DNS. The
+list is short and best-effort. **Never present this as "guaranteed"
+blocking.** Note that path 1 is unaffected by DoH — it reads the address
+bar, not the network.
+
+**Never blocked, whatever the rules say** (`WebPolicy.NEVER_BLOCK_SUFFIXES`):
+our own Supabase project, Google APIs/CDN hosts and the connectivity-check
+endpoints. Blocking those bricks supervision or makes Android declare the
+network dead.
 
 ### Website filtering categories (`pc_website_category_rules`, `pc_website_filter_settings`)
 
@@ -257,20 +277,29 @@ gap, each with its own trade-off:
   Brave, Mi Browser, DuckDuckGo). Catches browsers in our seed list
   (`WebCategories.OTHER_KNOWN_BROWSER_PACKAGES`) only — not literally every
   APK that could exist.
-- **Block unknown websites** — default-denies any domain that isn't in
-  ANY category's seed list and isn't explicitly allowed. Closes most of
-  the "unlisted site" gap above, at the cost of also blocking harmless
-  uncategorized sites (a parent has to explicitly allow them under
-  "Websites").
-- **Enforce Safe Search** — DNS-answers Google/Bing/DuckDuckGo/YouTube
-  queries with the IP of their own "strict" safe-search alias hostname
+- **Block unknown websites** — default-denies any domain outside
+  `WebCategories.ALL_CATEGORY_DOMAINS` (every category seed list, unioned
+  with an `ESSENTIAL_DOMAINS` list of OS/CDN/app-store infrastructure the
+  phone stops working without). Closes most of the "unlisted site" gap, at
+  the cost of blocking harmless uncategorized sites — a parent has to
+  allow each one under "Websites". Genuinely strict; the UI says so.
+- **Enforce Safe Search** — VPN-only (path 2). DNS-answers the search
+  front-end with its provider's documented "strict" alias
   (`forcesafesearch.google.com`, `strict.bing.com`, `safe.duckduckgo.com`,
-  `restrict.youtube.com`) instead of the real one — the same technique
-  those providers document for router/DNS-level filters. Only covers
-  those four engines; a search engine outside this list is unaffected.
+  `restrictmoderate.youtube.com`). Matching is **exact-host only** — see
+  the regression note above; never reintroduce suffix/substring matching
+  here. AAAA queries for a Safe Search host are answered NODATA so the
+  client falls back to the filtered IPv4 answer instead of racing to an
+  unfiltered v6 address.
 - **Blocked-website alerts** — a rate-limited (15 min per domain)
-  `pc_alerts` row with `alert_type = 'website_blocked'` whenever the DNS
-  filter actually blocks a query, if enabled.
+  `pc_alerts` row with `alert_type = 'website_blocked'` whenever a block
+  actually fires, if enabled.
+
+**Search-engine category caveat.** Its seed list holds the search HOSTS
+(`www.google.com`), not the apexes. Domain rules are parent-matched, so a
+rule on `google.com` would also block Gmail, Drive, Play and every Google
+sign-in — not what "block search engines" means to a parent. The trade-off
+is that a bare `google.com` typed without a subdomain isn't caught.
 
 ## Tamper detection — Accessibility / Device Admin turned off
 
@@ -300,6 +329,43 @@ checklist yet) and reacts:
 Repeated reminders for a still-off permission are capped at once every 15
 minutes per kind, so a device sitting with Accessibility off doesn't spam
 `pc_alerts` forever.
+
+## Stopping the child turning permissions off — parent PIN + Settings guard
+
+Android gives no ordinary app a way to FORBID revoking Accessibility,
+Device Admin, VPN consent or Usage access. Only a Device Owner (factory
+reset / adb provisioning) can. Everything below is deterrence, not an
+OS-level lock — say so to parents.
+
+`SettingsGuard.kt` + `PinGateActivity.kt`, driven from the accessibility
+service's window-state events:
+
+- **Trigger.** The foreground package looks like a Settings / package
+  installer / OEM security-centre app (prefix match, `GUARDED_PACKAGE_HINTS`)
+  AND the visible window text mentions this app's own label AND one of
+  `DANGER_PHRASES` (device admin, accessibility, usage access, VPN,
+  uninstall, force stop, ...). Requiring our own name is what keeps a child
+  changing the wallpaper or Wi-Fi from being interrupted.
+- **Reaction.** `GLOBAL_ACTION_HOME`, then `PinGateActivity` asks for the
+  parent PIN, and a rate-limited (5 min) `tamper_detected` alert goes to
+  the parent.
+- **Getting past it.** A correct PIN opens a 5-minute grace window
+  (`VoiceKidsPrefs.settingsGraceUntil`) during which the guard stands down,
+  so a parent can actually finish what they came to do.
+- **PIN storage.** `pc_children.parent_pin_hash` =
+  `sha256('<pin>:<child_id>')`, lower-case hex, computed identically by
+  `src/lib/parentPin.js` and `SettingsGuard.hashPin()`. The raw PIN never
+  leaves the parent's device. A 4–6 digit space is brute-forceable offline
+  by anyone who can read the hash — this is a UI gate on a phone the child
+  physically holds, exactly as strong as the same feature in every
+  mainstream competitor and no stronger. Don't reuse it for anything else.
+- **Self-lockout protection.** The guard is inert until a PIN exists
+  (otherwise there'd be no way through it, and the PARENT could not grant
+  permissions), and every Settings screen the app opens itself
+  (`SettingsGuard.allowAppInitiatedVisit`, called by the setup wizard's
+  request methods) opens a grace window first.
+- **Still bypassable by:** safe mode, adb, a factory reset, or a second
+  user profile. Device Owner is the only real answer to those.
 
 ## Battery optimization exemption (recommended, not required)
 

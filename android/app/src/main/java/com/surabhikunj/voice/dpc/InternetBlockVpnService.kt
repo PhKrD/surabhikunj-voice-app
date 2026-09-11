@@ -2,6 +2,8 @@ package com.surabhikunj.voice.dpc
 
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
@@ -26,10 +28,14 @@ import java.util.concurrent.Executors
  *     used for pause_internet / block_internet schedules. Unchanged from
  *     the original implementation.
  *
- *   MODE_DNS_FILTER — real domain-level website blocking for
- *     pc_website_rules (see PLATFORM_LIMITATIONS.md "Website filtering"
- *     — this is the enforcement counterpart to the schema that used to
- *     be enforcement-less). Only DNS-port UDP traffic (plus a short list
+ *   MODE_DNS_FILTER — OPT-IN, OFF BY DEFAULT (see
+ *     pc_website_filter_settings.use_vpn). Domain-level blocking that also
+ *     covers non-browser apps and browsers whose address bar we can't
+ *     read. The DEFAULT website-filtering path needs none of this: it's
+ *     VoiceKidsAccessibilityService reading the browser URL and blocking
+ *     the page (see WebPolicy.kt). A parent only turns this on to close
+ *     the "used an app instead of a browser" gap, knowing it puts every
+ *     DNS lookup on the device through us. Only DNS-port UDP traffic (plus a short list
  *     of known public DoH resolver IPs, on any port, so we can drop their
  *     non-DNS-port traffic too — see KNOWN_DOH_IPS below) is ever routed
  *     into this VPN at all; everything else — every other IP, every
@@ -76,7 +82,11 @@ class InternetBlockVpnService : VpnService() {
         private const val EXTRA_MODE = "mode"
 
         private const val FAKE_DNS_IP = "10.200.200.1"
-        private const val UPSTREAM_DNS_IP = "1.1.1.1" // Cloudflare — forwarded via a socket our own app is exempt from this VPN for
+        private const val UPSTREAM_TIMEOUT_MS = 3000
+
+        // Only used when the underlying network's own resolvers are
+        // unreadable or all fail — see upstreamResolvers().
+        private val PUBLIC_FALLBACK_DNS = listOf("1.1.1.1", "8.8.8.8", "9.9.9.9")
 
         // Known public DoH/DoT resolver IPs. Routed into our tunnel ONLY so
         // we can drop their non-DNS-port (443/853) traffic outright — see
@@ -130,6 +140,7 @@ class InternetBlockVpnService : VpnService() {
 
             if (mode == MODE_DNS_FILTER) {
                 builder.setSession("VOICE — Website filtering")
+                    .setMtu(1500)
                     .addDnsServer(FAKE_DNS_IP)
                     .addRoute(FAKE_DNS_IP, 32)
                 KNOWN_DOH_IPS.forEach { ip ->
@@ -220,37 +231,26 @@ class InternetBlockVpnService : VpnService() {
         val domain = DnsFilterEngine.extractQuestionName(dnsQuery, dnsQuery.size)
 
         if (domain != null) {
-            val allowed = DnsFilterEngine.matchesAny(domain, VoiceKidsPrefs.allowedDomains(applicationContext))
-            val blocked = !allowed && (
-                DnsFilterEngine.isBlocked(domain, VoiceKidsPrefs.blockedDomains(applicationContext)) ||
-                    // "Block unknown websites": default-deny anything not
-                    // explicitly categorized/allowed once enabled. A domain
-                    // is "known" if it's in ANY category's seed list
-                    // (allowed or blocked — being blocked already covers
-                    // it above; this only adds the block for domains in
-                    // NO list at all).
-                    (VoiceKidsPrefs.blockUnknownWebsites(applicationContext) &&
-                        !DnsFilterEngine.matchesAny(domain, WebCategories.categoryDomains(WebCategories.CATEGORY_DOMAINS.keys)))
-                )
-            if (blocked) {
-                Log.i(TAG, "DNS blocked: $domain")
-                val response = DnsFilterEngine.buildBlockedResponsePacket(datagram, dnsQuery, dnsQuery.size)
-                writePacket(output, response)
-                maybeAlertBlocked(domain)
-                return
+            when (WebPolicy.evaluate(applicationContext, domain)) {
+                WebPolicy.Verdict.BLOCK -> {
+                    Log.i(TAG, "DNS blocked: $domain")
+                    writePacket(output, DnsFilterEngine.buildBlockedResponsePacket(datagram, dnsQuery, dnsQuery.size))
+                    maybeAlertBlocked(domain)
+                    return
+                }
+                // 'alert' action: resolve normally, but tell the parent.
+                WebPolicy.Verdict.ALERT -> maybeAlertVisited(domain)
+                WebPolicy.Verdict.ALLOW -> Unit
             }
 
-            // 'alert' action (category or individual rule): resolve normally
-            // but tell the parent. Explicit allow-list wins over alert, same
-            // as it wins over block.
-            if (!allowed && DnsFilterEngine.matchesAny(domain, VoiceKidsPrefs.alertDomains(applicationContext))) {
-                maybeAlertVisited(domain)
-            }
-
-            if (!allowed && VoiceKidsPrefs.enforceSafeSearch(applicationContext)) {
-                val alias = DnsFilterEngine.safeSearchAliasFor(domain)
+            if (VoiceKidsPrefs.enforceSafeSearch(applicationContext)) {
+                val alias = WebPolicy.safeSearchAliasFor(domain)
                 if (alias != null) {
-                    executor.execute { forwardSafeSearch(datagram, dnsQuery, output, domain, alias) }
+                    if (DnsFilterEngine.extractQuestionType(dnsQuery, dnsQuery.size) != DnsFilterEngine.TYPE_A) {
+                        writePacket(output, DnsFilterEngine.buildNoDataPacket(datagram, dnsQuery, dnsQuery.size))
+                    } else {
+                        executor.execute { forwardSafeSearch(datagram, dnsQuery, output, domain, alias) }
+                    }
                     return
                 }
             }
@@ -324,22 +324,67 @@ class InternetBlockVpnService : VpnService() {
     }
 
     private fun forwardToUpstream(datagram: DnsFilterEngine.UdpDatagram, dnsQuery: ByteArray, output: FileOutputStream, domain: String?) {
+        for (upstream in upstreamResolvers()) {
+            val reply = queryUpstream(upstream, dnsQuery) ?: continue
+            writePacket(output, DnsFilterEngine.buildForwardedResponsePacket(datagram, reply))
+            return
+        }
+        // Every resolver failed. Answer SERVFAIL instead of dropping so the
+        // client gives up immediately rather than stalling on each lookup —
+        // "no site loads and nothing says why" is exactly what silent drops
+        // look like to a child.
+        Log.w(TAG, "All upstream resolvers failed for domain=$domain")
+        writePacket(output, DnsFilterEngine.buildServFailPacket(datagram, dnsQuery, dnsQuery.size))
+    }
+
+    private fun queryUpstream(upstream: InetAddress, dnsQuery: ByteArray): ByteArray? = try {
+        DatagramSocket().use { socket ->
+            socket.soTimeout = UPSTREAM_TIMEOUT_MS
+            socket.send(DatagramPacket(dnsQuery, dnsQuery.size, upstream, DnsFilterEngine.DNS_PORT))
+            // 4096, not 1500: with EDNS0 a legitimate answer routinely
+            // exceeds one MTU, and a short buffer silently TRUNCATES the
+            // datagram, handing the client a malformed reply it can only
+            // fail on. This was breaking large/CDN-heavy sites at random.
+            val replyBuf = ByteArray(4096)
+            val reply = DatagramPacket(replyBuf, replyBuf.size)
+            socket.receive(reply)
+            replyBuf.copyOf(reply.length)
+        }
+    } catch (e: Exception) {
+        Log.w(TAG, "Upstream ${upstream.hostAddress} failed: ${e.message}")
+        null
+    }
+
+    /**
+     * The resolvers to forward to, best first: whatever the UNDERLYING
+     * network handed the device (captured before/outside our tunnel, via
+     * the non-VPN active network's LinkProperties), then the public
+     * fallbacks. Using only a hardcoded public resolver breaks browsing
+     * outright on any network that blocks it — captive portals, some
+     * schools and a fair number of ISPs — and on split-horizon networks
+     * it can't resolve internal names at all.
+     */
+    private fun upstreamResolvers(): List<InetAddress> {
+        val out = LinkedHashSet<InetAddress>()
         try {
-            DatagramSocket().use { socket ->
-                socket.soTimeout = 4000
-                val upstreamAddr = InetAddress.getByName(UPSTREAM_DNS_IP)
-                socket.send(DatagramPacket(dnsQuery, dnsQuery.size, upstreamAddr, DnsFilterEngine.DNS_PORT))
-
-                val replyBuf = ByteArray(1500)
-                val reply = DatagramPacket(replyBuf, replyBuf.size)
-                socket.receive(reply)
-
-                val response = DnsFilterEngine.buildForwardedResponsePacket(datagram, replyBuf.copyOf(reply.length))
-                writePacket(output, response)
+            val cm = getSystemService(ConnectivityManager::class.java)
+            cm?.allNetworks?.forEach { network ->
+                val caps = cm.getNetworkCapabilities(network) ?: return@forEach
+                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return@forEach
+                if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return@forEach
+                cm.getLinkProperties(network)?.dnsServers?.forEach { dns ->
+                    // IPv4 only — our TUN carries no IPv6 route, so an IPv6
+                    // resolver is unreachable from this socket.
+                    if (dns.address.size == 4 && !dns.isLoopbackAddress) out.add(dns)
+                }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Upstream DNS forward failed for domain=$domain: ${e.message}")
+            Log.w(TAG, "Could not read system DNS servers: ${e.message}")
         }
+        PUBLIC_FALLBACK_DNS.forEach { ip ->
+            try { out.add(InetAddress.getByName(ip)) } catch (_: Exception) {}
+        }
+        return out.toList()
     }
 
     private fun writePacket(output: FileOutputStream, packet: ByteArray) {

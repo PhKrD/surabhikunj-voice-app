@@ -121,8 +121,16 @@ object PolicyEnforcer {
     private const val INPUT_CACHE_MAX_AGE_MS = 5 * 60_000L
 
     private fun loadInputs(context: Context, childId: String): PolicyInputs? {
-        val policyVersion = fetchRows(context, "pc_children", "id=eq.$childId&select=policy_version")
-            ?.optJSONObject(0)?.optLong("policy_version", -1L)?.takeIf { it >= 0 }
+        // select=* rather than naming columns: parent_pin_hash /
+        // protect_settings only exist after migration 71, and PostgREST
+        // rejects the whole request for an unknown column, which would
+        // take enforcement down entirely on a not-yet-migrated database.
+        val childRow = fetchRows(context, "pc_children", "id=eq.$childId&select=*")?.optJSONObject(0)
+        if (childRow != null) {
+            VoiceKidsPrefs.setParentPinHash(context, childRow.optString("parent_pin_hash", "").takeIf { it.isNotEmpty() && it != "null" })
+            VoiceKidsPrefs.setProtectSettings(context, childRow.optBoolean("protect_settings", true))
+        }
+        val policyVersion = childRow?.optLong("policy_version", -1L)?.takeIf { it >= 0 }
         val cached = cachedInputs
         val now = System.currentTimeMillis()
         if (cached != null && policyVersion != null && cached.policyVersion == policyVersion &&
@@ -201,6 +209,10 @@ object PolicyEnforcer {
         val blockUnknownWebsites = applyFilters && (filterSettings?.optBoolean("block_unknown_websites", false) ?: false)
         val enforceSafeSearch = applyFilters && (filterSettings?.optBoolean("enforce_safe_search", false) ?: false)
         val alertOnBlock = filterSettings?.optBoolean("alert_on_block", true) ?: true
+        // Opt-in, default off — website blocking works through the
+        // accessibility URL read (WebPolicy) without any tunnel.
+        val useVpn = applyFilters && (filterSettings?.optBoolean("use_vpn", false) ?: false)
+        VoiceKidsPrefs.setUseVpnFiltering(context, useVpn)
 
         // "Block unsupported browsers": kick to home any known browser app
         // that isn't one VoiceKidsAccessibilityService can actually read
@@ -275,7 +287,13 @@ object PolicyEnforcer {
         val deviceAdmin = DpcActions.isDeviceAdmin(context)
         val deviceOwner = DpcActions.isDeviceOwner(context)
         val vpnConsent = DpcActions.hasVpnConsent(context)
-        val internetPausedByLock = (lock?.pausesInternet == true || manualPause) && vpnConsent
+        // The pause itself no longer depends on VPN consent: the
+        // accessibility service keeps every internet-using app off screen
+        // (VoiceKidsPrefs.internetPauseActive). The tunnel, when consented,
+        // is an extra layer that also stops background traffic.
+        val internetPauseWanted = lock?.pausesInternet == true || manualPause
+        VoiceKidsPrefs.setInternetPauseActive(context, internetPauseWanted)
+        val internetPausedByLock = internetPauseWanted && vpnConsent
         // Accessibility-based soft blocking (VoiceKidsAccessibilityService)
         // needs no Device Admin/Owner at all — it's a separate OS permission.
         // Device Admin is only needed here for lockDevice()/pauseInternet().
@@ -380,7 +398,8 @@ object PolicyEnforcer {
             // full internet pause, and only one VPN mode can hold the tunnel
             // at a time anyway.
             val lockOwnsVpn = internetPausedByLock
-            val desiredWebsiteFilter = (blockedDomains.isNotEmpty() || blockUnknownWebsites || enforceSafeSearch || alertDomains.isNotEmpty()) &&
+            val desiredWebsiteFilter = useVpn &&
+                (blockedDomains.isNotEmpty() || blockUnknownWebsites || enforceSafeSearch || alertDomains.isNotEmpty()) &&
                 !lockOwnsVpn && vpnConsent
             if (desiredWebsiteFilter != websiteFilterActive) {
                 if (desiredWebsiteFilter) {

@@ -44,6 +44,27 @@ export const dpc = {
     return NativeDpc.getProvisioningPayload()
   },
 
+  /** Notification permission — the child device needs it for lock/tamper notices. */
+  async hasNotificationPermission() {
+    if (!isNative()) return { granted: false }
+    return NativeDpc.hasNotificationPermission()
+  },
+
+  async requestNotificationPermission() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.requestNotificationPermission()
+  },
+
+  async hasLocationPermission() {
+    if (!isNative()) return { granted: false }
+    return NativeDpc.hasLocationPermission()
+  },
+
+  async requestLocationPermission() {
+    if (!isNative()) return webFallback()
+    return NativeDpc.requestLocationPermission()
+  },
+
   /** "Draw over other apps" — used for the brief block-screen shown when a disallowed app is kicked to home. */
   async canDrawOverlays() {
     if (!isNative()) return { granted: false }
@@ -177,10 +198,32 @@ export const dpc = {
       return {
         locked: false, lockReason: null, lockLabel: '', blockAllActive: false, allowListActive: false,
         bonusActive: false, screenTimeTodayMin: null, screenTimeLimitMin: null, blockedPackageCount: 0,
-        websiteFilterActive: false, isDeviceAdmin: false, isDeviceOwner: false, accessibilityEnabled: false,
-        usageAccess: false, webPlatform: true,
+        websiteFilterActive: false, vpnFilteringEnabled: false, internetPaused: false, isDeviceAdmin: false, isDeviceOwner: false,
+        accessibilityEnabled: false, usageAccess: false, settingsProtected: false, webPlatform: true,
       }
     }
     return NativeDpc.getEnforcementSnapshot()
+  },
+
+  /**
+   * Native SOS insert (SosReporter.kt) — the fallback sosApi.js uses when
+   * the WebView's own Supabase session can't be established. Coordinates
+   * are optional; the native side falls back to the last known fix.
+   */
+  async fireSos({ notes = '', latitude = null, longitude = null } = {}) {
+    if (!isNative()) return webFallback()
+    return NativeDpc.fireSos({ notes, latitude, longitude })
+  },
+
+  /** { hasPin, protectSettings, graceActive } — see SettingsGuard.kt. */
+  async getGuardStatus() {
+    if (!isNative()) return { hasPin: false, protectSettings: false, graceActive: false }
+    return NativeDpc.getGuardStatus()
+  },
+
+  /** Verifies the parent PIN on-device and, on success, stands the settings guard down for 5 minutes. */
+  async verifyParentPin(pin) {
+    if (!isNative()) return webFallback()
+    return NativeDpc.verifyParentPin({ pin })
   },
 }

@@ -48,14 +48,8 @@ export default function RequestsTab({ childId }) {
   }
 
   const handleResolve = async (request, approve) => {
-    let expiresAt = null
-    if (approve && request.request_type === 'bonus_time') {
-      const minutes = request.metadata?.minutes || 30
-      expiresAt = new Date(Date.now() + minutes * 60 * 1000).toISOString()
-    }
-
     try {
-      await resolveChildRequest(request.id, { approve, expiresAt })
+      await resolveChildRequest(request.id, { approve, bonusMinutes: request.metadata?.minutes || 30 })
       toast.success(approve ? 'Request approved' : 'Request denied')
       await load()
     } catch (error) {

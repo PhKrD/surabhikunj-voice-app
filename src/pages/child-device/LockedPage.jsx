@@ -15,7 +15,7 @@
  * ChildDeviceShell, which watches the same snapshot.
  */
 
-import { Clock, Moon, Lock, Hourglass, Plus } from 'lucide-react'
+import { Clock, Moon, Lock, Hourglass, Plus, ShieldAlert } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useDeviceState } from '../../store/childDeviceState.js'
@@ -47,44 +47,49 @@ export default function LockedPage() {
   const canAsk = reason !== 'parent_lock'
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center px-8 gap-8 text-white">
-      <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center">
-        <Icon size={48} className="text-indigo-400" />
+    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center px-8 gap-7 text-white">
+      <div className="w-24 h-24 bg-white/5 border border-white/10 rounded-3xl flex items-center justify-center">
+        <Icon size={44} className="text-indigo-300" />
       </div>
 
-      <div className="text-center">
-        <h1 className="text-3xl font-bold">{copy.title}</h1>
-        <p className="text-gray-400 mt-3">{copy.body}</p>
+      <div className="text-center max-w-xs">
+        <h1 className="text-3xl font-bold leading-tight">{copy.title}</h1>
+        <p className="text-slate-400 mt-3 leading-relaxed">{copy.body}</p>
         {reason === 'schedule' && lockLabel && (
-          <p className="text-indigo-300 text-sm mt-2">Schedule: {lockLabel}</p>
+          <p className="inline-block mt-4 text-xs font-medium text-indigo-200 bg-indigo-500/15 rounded-full px-3 py-1.5">
+            {lockLabel}
+          </p>
         )}
         {reason === 'daily_limit' && screenTime.limitMin != null && (
-          <p className="text-indigo-300 text-sm mt-2">
-            {formatMinutes(screenTime.usedMin ?? screenTime.limitMin)} used of today&apos;s {formatMinutes(screenTime.limitMin)}
+          <p className="inline-block mt-4 text-xs font-medium text-indigo-200 bg-indigo-500/15 rounded-full px-3 py-1.5">
+            {formatMinutes(screenTime.usedMin ?? screenTime.limitMin)} used of {formatMinutes(screenTime.limitMin)}
           </p>
         )}
       </div>
 
-      {canAsk && (
+      <div className="w-full max-w-xs flex flex-col gap-3 mt-2">
+        {canAsk && (
+          <button
+            onClick={() => navigate('/child/bonus')}
+            className="w-full bg-indigo-500 active:bg-indigo-600 text-white font-semibold rounded-2xl py-4 flex items-center justify-center gap-2"
+          >
+            <Plus size={20} />
+            Ask for more time
+          </button>
+        )}
+
+        {/* SOS is always accessible during lock */}
         <button
-          onClick={() => navigate('/child/bonus')}
-          className="w-full max-w-xs bg-indigo-500 hover:bg-indigo-600 text-white font-semibold rounded-2xl py-4 flex items-center justify-center gap-2"
+          onClick={() => navigate('/child/sos')}
+          className="w-full bg-red-600/90 active:bg-red-600 text-white font-bold rounded-2xl py-4 flex items-center justify-center gap-2"
         >
-          <Plus size={20} />
-          Ask for more time
+          <ShieldAlert size={20} />
+          SOS — I need help
         </button>
-      )}
+      </div>
 
-      {/* SOS is always accessible during lock */}
-      <button
-        onClick={() => navigate('/child/sos')}
-        className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl px-8 py-4 flex items-center gap-2"
-      >
-        SOS — I need help
-      </button>
-
-      <p className="text-xs text-gray-600 text-center">
-        The SOS button is always available for emergencies.
+      <p className="text-xs text-slate-600 text-center">
+        SOS always works, even while the device is locked.
       </p>
     </div>
   )

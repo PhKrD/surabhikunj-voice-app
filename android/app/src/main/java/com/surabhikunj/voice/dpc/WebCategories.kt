@@ -31,8 +31,15 @@ object WebCategories {
             "netflix.com", "primevideo.com", "hotstar.com", "disneyplus.com",
             "spotify.com", "twitch.tv",
         ),
+        // Deliberately the search HOSTS, not the apexes. A rule on
+        // "google.com" is parent-domain-matched, so blocking this category
+        // would also take out Gmail, Drive, Play, Photos and every Google
+        // sign-in — which is not what "block search engines" means to a
+        // parent. Bare "google.com" typed without a subdomain is the one
+        // gap; that's a far better trade than bricking the phone.
         "search_engines" to setOf(
-            "google.com", "bing.com", "duckduckgo.com", "yahoo.com",
+            "www.google.com", "www.bing.com", "duckduckgo.com",
+            "search.yahoo.com", "www.ecosia.org", "yandex.com", "search.brave.com",
         ),
         "news" to setOf(
             "ndtv.com", "bbc.com", "cnn.com", "timesofindia.indiatimes.com", "reuters.com",
@@ -104,4 +111,31 @@ object WebCategories {
         for (key in keys) CATEGORY_DOMAINS[key]?.let { out.addAll(it) }
         return out
     }
+
+    /**
+     * Every domain in every seed list — the "is this site known at all?"
+     * set behind the opt-in "block unknown websites" setting. Deliberately
+     * unioned with ESSENTIAL_DOMAINS: the seed lists above are a curated
+     * few dozen sites, so a literal default-deny against them alone would
+     * take out app stores, CDNs, OS services and the child's school
+     * portal along with everything else. The parent-facing toggle warns
+     * about this too (WebsiteRulesTab).
+     */
+    val ALL_CATEGORY_DOMAINS: Set<String> by lazy {
+        CATEGORY_DOMAINS.values.flatten().toSet() + ESSENTIAL_DOMAINS
+    }
+
+    /**
+     * Infrastructure a phone stops working without: OS/update/CDN hosts,
+     * app stores, and the certificate/time services everything else
+     * depends on. Never counted as an "unknown website".
+     */
+    private val ESSENTIAL_DOMAINS: Set<String> = setOf(
+        "google.com", "gstatic.com", "googleapis.com", "googleusercontent.com",
+        "ggpht.com", "ytimg.com", "youtube.com", "android.com", "googlevideo.com",
+        "apple.com", "icloud.com", "microsoft.com", "windowsupdate.com",
+        "cloudflare.com", "cloudfront.net", "akamaized.net", "akamai.net",
+        "fastly.net", "jsdelivr.net", "digicert.com", "letsencrypt.org",
+        "ntp.org", "whatsapp.net", "whatsapp.com", "supabase.co",
+    )
 }

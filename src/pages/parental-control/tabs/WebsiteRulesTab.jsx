@@ -71,12 +71,18 @@ function SettingsModal({ settings, onClose, onSave }) {
     {
       key: 'block_unknown_websites',
       title: 'Block unknown websites',
-      hint: 'Remove the risk of my child accessing uncategorized websites (anything not in an allowed category or an explicit allow rule below).',
+      hint: 'Very strict: blocks anything that is not in an allowed category or an explicit allow rule. The category lists are a curated few dozen sites, so expect to add exceptions for school portals and the like.',
     },
     {
       key: 'enforce_safe_search',
       title: 'Enforce Safe Search',
-      hint: 'Remove potentially harmful content from Google/Bing/DuckDuckGo/YouTube search results.',
+      hint: 'Remove potentially harmful content from Google/Bing/DuckDuckGo search results and put YouTube in Restricted Mode. Needs "Also filter with a VPN" below.',
+      requiresVpn: true,
+    },
+    {
+      key: 'use_vpn',
+      title: 'Also filter with a VPN (advanced)',
+      hint: 'Off by default. Website blocking already works in the browser without it. Turning this on also covers non-browser apps, but routes every DNS lookup on the phone through VOICE — if it misbehaves, unrelated sites and apps can stop loading. Needs the one-time VPN permission on the device.',
     },
   ]
 
@@ -96,6 +102,11 @@ function SettingsModal({ settings, onClose, onSave }) {
               <div>
                 <p className="text-sm font-medium text-primary-token">{row.title}</p>
                 <p className="text-xs text-muted-token mt-0.5">{row.hint}</p>
+                {row.requiresVpn && form[row.key] && !form.use_vpn && (
+                  <p className="text-xs text-amber-700 mt-1 font-medium">
+                    Turn on &quot;Also filter with a VPN&quot; below for this to take effect.
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => toggle(row.key)}
@@ -241,13 +252,13 @@ export default function WebsiteRulesTab({ childId }) {
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 flex items-start gap-3">
         <AlertTriangle className="w-4.5 h-4.5 text-amber-600 flex-shrink-0 mt-0.5" />
         <p className="text-xs text-amber-800 leading-relaxed">
-          <span className="font-semibold">Best-effort, not guaranteed.</span> Blocking is enforced
-          on-device via a local DNS filter (needs the one-time VPN permission from the device's setup
-          checklist). Categories are a curated seed list of well-known domains, not a real-time
-          content classifier — turn on "Block unknown websites" in Settings to default-deny anything
-          uncategorized. Incognito/private browsing does NOT bypass this (it's network-level, not
-          history-based). A browser hardwired to its own DNS-over-HTTPS provider outside our short
-          mitigated list can still bypass it. See PLATFORM_LIMITATIONS.md for the full picture.
+          <span className="font-semibold">Best-effort, not guaranteed.</span> Blocking works in the
+          child&apos;s browser — VOICE reads the address bar and closes the page. No VPN required, and
+          incognito doesn&apos;t bypass it. Limits: it only covers the browsers VOICE recognises (Chrome,
+          Firefox, Samsung Internet, Edge, Opera, Brave, Mi Browser, DuckDuckGo — turn on &quot;Block
+          unsupported browsers&quot; to close that gap), and it can&apos;t see inside apps. Categories are a
+          curated seed list of well-known domains, not a live content classifier. See
+          PLATFORM_LIMITATIONS.md for the full picture.
         </p>
       </div>
 

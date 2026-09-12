@@ -44,7 +44,7 @@ function fmtTime(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export default function SummaryTab({ childId, onNavigateTab }) {
+export default function SummaryTab({ childId, child, onNavigateTab }) {
   const toast = useToastStore()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -117,8 +117,12 @@ export default function SummaryTab({ childId, onNavigateTab }) {
   const activeDevices = devices.filter((d) => d.is_active)
   const onlineCount = activeDevices.filter((d) => isDeviceOnline(d)).length
   const anyState = activeDevices.find((d) => d.enforcement_state)?.enforcement_state
-  const lockReason = anyState?.lock_reason ?? null
-  const internetPaused = Boolean(anyState?.internet_paused)
+  // The parent's own lock/pause are desired state on the child row
+  // (migration 72); only automatic locks come from the device's report.
+  const parentLocked = child?.parent_lock_active ?? anyState?.lock_reason === 'parent_lock'
+  const autoLock = anyState?.lock_reason && anyState.lock_reason !== 'parent_lock' ? anyState.lock_reason : null
+  const lockReason = parentLocked ? 'parent_lock' : autoLock
+  const internetPaused = child?.internet_pause_active ?? Boolean(anyState?.manual_internet_pause ?? anyState?.internet_paused)
   const setupIssues = activeDevices.filter((d) => {
     const s = d.enforcement_state
     return s && (s.device_admin === false || s.accessibility_enabled === false || s.usage_access === false)

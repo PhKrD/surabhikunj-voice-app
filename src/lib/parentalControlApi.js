@@ -291,25 +291,33 @@ export async function getUsageHistory(childId, { days = 7 } = {}) {
   return Object.values(byDate)
 }
 
-/** Grants bonus/extra time directly (no child request needed) to every active device of the child. */
+/**
+ * Grants bonus/extra time directly (no child request needed).
+ *
+ * Written as desired state on the child (pc_children.bonus_expires_at) so
+ * a device that is offline right now still honours — and still correctly
+ * expires — the grant once it reconnects. See setDesiredState().
+ */
 export async function grantExtraTime(childId, minutes) {
-  const devices = await listDevices(childId)
-  const active = devices.filter((d) => d.is_active)
   const expiresAt = new Date(Date.now() + minutes * 60_000).toISOString()
-  await Promise.all(
-    active.map((d) => sendDeviceCommand({ deviceId: d.id, commandType: 'grant_bonus_time', payload: { expires_at: expiresAt, minutes } })),
+  const result = await setDesiredState(
+    childId,
+    { bonus_expires_at: expiresAt },
+    { commandType: 'grant_bonus_time', payload: { expires_at: expiresAt, minutes } },
   )
   await recordAudit({ childId, action: 'grant_extra_time', target: `bonus:${childId}`, metadata: { minutes, expires_at: expiresAt } })
-  return { expiresAt, devices: active.length }
+  return { expiresAt, devices: result.devices }
 }
 
-/** Revokes any active bonus/extra time on every active device of the child. */
+/** Revokes any active bonus/extra time for the child. */
 export async function revokeExtraTime(childId) {
-  const devices = await listDevices(childId)
-  const active = devices.filter((d) => d.is_active)
-  await Promise.all(active.map((d) => sendDeviceCommand({ deviceId: d.id, commandType: 'revoke_bonus_time' })))
+  const result = await setDesiredState(
+    childId,
+    { bonus_expires_at: null },
+    { commandType: 'revoke_bonus_time' },
+  )
   await recordAudit({ childId, action: 'revoke_extra_time', target: `bonus:${childId}` })
-  return { devices: active.length }
+  return { devices: result.devices }
 }
 
 // ---------------------------------------------------------------------
@@ -938,6 +946,113 @@ export async function sendDeviceCommand({ deviceId, commandType, payload }) {
     .single()
   if (error) throw error
   return data
+}
+
+// ---------------------------------------------------------------------
+// Desired enforcement state (lock / internet pause / extra time)
+// ---------------------------------------------------------------------
+//
+// These four controls are DESIRED STATE on pc_children (migration 72),
+// not fire-and-forget commands. PolicyEnforcer.kt re-reads the child row
+// on every enforcement pass and converges on it, so a device that was
+// offline / asleep / force-stopped when the parent tapped the button
+// applies the change as soon as it is next reachable.
+//
+// Previously each of these existed only as a pc_device_commands row with
+// a 90-second expires_at. Missing that window left the device in the
+// wrong state permanently with nothing able to reconcile it — which is
+// why "Unlock" appeared not to work on an offline device.
+//
+// The command is still sent, as the fast path for a device that is online
+// right now (it reacts in ~2s rather than waiting for the next policy
+// tick). A command that never lands is no longer a lost instruction.
+
+/**
+ * True when an error is Postgres/PostgREST complaining about a column that
+ * doesn't exist — i.e. migration 72 hasn't been applied to this database
+ * yet. Mirrors the tolerance in policySync.js isMigrationApplied().
+ */
+function isMissingColumnError(error) {
+  return error?.code === '42703' || error?.code === 'PGRST204' ||
+    /column .* does not exist|could not find the .* column/i.test(error?.message ?? '')
+}
+
+/**
+ * Writes the parent's intent, then nudges every active device.
+ *
+ * Degrades to command-only on a database where migration 72 hasn't run
+ * yet: the durable-intent half is simply unavailable there, and failing
+ * hard would take away the parent's ability to lock/unlock at all. The
+ * caller is told via `durable` so the UI can be honest about it.
+ */
+async function setDesiredState(childId, patch, { commandType, payload } = {}) {
+  let child = null
+  let durable = true
+  const { data, error } = await supabase
+    .from('pc_children')
+    .update(patch)
+    .eq('id', childId)
+    .select()
+    .single()
+  if (error) {
+    if (!isMissingColumnError(error)) throw error
+    console.warn('[parentalControlApi] migration 72 not applied — falling back to command-only delivery')
+    durable = false
+  } else {
+    child = data
+  }
+
+  let devices = []
+  if (commandType) {
+    devices = (await listDevices(childId)).filter((d) => d.is_active)
+    const results = await Promise.all(
+      devices.map((d) =>
+        sendDeviceCommand({ deviceId: d.id, commandType, payload }).then(() => true, () => false),
+      ),
+    )
+    // With no durable intent recorded, the command IS the instruction — so
+    // if every send failed there is nothing left to apply it and the parent
+    // must know the action did not take.
+    if (!durable && devices.length > 0 && !results.some(Boolean)) {
+      throw new Error('Could not reach any device, and this database has not been migrated to store the request.')
+    }
+  }
+  return { child, devices: devices.length, durable }
+}
+
+/**
+ * Parent's "Lock now" / "Unlock". Persists until changed — it is not tied
+ * to the device being reachable at this moment.
+ */
+export async function setParentLock(childId, active) {
+  const result = await setDesiredState(
+    childId,
+    { parent_lock_active: active },
+    { commandType: active ? 'lock_device' : 'unlock_device' },
+  )
+  await recordAudit({
+    childId,
+    action: active ? 'lock_device' : 'unlock_device',
+    target: `child:${childId}`,
+    metadata: { devices: result.devices },
+  })
+  return result
+}
+
+/** Parent's "Pause internet" / "Resume internet", as durable desired state. */
+export async function setInternetPause(childId, active) {
+  const result = await setDesiredState(
+    childId,
+    { internet_pause_active: active },
+    { commandType: active ? 'pause_internet' : 'resume_internet' },
+  )
+  await recordAudit({
+    childId,
+    action: active ? 'pause_internet' : 'resume_internet',
+    target: `child:${childId}`,
+    metadata: { devices: result.devices },
+  })
+  return result
 }
 
 /**

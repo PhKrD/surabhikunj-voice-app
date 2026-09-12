@@ -129,6 +129,7 @@ object PolicyEnforcer {
         if (childRow != null) {
             VoiceKidsPrefs.setParentPinHash(context, childRow.optString("parent_pin_hash", "").takeIf { it.isNotEmpty() && it != "null" })
             VoiceKidsPrefs.setProtectSettings(context, childRow.optBoolean("protect_settings", true))
+            applyDesiredState(context, childRow)
         }
         val policyVersion = childRow?.optLong("policy_version", -1L)?.takeIf { it >= 0 }
         val cached = cachedInputs
@@ -159,6 +160,81 @@ object PolicyEnforcer {
     /** Drops the input cache so the next pass re-reads everything (sync_rules command, reassignment). */
     fun invalidateCache() {
         cachedInputs = null
+    }
+
+    /**
+     * Reconciles the parent's DESIRED enforcement state (migration 72:
+     * pc_children.parent_lock_active / internet_pause_active /
+     * bonus_expires_at) into local prefs.
+     *
+     * This is what makes "Lock now" / "Unlock" / "Pause internet" /
+     * "Resume internet" / extra time independent of whether the device was
+     * online when the parent tapped the button. Those controls used to be
+     * carried ONLY by a pc_device_commands row: if the device was offline,
+     * asleep, force-stopped or its token had expired when the command was
+     * written, nothing ever applied it and — because the resulting bit lived
+     * only in SharedPreferences — nothing could reconcile it afterwards
+     * either. A device could sit locked forever while the parent tapped
+     * "Unlock" to no effect.
+     *
+     * Deliberately runs BEFORE the policy_version cache check in
+     * loadInputs(), so it converges on every single pass (~4s) even when no
+     * policy table changed. Columns are read defensively: on a database
+     * where migration 72 has not been applied the keys are simply absent,
+     * and we must then leave the command-driven local values alone rather
+     * than reading a missing column as "false" and releasing a real lock.
+     */
+    private fun applyDesiredState(context: Context, childRow: JSONObject) {
+        if (childRow.has("parent_lock_active") && !childRow.isNull("parent_lock_active")) {
+            val wanted = childRow.optBoolean("parent_lock_active", false)
+            if (wanted != VoiceKidsPrefs.parentLockActive(context)) {
+                Log.i(TAG, "Desired state: parent lock -> $wanted")
+                VoiceKidsPrefs.setParentLockActive(context, wanted)
+            }
+        }
+        if (childRow.has("internet_pause_active") && !childRow.isNull("internet_pause_active")) {
+            val wanted = childRow.optBoolean("internet_pause_active", false)
+            if (wanted != VoiceKidsPrefs.manualInternetPause(context)) {
+                Log.i(TAG, "Desired state: internet pause -> $wanted")
+                VoiceKidsPrefs.setManualInternetPause(context, wanted)
+                // Tear the tunnel down immediately on release; enforce()
+                // below brings it up when the pause is switched on.
+                if (!wanted) DpcActions.resumeInternet(context)
+            }
+        }
+        if (childRow.has("bonus_expires_at")) {
+            val raw = childRow.optString("bonus_expires_at", "").takeIf { it.isNotEmpty() && it != "null" }
+            // 0L is this pref's "no bonus" sentinel, matching VoiceKidsPrefs.
+            val wanted = raw?.let { parseIsoToEpochMillis(it) } ?: 0L
+            if (wanted != VoiceKidsPrefs.bonusExpiresAt(context)) {
+                Log.i(TAG, "Desired state: bonus expiry -> $wanted")
+                VoiceKidsPrefs.setBonusExpiresAt(context, wanted)
+            }
+        }
+    }
+
+    /**
+     * Parses a Supabase/Postgres ISO timestamp to epoch millis, or null if
+     * it is in none of the shapes PostgREST emits. Mirrors the helper of the
+     * same name in VoiceKidsMonitorService (which is private to it).
+     */
+    private fun parseIsoToEpochMillis(iso: String): Long? {
+        for (pattern in listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        )) {
+            try {
+                val sdf = SimpleDateFormat(pattern, Locale.US)
+                if (pattern.endsWith("'Z'")) sdf.timeZone = TimeZone.getTimeZone("UTC")
+                return sdf.parse(iso)?.time
+            } catch (_: Exception) {
+                // try the next shape
+            }
+        }
+        Log.w(TAG, "Could not parse timestamp: $iso")
+        return null
     }
 
     /** One enforcement pass at a time — called from VoiceKidsMonitorService's single executor thread already. */

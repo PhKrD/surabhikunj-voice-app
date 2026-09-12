@@ -49,7 +49,13 @@ const TAB_GROUPS = [
 ]
 const TABS = TAB_GROUPS.flatMap((g) => g.tabs)
 
-/** Live status chips straight from what the devices last reported. */
+/**
+ * Live status chips. Permission/protection state comes from what the
+ * devices last reported; the parent's own lock and internet pause come
+ * from the child row, because those are DESIRED STATE (migration 72) —
+ * reading them off a stale report is what used to leave "Locked by you"
+ * showing after an unlock, or vanish while an offline device caught up.
+ */
 function statusChips(devices, child) {
   const active = devices.filter((d) => d.is_active)
   if (active.length === 0) return [{ key: 'nodev', label: 'No device paired', variant: 'saffron', icon: Smartphone }]
@@ -62,14 +68,24 @@ function statusChips(devices, child) {
     if (s.device_admin === false) missing.add('Device admin')
     if (s.accessibility_enabled === false) missing.add('Accessibility')
     if (s.usage_access === false) missing.add('Usage access')
-    if (s.lock_reason === 'parent_lock') chips.push({ key: 'lock', label: 'Locked by you', variant: 'red', icon: Lock })
-    else if (s.lock_reason) chips.push({ key: 'lock', label: LOCK_LABEL[s.lock_reason] ?? 'Locked', variant: 'yellow', icon: Hourglass })
-    if (s.internet_paused || s.manual_internet_pause) chips.push({ key: 'net', label: 'Internet paused', variant: 'yellow', icon: WifiOff })
+    // Only automatic locks are read from the device report — the parent's
+    // own lock is authoritative below.
+    if (s.lock_reason && s.lock_reason !== 'parent_lock') {
+      chips.push({ key: 'lock', label: LOCK_LABEL[s.lock_reason] ?? 'Locked', variant: 'yellow', icon: Hourglass })
+    }
   }
 
   if (missing.size === 0) chips.unshift({ key: 'prot', label: 'Protected', variant: 'tulasi', icon: ShieldCheck })
   else if (missing.has('setup') && missing.size === 1) chips.unshift({ key: 'prot', label: 'Setup needed', variant: 'saffron', icon: ShieldAlert })
   else chips.unshift({ key: 'prot', label: `Missing ${[...missing].filter((m) => m !== 'setup').join(', ')}`, variant: 'yellow', icon: ShieldAlert })
+
+  // Parent intent. Falls back to the device report on a database where
+  // migration 72 hasn't been applied yet.
+  const reported = active.find((d) => d.enforcement_state)?.enforcement_state
+  const locked = child?.parent_lock_active ?? reported?.lock_reason === 'parent_lock'
+  const paused = child?.internet_pause_active ?? Boolean(reported?.manual_internet_pause)
+  if (locked) chips.push({ key: 'parentlock', label: 'Locked by you', variant: 'red', icon: Lock })
+  if (paused) chips.push({ key: 'net', label: 'Internet paused', variant: 'yellow', icon: WifiOff })
 
   if (!child?.parent_pin_hash) {
     chips.push({ key: 'pin', label: 'No protection PIN', variant: 'saffron', icon: ShieldAlert })
@@ -156,7 +172,13 @@ export default function ChildDetailPage() {
 
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-5">
         {/* Quick actions */}
-        <CommandCenter devices={devices} childId={childId} onRefreshDevices={load} />
+        <CommandCenter
+          devices={devices}
+          childId={childId}
+          child={child}
+          onChildUpdated={setChild}
+          onRefreshDevices={load}
+        />
 
         {/* Tabs */}
         <nav className="rounded-3xl border border-[var(--border-color)] bg-[var(--surface)] p-4 space-y-3">
@@ -188,7 +210,7 @@ export default function ChildDetailPage() {
         </nav>
 
         {ActiveComponent && (
-          <ActiveComponent childId={childId} onNavigateTab={setActiveTab} onChildUpdated={setChild} />
+          <ActiveComponent childId={childId} child={child} onNavigateTab={setActiveTab} onChildUpdated={setChild} />
         )}
       </div>
     </div>

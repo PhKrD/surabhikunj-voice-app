@@ -28,17 +28,42 @@ class VoiceKidsAccessibilityPlugin : Plugin() {
         call.resolve(result)
     }
 
-    /** Opens Settings > Accessibility so the parent can enable "VOICE" once. */
+    /**
+     * Opens the Accessibility grant for VOICE.
+     *
+     * Android does not let any app — Device Owner included — switch an
+     * accessibility service on for itself, so a trip to Settings is
+     * unavoidable here. What we CAN avoid is making the parent hunt for
+     * VOICE in a long list: passing the service's component id through
+     * :settings:fragment_args_key + :settings:show_fragment_args makes
+     * AOSP Settings (and most OEM forks) open VOICE's own toggle page
+     * directly, highlighted. If that extra is ignored we simply land on
+     * the normal Accessibility list, which is the old behaviour.
+     */
     @PluginMethod
     fun openSettings(call: PluginCall) {
+        SettingsGuard.allowAppInitiatedVisit(context)
+        val component = "${context.packageName}/${VoiceKidsAccessibilityService::class.java.name}"
+        val deepLink = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            putExtra(":settings:fragment_args_key", component)
+            putExtra(
+                ":settings:show_fragment_args",
+                android.os.Bundle().apply { putString(":settings:fragment_args_key", component) },
+            )
+        }
         try {
-            SettingsGuard.allowAppInitiatedVisit(context)
-            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            val result = JSObject()
-            result.put("success", true)
-            call.resolve(result)
+            context.startActivity(deepLink)
+            call.resolve(JSObject().apply { put("success", true) })
         } catch (e: Exception) {
-            call.reject("Could not open accessibility settings: ${e.message}")
+            try {
+                context.startActivity(
+                    Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+                call.resolve(JSObject().apply { put("success", true) })
+            } catch (e2: Exception) {
+                call.reject("Could not open accessibility settings: ${e2.message}")
+            }
         }
     }
 

@@ -147,10 +147,14 @@ object VoiceKidsPrefs {
     // "daily_limit" | "restricted_time" | "schedule" | "parent_lock".
 
     /**
-     * Parent's explicit "Pause internet" command — persists until "Resume
-     * internet". Set by the command handlers only (never by PolicyEnforcer),
-     * so a schedule/limit lock ending can't silently undo a manual pause, and
+     * Parent's explicit "Pause internet" — persists until "Resume internet".
+     * A schedule/limit lock ending can't silently undo a manual pause, and
      * the website-filter VPN mode never replaces the pause tunnel.
+     *
+     * Authoritative source is pc_children.internet_pause_active, which
+     * PolicyEnforcer mirrors in here on every pass (migration 72). The
+     * pause/resume_internet commands write it too, as the fast path for a
+     * device that is online right now.
      */
     fun manualInternetPause(context: Context): Boolean = prefs(context).getBoolean("manual_internet_pause", false)
 
@@ -158,7 +162,15 @@ object VoiceKidsPrefs {
         prefs(context).edit().putBoolean("manual_internet_pause", active).apply()
     }
 
-    /** Parent's explicit "Lock now" — persists until "Unlock now" (or bonus time). Set by the lock_device/unlock_device command handlers only. */
+    /**
+     * Parent's explicit "Lock now" — persists until "Unlock" (or bonus time).
+     *
+     * Authoritative source is pc_children.parent_lock_active, mirrored in
+     * here by PolicyEnforcer every pass (migration 72). It used to be set
+     * ONLY by the lock_device/unlock_device command handlers, which meant a
+     * command missed while the device was offline left it stuck locked with
+     * nothing able to reconcile it — that was the "Unlock doesn't work" bug.
+     */
     fun parentLockActive(context: Context): Boolean = prefs(context).getBoolean("parent_lock_active", false)
 
     fun setParentLockActive(context: Context, active: Boolean) {

@@ -45,17 +45,32 @@ function protectionMeta(devices) {
   return { label: `Missing ${[...missing].filter((m) => m !== 'setup').join(', ')}`, variant: 'yellow', icon: ShieldAlert }
 }
 
-/** What is actively restricting this child right now, from the devices' own reports. */
-function liveState(devices) {
+/**
+ * What is actively restricting this child right now.
+ *
+ * The parent's own lock and internet pause are read from the child row —
+ * they are desired state (migration 72) and hold whether or not a device
+ * is currently online, so a locked device that happens to be offline must
+ * still show as locked. Automatic locks (bedtime, time's up) come from the
+ * reports of devices we can actually hear from.
+ */
+function liveState(devices, child) {
   const online = devices.filter((d) => d.is_active && isDeviceOnline(d))
   const chips = []
   for (const d of online) {
     const s = d.enforcement_state
     if (!s) continue
-    if (s.lock_reason === 'parent_lock') chips.push({ key: 'lock', label: 'Locked', icon: Lock, variant: 'red' })
-    else if (s.lock_reason) chips.push({ key: 'lock', label: labelForLock(s.lock_reason), icon: Hourglass, variant: 'yellow' })
-    if (s.manual_internet_pause || s.internet_paused) chips.push({ key: 'net', label: 'Internet paused', icon: WifiOff, variant: 'yellow' })
+    if (s.lock_reason && s.lock_reason !== 'parent_lock') {
+      chips.push({ key: 'lock', label: labelForLock(s.lock_reason), icon: Hourglass, variant: 'yellow' })
+    }
   }
+
+  const reported = devices.find((d) => d.is_active && d.enforcement_state)?.enforcement_state
+  const locked = child?.parent_lock_active ?? reported?.lock_reason === 'parent_lock'
+  const paused = child?.internet_pause_active ?? Boolean(reported?.manual_internet_pause)
+  if (locked) chips.push({ key: 'parentlock', label: 'Locked', icon: Lock, variant: 'red' })
+  if (paused) chips.push({ key: 'net', label: 'Internet paused', icon: WifiOff, variant: 'yellow' })
+
   // Dedupe by key — two devices in the same state shouldn't show two chips.
   return [...new Map(chips.map((c) => [c.key, c])).values()]
 }
@@ -174,7 +189,7 @@ export default function ChildrenOverview({ onAddChild, reloadKey = 0 }) {
             const usedMin = Math.round(d.totalMs / 60000)
             const pct = d.limitMin ? Math.min(100, (usedMin / d.limitMin) * 100) : null
             const over = d.limitMin != null && usedMin >= d.limitMin
-            const chips = liveState(d.devices)
+            const chips = liveState(d.devices, child)
 
             return (
               <Card key={child.id} hover onClick={() => navigate(`/parental-control/${child.id}`)}>

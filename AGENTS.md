@@ -134,6 +134,34 @@ timestamps are unreliable there.
   "Child device can also use org features" and `src/App.jsx`. Unlinked
   children keep the original fully-isolated device-only experience.
 
+## Lock / pause / extra time are DESIRED STATE, not commands (migration 72)
+`pc_children.parent_lock_active`, `internet_pause_active` and
+`bonus_expires_at` hold the parent's INTENT. `PolicyEnforcer.loadInputs()`
+reads the child row on every pass and `applyDesiredState()` mirrors these
+into `VoiceKidsPrefs`, so the device converges whenever it is next online.
+
+This replaced a fire-and-forget model where those four controls existed
+only as `pc_device_commands` rows with a 90s `expires_at`. If the device
+was offline/asleep/force-stopped when the parent tapped the button, the
+command was never applied and — because the resulting bit lived only in
+SharedPreferences — nothing could reconcile it afterwards. Devices got
+stuck locked with "Unlock" appearing to do nothing.
+
+Rules when touching this:
+- `setParentLock`/`setInternetPause`/`grantExtraTime`/`revokeExtraTime` in
+  `parentalControlApi.js` write the child row FIRST (durable), then send
+  the command as a fast path. Never send only the command.
+- The parent UI must read lock/pause from the CHILD ROW, not from
+  `pc_devices.enforcement_state` — the report is stale while a device is
+  offline. Only automatic locks (`daily_limit`, `restricted_time`,
+  `schedule`) come from the report.
+- `enforcement_state.internet_paused` is true whenever ANY lock is active
+  (a parent lock's action is `lock_device`, whose `pausesInternet` is
+  true). Only `manual_internet_pause` means the parent paused it.
+- `applyDesiredState()` checks `childRow.has(...)` so a pre-72 database
+  keeps the old command behaviour; `setDesiredState()` catches the missing
+  column (42703/PGRST204) and falls back to command-only.
+
 ## Recent Parental Control Updates (Migration 71+)
 - **Parent PIN protection**: `SettingsGuard.kt` + `PinGateActivity.kt` prevent
   children from disabling Device Admin, Accessibility, Usage Access, or VPN

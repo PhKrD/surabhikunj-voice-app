@@ -1,15 +1,29 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { Users, Search, AlertTriangle, ChevronRight } from 'lucide-react'
-import { startOfWeek, addDays, differenceInCalendarDays, format } from 'date-fns'
+import {
+  startOfWeek, addDays, differenceInCalendarDays, format,
+  startOfMonth, endOfMonth, subDays,
+} from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
 import Card, { CardBody } from '@/components/ui/Card'
 import Avatar from '@/components/ui/Avatar'
 import Badge from '@/components/ui/Badge'
+import ExportMenu from '@/components/trackers/ExportMenu'
 import { cn } from '@/lib/utils'
 import { fetchTrackerConfig } from '@/lib/trackerApi'
-import { myMentees, menteePeriodScore, fetchEntriesByDate } from '@/lib/counsellorApi'
+import { myMentees, menteePeriodScore, fetchEntriesByDate, buildMenteeExportSections } from '@/lib/counsellorApi'
+import { tap } from '@/lib/haptics'
+
+// Ranges offered when a counsellor exports their whole group.
+const EXPORT_RANGES = [
+  { key: 'this_week', label: 'This week', resolve: () => { const s = startOfWeek(new Date(), { weekStartsOn: 1 }); return [s, addDays(s, 6)] } },
+  { key: 'last_7', label: 'Last 7 days', resolve: () => [subDays(new Date(), 6), new Date()] },
+  { key: 'this_month', label: 'This month', resolve: () => [startOfMonth(new Date()), endOfMonth(new Date())] },
+  { key: 'last_30', label: 'Last 30 days', resolve: () => [subDays(new Date(), 29), new Date()] },
+]
 
 function scoreTone(pct) {
   if (pct == null) return 'text-muted-token'
@@ -34,6 +48,10 @@ export default function CounsellorDashboard() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('name')
   const [onlyAttention, setOnlyAttention] = useState(false)
+  // Tracker config is fetched during load(); keep it so Export doesn't
+  // have to re-fetch the whole definition on every tap.
+  const [sadhana, setSadhana] = useState(null)
+  const [exportRange, setExportRange] = useState('this_week')
 
   const load = useCallback(async () => {
     if (!profile?.id) return
@@ -61,6 +79,7 @@ export default function CounsellorDashboard() {
       if (tracker?.id) {
         const cfg = await fetchTrackerConfig(tracker.id)
         fields = cfg.fields; groups = cfg.groups; rules = cfg.rules; calculatedColumns = cfg.calculated_columns
+        setSadhana({ trackerId: tracker.id, fields, groups, rules, calculatedColumns })
       }
 
       const rows = await Promise.all((profiles ?? []).map(async (p) => {
@@ -116,14 +135,78 @@ export default function CounsellorDashboard() {
     return { total, attention, avg, submitted }
   }, [mentees])
 
+  // Export every counselli currently in view (so the search box and the
+  // "needs attention" filter double as an export selection) into one
+  // workbook / PDF, with a comparison summary as the first sheet/page.
+  const getExportData = useCallback(async () => {
+    if (!sadhana?.trackerId) throw new Error('The Sadhana tracker is not set up yet.')
+    const spec = EXPORT_RANGES.find((r) => r.key === exportRange) ?? EXPORT_RANGES[0]
+    const [start, end] = spec.resolve()
+    const sections = await buildMenteeExportSections({
+      trackerId: sadhana.trackerId,
+      members: filtered.map((m) => ({ id: m.id, name: m.name })),
+      startDate: start,
+      endDate: end,
+      fields: sadhana.fields,
+      groups: sadhana.groups,
+      rules: sadhana.rules,
+      calculatedColumns: sadhana.calculatedColumns,
+    })
+    return {
+      sections,
+      title: `Sadhana — ${profile?.display_name ?? profile?.spiritual_name ?? 'Counsellis'}`,
+      rangeLabel: `${format(start, 'dd MMM yyyy')} – ${format(end, 'dd MMM yyyy')}`,
+      includeSummary: true,
+    }
+  }, [sadhana, exportRange, filtered, profile])
+
   if (loading) return <div className="p-8 text-center text-muted-token">Loading dashboard…</div>
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
-      <div>
-        <h1 className="text-xl font-extrabold text-primary-token">Counsellor Dashboard</h1>
-        <p className="text-sm text-secondary-token">Welcome, {profile?.display_name ?? profile?.spiritual_name}</p>
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-extrabold text-primary-token">Counsellor Dashboard</h1>
+          <p className="text-sm text-secondary-token">Welcome, {profile?.display_name ?? profile?.spiritual_name}</p>
+        </div>
       </div>
+
+      {/* Group export — range picker + format menu */}
+      {stats.total > 0 && (
+        <Card>
+          <CardBody className="py-3 flex flex-wrap items-center gap-2">
+            <p className="text-xs font-bold text-secondary-token mr-1">Export all counsellis</p>
+            <div className="flex items-center gap-1 bg-[var(--surface-muted)] rounded-xl p-1">
+              {EXPORT_RANGES.map((r) => (
+                <button
+                  key={r.key}
+                  onClick={() => { tap(); setExportRange(r.key) }}
+                  className={cn(
+                    'relative px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors whitespace-nowrap',
+                    exportRange === r.key ? 'text-saffron-600' : 'text-secondary-token'
+                  )}
+                >
+                  {exportRange === r.key && (
+                    <motion.span
+                      layoutId="export-range-pill"
+                      className="absolute inset-0 rounded-lg bg-[var(--surface)] shadow-sm"
+                      transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                    />
+                  )}
+                  <span className="relative">{r.label}</span>
+                </button>
+              ))}
+            </div>
+            <span className="flex-1" />
+            <ExportMenu
+              getExportData={getExportData}
+              label={`Export ${filtered.length}`}
+              variant="primary"
+              disabled={!sadhana?.trackerId || !filtered.length}
+            />
+          </CardBody>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card><CardBody className="py-4">
@@ -151,8 +234,8 @@ export default function CounsellorDashboard() {
             {mentees.filter((m) => m.needsAttention).map((m) => (
               <button
                 key={m.id}
-                onClick={() => navigate(`counselli/${m.id}`)}
-                className="w-full flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-red-50 text-left"
+                onClick={() => { tap(); navigate(`counselli/${m.id}`) }}
+                className="w-full flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-red-50 text-left active:scale-[0.99] transition-transform"
               >
                 <Avatar name={m.name} url={m.avatar_url} size="sm" />
                 <div className="min-w-0 flex-1">
@@ -177,8 +260,8 @@ export default function CounsellorDashboard() {
           />
         </div>
         <button
-          onClick={() => setOnlyAttention((v) => !v)}
-          className={cn('px-3 py-2.5 rounded-xl text-xs font-semibold border whitespace-nowrap', onlyAttention ? 'bg-red-500 text-white border-red-500' : 'bg-[var(--surface)] text-secondary-token border-[var(--border-color)]')}
+          onClick={() => { tap(); setOnlyAttention((v) => !v) }}
+          className={cn('px-3 py-2.5 rounded-xl text-xs font-semibold border whitespace-nowrap transition-colors active:scale-95', onlyAttention ? 'bg-red-500 text-white border-red-500' : 'bg-[var(--surface)] text-secondary-token border-[var(--border-color)]')}
         >
           Needs Attention
         </button>
@@ -198,9 +281,20 @@ export default function CounsellorDashboard() {
             <p>No counsellis {onlyAttention ? 'need attention right now' : 'assigned yet'}.</p>
           </CardBody></Card>
         )}
-        {filtered.map((m) => (
-          <Card key={m.id}>
-            <CardBody className="flex items-center gap-3 cursor-pointer" onClick={() => navigate(`counselli/${m.id}`)}>
+        {filtered.map((m, i) => (
+          <motion.div
+            key={m.id}
+            layout
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            // Cap the stagger so a large group doesn't take seconds to appear.
+            transition={{ delay: Math.min(i * 0.03, 0.3), type: 'spring', stiffness: 380, damping: 32 }}
+          >
+          <Card>
+            <CardBody
+              className="flex items-center gap-3 cursor-pointer active:scale-[0.99] transition-transform"
+              onClick={() => { tap(); navigate(`counselli/${m.id}`) }}
+            >
               <Avatar name={m.name} url={m.avatar_url} size="md" />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-primary-token truncate">{m.name}</p>
@@ -216,6 +310,7 @@ export default function CounsellorDashboard() {
               <ChevronRight className="w-4 h-4 text-muted-token" />
             </CardBody>
           </Card>
+          </motion.div>
         ))}
       </div>
     </div>

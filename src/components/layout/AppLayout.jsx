@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import Sidebar from './Sidebar'
 import Header from './Header'
 
@@ -88,7 +89,20 @@ export default function AppLayout() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header onMenuClick={() => setMobileOpen(true)} />
         <main ref={mainRef} className="flex-1 scroll-container p-4 lg:p-6">
-          <Outlet />
+          {/*
+            Page transition. Deliberately opacity-only and enter-only (no
+            AnimatePresence, no transform): the scroll-restoration above
+            sets scrollTop on this container while the new page is still
+            loading, and an exit animation or a translate would fight it.
+          */}
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+          >
+            <Outlet />
+          </motion.div>
         </main>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Check, Minus, Save } from 'lucide-react'
 import {
   format, startOfWeek, addDays, addWeeks, subWeeks,
@@ -7,11 +8,12 @@ import {
 import { supabase } from '@/lib/supabase'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import ExportMenu from '@/components/trackers/ExportMenu'
 import useToastStore from '@/store/toastStore'
 import { cn } from '@/lib/utils'
-import {
-  calculateFieldScore, hasValue, resolveGroupTotals, resolveCalculatedColumns,
-} from '@/lib/trackerScoring'
+import { hasValue } from '@/lib/trackerScoring'
+import { buildSheetModel } from '@/lib/trackerSheet'
+import { tap, select as hapticSelect, success as hapticSuccess } from '@/lib/haptics'
 
 const CELL_BASE = 'w-full px-2 py-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--surface)] text-xs text-primary-token focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 const DATE_W = 60
@@ -60,26 +62,6 @@ function EditableCell({ field, value, onChange }) {
   return <input type="text" value={value ?? ''} onChange={(e) => onChange(e.target.value)} className={CELL_BASE} />
 }
 
-// Which columns to render per field: raw input column, marks column, both, or neither.
-function buildColumnPlan(fields, rulesByField) {
-  return (fields ?? []).filter((f) => f.is_active !== false).map((f) => {
-    const hasRule = (rulesByField[f.key]?.length ?? 0) > 0
-    let showInput = f.show_input !== false
-    let showMarks = f.show_marks !== false && hasRule
-    if (!showInput && !showMarks) showInput = true // never fully hide a field
-    return { field: f, showInput, showMarks, hasRule }
-  })
-}
-
-function groupByField(rules) {
-  const out = {}
-  for (const r of rules ?? []) {
-    if (!out[r.field_key]) out[r.field_key] = []
-    out[r.field_key].push(r)
-  }
-  return out
-}
-
 function ReadOnlyCell({ field, value }) {
   if (field.field_type === 'boolean') {
     const on = value === true || value === 'true' || value === '1'
@@ -92,7 +74,13 @@ function ReadOnlyCell({ field, value }) {
   return <div className="px-2 py-1.5 text-xs text-primary-token text-center truncate">{hasValue(value) ? String(value) : '–'}</div>
 }
 
-export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], rules = [], calculatedColumns = [], orgId, userId, readOnly = false }) {
+export default function TrackerSpreadsheet({
+  tracker, fields = [], groups = [], rules = [], calculatedColumns = [],
+  orgId, userId, readOnly = false,
+  // Whose sheet this is — used to name the exported file. Defaults to the
+  // tracker name for a devotee looking at their own Sadhana.
+  exportTitle,
+}) {
   const toastSuccess = useToastStore((s) => s.success)
   const toastError = useToastStore((s) => s.error)
   const toastInfo = useToastStore((s) => s.info)
@@ -108,21 +96,11 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
     return eachDayOfInterval({ start: startOfMonth(anchor), end: endOfMonth(anchor) })
   }, [mode, anchor])
 
-  const canGoNext = true
-
-  const rulesByField = useMemo(() => groupByField(rules), [rules])
-  const columnPlan = useMemo(() => buildColumnPlan(fields, rulesByField), [fields, rulesByField])
-
-  // Ordered groups + an implicit "Other" bucket for ungrouped fields
-  const orderedGroups = useMemo(() => {
-    const active = [...groups].filter((g) => g.is_active !== false).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-    const grouped = active.map((g) => ({ group: g, columns: columnPlan.filter((c) => c.field.group_id === g.id) }))
-    const ungroupedCols = columnPlan.filter((c) => !c.field.group_id || !active.some((g) => g.id === c.field.group_id))
-    return ungroupedCols.length ? [...grouped, { group: null, columns: ungroupedCols }] : grouped
-  }, [groups, columnPlan])
-
-  const activeColumns = useMemo(() => orderedGroups.flatMap((g) => g.columns), [orderedGroups])
-  const sortedColumns = useMemo(() => [...calculatedColumns].filter((c) => c.is_active !== false).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)), [calculatedColumns])
+  // The single layout + scoring model, shared with the exporters so a
+  // downloaded sheet always matches what is rendered here.
+  const model = useMemo(() => buildSheetModel({
+    fields, groups, rules, calculatedColumns, days, entriesByDate: grid,
+  }), [fields, groups, rules, calculatedColumns, days, grid])
 
   const load = useCallback(async () => {
     if (!tracker?.id || !userId) return
@@ -176,49 +154,11 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
     setGrid((prev) => ({ ...prev, [dateISO]: { ...(prev[dateISO] ?? {}), [key]: value } }))
   }
 
-  // Per-day computed field totals, used for Marks columns + calculated columns
-  const dayTotals = useMemo(() => {
+  const rowByISO = useMemo(() => {
     const out = {}
-    for (const d of days) {
-      const iso = toISO(d)
-      const values = grid[iso] ?? {}
-      const fieldTotals = {}
-      for (const { field, hasRule } of columnPlan) {
-        if (!hasRule) continue
-        let earned = 0, max = 0
-        for (const rule of rulesByField[field.key] ?? []) {
-          max += Number(rule.max_points) || 0
-          if (hasValue(values[field.key])) earned += calculateFieldScore(rule, values).points
-        }
-        fieldTotals[field.key] = { earned, max }
-      }
-      const groupTotals = resolveGroupTotals(groups, fields, fieldTotals)
-      const columnTotals = resolveCalculatedColumns(sortedColumns, fieldTotals, groupTotals)
-      out[iso] = { fieldTotals, groupTotals, columnTotals }
-    }
+    for (const r of model.rows) out[r.iso] = r
     return out
-  }, [days, grid, columnPlan, rulesByField, groups, fields, sortedColumns])
-
-  // Footer summary: earned/max per Marks column + per calculated column
-  const summary = useMemo(() => {
-    const fieldSum = {}
-    const columnSum = {}
-    for (const d of days) {
-      const t = dayTotals[toISO(d)]
-      if (!t) continue
-      for (const [key, v] of Object.entries(t.fieldTotals)) {
-        fieldSum[key] = fieldSum[key] ?? { earned: 0, max: 0 }
-        fieldSum[key].earned += v.earned
-        fieldSum[key].max += v.max
-      }
-      for (const [key, v] of Object.entries(t.columnTotals)) {
-        columnSum[key] = columnSum[key] ?? { earned: 0, max: 0 }
-        columnSum[key].earned += v.earned
-        columnSum[key].max += v.max
-      }
-    }
-    return { fieldSum, columnSum }
-  }, [days, dayTotals])
+  }, [model])
 
   const handleSave = async () => {
     if (!orgId || !userId) return
@@ -230,14 +170,14 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
         const values = grid[iso] ?? {}
         const anyValue = Object.values(values).some((v) => hasValue(v))
         if (!anyValue) continue
-        const t = dayTotals[iso]
-        let earned = 0, max = 0
-        for (const v of Object.values(t?.fieldTotals ?? {})) { earned += v.earned; max += v.max }
+        const r = rowByISO[iso]
         rows.push({
           payload: {
             tracker_id: tracker.id, org_id: orgId, user_id: userId, period_date: iso,
-            score: max > 0 ? Math.round((earned / max) * 100) : null,
-            score_detail: t ?? {},
+            score: r && r.max > 0 ? Math.round((r.earned / r.max) * 100) : null,
+            score_detail: r
+              ? { fieldTotals: r.fieldTotals, groupTotals: r.groupTotals, columnTotals: r.columnTotals }
+              : {},
           },
           values,
         })
@@ -266,6 +206,7 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
         const { error: valErr } = await supabase.from('tracker_field_values').upsert(valueRows, { onConflict: 'entry_id,field_key' })
         if (valErr) throw valErr
       }
+      hapticSuccess()
       toastSuccess('Saved', `${rows.length} ${rows.length === 1 ? 'day' : 'days'} updated`)
       await load()
     } catch (e) {
@@ -279,12 +220,36 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
     ? `${format(days[0], 'dd MMM')} – ${format(days[days.length - 1], 'dd MMM yyyy')}`
     : format(anchor, 'MMMM yyyy')
 
-  const step = (dir) => {
-    if (mode === 'week') setAnchor((a) => (dir < 0 ? subWeeks(a, 1) : addWeeks(a, 1)))
-    else setAnchor((a) => (dir < 0 ? subMonths(a, 1) : addMonths(a, 1)))
+  const [dir, setDir] = useState(0)
+  const step = (d) => {
+    setDir(d)
+    hapticSelect()
+    if (mode === 'week') setAnchor((a) => (d < 0 ? subWeeks(a, 1) : addWeeks(a, 1)))
+    else setAnchor((a) => (d < 0 ? subMonths(a, 1) : addMonths(a, 1)))
   }
 
+  // Horizontal drag on the period header pages through weeks/months, the
+  // same gesture people already expect from a calendar.
+  const onDragEnd = (_e, info) => {
+    const { offset, velocity } = info
+    if (Math.abs(offset.x) < 60 && Math.abs(velocity.x) < 400) return
+    step(offset.x > 0 ? -1 : 1)
+  }
+
+  const title = exportTitle ?? tracker?.name ?? 'Sadhana'
+  const exportData = useCallback(() => ({
+    title,
+    rangeLabel,
+    sections: [{
+      title,
+      subtitle: `${tracker?.name ?? 'Sadhana'} · ${rangeLabel}`,
+      sheetName: mode === 'week' ? format(days[0], 'dd MMM yyyy') : format(anchor, 'MMM yyyy'),
+      model,
+    }],
+  }), [title, tracker?.name, rangeLabel, mode, days, anchor, model])
+
   const thBase = 'px-2 py-2 text-[11px] font-bold text-white text-center whitespace-nowrap border-r border-white/15'
+  const calcCount = model.columns.filter((c) => c.kind === 'calc').length
 
   return (
     <div className="space-y-3">
@@ -293,39 +258,76 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
         <CardBody className="py-3 space-y-2">
           {/* Row 1: mode picker + navigation */}
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-[var(--surface-muted)] rounded-xl p-1 flex-shrink-0">
-              <button
-                onClick={() => setMode('week')}
-                className={cn('px-3 py-1.5 rounded-lg text-xs font-semibold transition', mode === 'week' ? 'bg-[var(--surface)] shadow-sm text-saffron-600' : 'text-secondary-token')}
-              >Week</button>
-              <button
-                onClick={() => setMode('month')}
-                className={cn('px-3 py-1.5 rounded-lg text-xs font-semibold transition', mode === 'month' ? 'bg-[var(--surface)] shadow-sm text-saffron-600' : 'text-secondary-token')}
-              >Month</button>
+            <div className="relative flex items-center gap-1 bg-[var(--surface-muted)] rounded-xl p-1 flex-shrink-0">
+              {['week', 'month'].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => { tap(); setMode(m) }}
+                  className={cn(
+                    'relative px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors capitalize',
+                    mode === m ? 'text-saffron-600' : 'text-secondary-token'
+                  )}
+                >
+                  {mode === m && (
+                    <motion.span
+                      layoutId="sheet-mode-pill"
+                      className="absolute inset-0 rounded-lg bg-[var(--surface)] shadow-sm"
+                      transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                    />
+                  )}
+                  <span className="relative">{m}</span>
+                </button>
+              ))}
             </div>
 
-            <button onClick={() => step(-1)} className="p-2 rounded-xl text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)] flex-shrink-0">
+            <button onClick={() => step(-1)} className="p-2 rounded-xl text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)] flex-shrink-0 active:scale-90 transition">
               <ChevronLeft className="w-5 h-5" />
             </button>
 
-            <div className="flex-1 text-center">
-              <p className="font-bold text-primary-token text-sm leading-tight">{rangeLabel}</p>
-            </div>
+            {/* Draggable period label — swipe left/right to page. */}
+            <motion.div
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.18}
+              onDragEnd={onDragEnd}
+              className="flex-1 text-center overflow-hidden cursor-grab active:cursor-grabbing touch-pan-y"
+            >
+              <AnimatePresence mode="popLayout" initial={false} custom={dir}>
+                <motion.p
+                  key={rangeLabel}
+                  custom={dir}
+                  initial={{ opacity: 0, x: dir >= 0 ? 24 : -24 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: dir >= 0 ? -24 : 24 }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                  className="font-bold text-primary-token text-sm leading-tight select-none"
+                >
+                  {rangeLabel}
+                </motion.p>
+              </AnimatePresence>
+            </motion.div>
 
             <button
               onClick={() => step(1)}
-              className="p-2 rounded-xl text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)] flex-shrink-0"
+              className="p-2 rounded-xl text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)] flex-shrink-0 active:scale-90 transition"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Row 2: save button (only when editable) */}
-          {!readOnly && (
-            <Button size="sm" icon={Save} loading={saving} onClick={handleSave} className="w-full justify-center">
-              Save Changes
-            </Button>
-          )}
+          {/* Row 2: save + export */}
+          <div className="flex items-center gap-2">
+            {!readOnly && (
+              <Button size="sm" icon={Save} loading={saving} onClick={handleSave} className="flex-1 justify-center">
+                Save Changes
+              </Button>
+            )}
+            <ExportMenu
+              getExportData={exportData}
+              disabled={loading}
+              className={readOnly ? 'flex-1' : undefined}
+            />
+          </div>
         </CardBody>
       </Card>
 
@@ -341,36 +343,31 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
                 <tr className="bg-saffron-500">
                   <th className="sticky left-0 z-20 bg-saffron-500" style={{ width: DATE_W }} />
                   <th className="sticky z-20 bg-saffron-500" style={{ width: DAY_W, left: DATE_W }} />
-                  {orderedGroups.map((g, gi) => {
-                    const span = g.columns.reduce((n, c) => n + (c.showInput ? 1 : 0) + (c.showMarks ? 1 : 0), 0)
-                    if (!span) return null
-                    return (
-                      <th key={g.group?.id ?? `ungrouped-${gi}`} colSpan={span} className={cn(thBase, 'text-xs')}>
-                        {g.group?.label ?? 'Other'}
-                      </th>
-                    )
-                  })}
-                  {sortedColumns.length > 0 && (
-                    <th colSpan={sortedColumns.length} className="bg-slate-800 text-white text-[11px] font-bold text-center" />
+                  {model.groupHeader.map((g, gi) => (
+                    <th key={`${g.label}-${gi}`} colSpan={g.span} className={cn(thBase, 'text-xs')}>
+                      {g.label}
+                    </th>
+                  ))}
+                  {calcCount > 0 && (
+                    <th colSpan={calcCount} className="bg-slate-800 text-white text-[11px] font-bold text-center" />
                   )}
                 </tr>
                 {/* Field / Marks header row */}
                 <tr className="bg-slate-800">
                   <th className="sticky left-0 z-20 bg-slate-800 text-white text-[11px] font-bold px-2 py-2" style={{ width: DATE_W }}>Date</th>
                   <th className="sticky z-20 bg-slate-800 text-white text-[11px] font-bold px-2 py-2" style={{ width: DAY_W, left: DATE_W }}>Day</th>
-                  {activeColumns.map(({ field, showInput, showMarks }) => (
-                    <>
-                      {showInput && <th key={`${field.key}-in`} className={thBase}>{field.label}</th>}
-                      {showMarks && <th key={`${field.key}-mk`} className={cn(thBase, 'bg-black/20')}>Marks</th>}
-                    </>
-                  ))}
-                  {sortedColumns.map((c) => (
+                  {model.columns.map((col) => (
                     <th
-                      key={c.key}
-                      className={cn('px-2 py-2 text-[11px] font-bold text-center whitespace-nowrap', c.is_highlighted ? 'bg-yellow-400 text-primary-token' : 'bg-slate-700 text-white')}
-                      style={{ width: CALC_W }}
+                      key={col.id}
+                      className={cn(
+                        col.kind === 'calc'
+                          ? cn('px-2 py-2 text-[11px] font-bold text-center whitespace-nowrap', col.isHighlighted ? 'bg-yellow-400 text-primary-token' : 'bg-slate-700 text-white')
+                          : thBase,
+                        col.kind === 'marks' && 'bg-black/20'
+                      )}
+                      style={col.kind === 'calc' ? { width: CALC_W } : undefined}
                     >
-                      {c.label}
+                      {col.kind === 'marks' ? col.shortLabel : col.label}
                     </th>
                   ))}
                 </tr>
@@ -378,79 +375,70 @@ export default function TrackerSpreadsheet({ tracker, fields = [], groups = [], 
                 <tr className="bg-orange-50">
                   <th className="sticky left-0 z-20 bg-orange-50 text-[10px] text-muted-token" style={{ width: DATE_W }} />
                   <th className="sticky z-20 bg-orange-50 text-[10px] text-muted-token" style={{ width: DAY_W, left: DATE_W }} />
-                  {activeColumns.map(({ field, showInput, showMarks, hasRule }) => {
-                    const max = (rulesByField[field.key] ?? []).reduce((n, r) => n + (Number(r.max_points) || 0), 0)
-                    return (
-                      <>
-                        {showInput && <th key={`${field.key}-in-max`} className="px-2 py-1.5 text-[11px] font-semibold text-orange-700 border-r border-orange-100">{hasRule && !showMarks ? max.toFixed(2) : ''}</th>}
-                        {showMarks && <th key={`${field.key}-mk-max`} className="px-2 py-1.5 text-[11px] font-semibold text-orange-700 border-r border-orange-100">{max.toFixed(2)}</th>}
-                      </>
-                    )
-                  })}
-                  {sortedColumns.map((c) => (
-                    <th key={c.key} className="px-2 py-1.5 text-[11px] font-semibold text-orange-700">
-                      {(summary.columnSum[c.key]?.max ?? 0).toFixed(2)}
+                  {model.columns.map((col, i) => (
+                    <th key={col.id} className="px-2 py-1.5 text-[11px] font-semibold text-orange-700 border-r border-orange-100">
+                      {model.maxRow[i] == null ? '' : model.maxRow[i].toFixed(2)}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {days.map((d, idx) => {
-                  const iso = toISO(d)
-                  const values = grid[iso] ?? {}
-                  const t = dayTotals[iso] ?? { fieldTotals: {}, columnTotals: {} }
-                  return (
-                    <tr key={iso} className={idx % 2 === 0 ? 'bg-[var(--surface)]' : 'bg-slate-50/60'}>
-                      <td className="sticky left-0 z-10 bg-inherit px-2 py-1.5 text-xs font-semibold text-primary-token border-r border-[var(--border-color)]" style={{ width: DATE_W }}>
-                        {format(d, 'd MMM')}
-                      </td>
-                      <td className="sticky z-10 bg-inherit px-2 py-1.5 text-xs text-secondary-token border-r border-[var(--border-color)]" style={{ width: DAY_W, left: DATE_W }}>
-                        {format(d, 'EEE')}
-                      </td>
-                      {activeColumns.map(({ field, showInput, showMarks }) => (
-                        <>
-                          {showInput && (
-                            <td key={`${field.key}-in`} className="px-1.5 py-1 border-r border-[var(--border-color)]" style={{ minWidth: 90 }}>
-                              {readOnly
-                                ? <ReadOnlyCell field={field} value={values[field.key]} />
-                                : <EditableCell field={field} value={values[field.key]} onChange={(v) => setCell(iso, field.key, v)} />}
-                            </td>
-                          )}
-                          {showMarks && (
-                            <td key={`${field.key}-mk`} className="px-2 py-1.5 text-center text-xs font-semibold text-secondary-token bg-slate-50/60 border-r border-[var(--border-color)]">
-                              {(t.fieldTotals[field.key]?.earned ?? 0).toFixed(2)}
-                            </td>
-                          )}
-                        </>
-                      ))}
-                      {sortedColumns.map((c) => (
-                        <td key={c.key} className={cn('px-2 py-1.5 text-center text-xs font-bold', c.is_highlighted ? 'bg-yellow-50 text-yellow-800' : 'text-primary-token')}>
-                          {(t.columnTotals[c.key]?.earned ?? 0).toFixed(2)}
+                {model.rows.map((row, idx) => (
+                  <tr key={row.iso} className={idx % 2 === 0 ? 'bg-[var(--surface)]' : 'bg-slate-50/60'}>
+                    <td className="sticky left-0 z-10 bg-inherit px-2 py-1.5 text-xs font-semibold text-primary-token border-r border-[var(--border-color)]" style={{ width: DATE_W }}>
+                      {row.dateLabel}
+                    </td>
+                    <td className="sticky z-10 bg-inherit px-2 py-1.5 text-xs text-secondary-token border-r border-[var(--border-color)]" style={{ width: DAY_W, left: DATE_W }}>
+                      {row.dayLabel}
+                    </td>
+                    {model.columns.map((col, ci) => {
+                      const cell = row.cells[ci]
+                      if (col.kind === 'input') {
+                        return (
+                          <td key={col.id} className="px-1.5 py-1 border-r border-[var(--border-color)]" style={{ minWidth: 90 }}>
+                            {readOnly
+                              ? <ReadOnlyCell field={col.field} value={cell.raw} />
+                              : (
+                                <EditableCell
+                                  field={col.field}
+                                  value={cell.raw}
+                                  onChange={(v) => setCell(row.iso, col.field.key, v)}
+                                />
+                              )}
+                          </td>
+                        )
+                      }
+                      if (col.kind === 'marks') {
+                        return (
+                          <td key={col.id} className="px-2 py-1.5 text-center text-xs font-semibold text-secondary-token bg-slate-50/60 border-r border-[var(--border-color)]">
+                            {Number(cell.raw ?? 0).toFixed(2)}
+                          </td>
+                        )
+                      }
+                      return (
+                        <td key={col.id} className={cn('px-2 py-1.5 text-center text-xs font-bold', col.isHighlighted ? 'bg-yellow-50 text-yellow-800' : 'text-primary-token')}>
+                          {Number(cell.raw ?? 0).toFixed(2)}
                         </td>
-                      ))}
-                    </tr>
-                  )
-                })}
+                      )
+                    })}
+                  </tr>
+                ))}
               </tbody>
               <tfoot>
                 <tr className="bg-orange-500">
                   <td className="sticky left-0 z-10 bg-orange-500" style={{ width: DATE_W }} />
                   <td className="sticky z-10 bg-orange-500 text-center text-white text-[11px] font-bold py-2" style={{ width: DAY_W, left: DATE_W }}>%</td>
-                  {activeColumns.map(({ field, showInput, showMarks }) => {
-                    const s = summary.fieldSum[field.key]
-                    const pct = s && s.max > 0 ? ((s.earned / s.max) * 100).toFixed(1) : '0.0'
-                    return (
-                      <>
-                        {showInput && <td key={`${field.key}-in-f`} className="border-r border-orange-400" />}
-                        {showMarks && <td key={`${field.key}-mk-f`} className="text-center text-white text-[11px] font-bold py-2 border-r border-orange-400">{pct}%</td>}
-                      </>
-                    )
-                  })}
-                  {sortedColumns.map((c) => {
-                    const s = summary.columnSum[c.key]
-                    const pct = s && s.max > 0 ? ((s.earned / s.max) * 100).toFixed(1) : '0.0'
-                    return <td key={c.key} className="text-center text-white text-[11px] font-bold py-2">{pct}%</td>
-                  })}
+                  {model.columns.map((col, i) => (
+                    <td
+                      key={col.id}
+                      className={cn(
+                        'text-center text-white text-[11px] font-bold py-2',
+                        col.kind !== 'calc' && 'border-r border-orange-400'
+                      )}
+                    >
+                      {model.totals.pctCells[i] == null ? '' : `${model.totals.pctCells[i].toFixed(1)}%`}
+                    </td>
+                  ))}
                 </tr>
               </tfoot>
             </table>

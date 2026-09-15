@@ -367,6 +367,7 @@ export default function CounselliProfile() {
               tracker={tracker}
               fields={config.fields} groups={config.groups} rules={config.rules} calculatedColumns={config.calculatedColumns}
               orgId={org?.id} userId={mentee.id} readOnly
+              exportTitle={name}
             />
           </div>
         ) : <Card><CardBody className="py-8 text-center text-muted-token text-sm">No Sadhana tracker configured for this organization.</CardBody></Card>

@@ -16,7 +16,28 @@ import { fetchTrackerConfig } from '@/lib/trackerApi'
 
 const inputBase = 'w-full px-3 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 const FIELD_TYPES = ['number', 'time', 'duration_min', 'boolean', 'select', 'text', 'textarea']
-const RULE_TYPES = ['boolean', 'threshold', 'range', 'penalty', 'formula']
+const RULE_TYPES = ['boolean', 'band', 'threshold', 'range', 'penalty', 'formula']
+const RULE_TYPE_HINTS = {
+  boolean: 'Done / not done — full marks when ticked.',
+  band: 'From–To windows, e.g. 03:30 to 03:45 → 25 marks.',
+  threshold: 'Cutoffs — the first tier the value is at or under wins.',
+  range: 'Scales from a minimum up to a target, e.g. 16 japa rounds.',
+  penalty: 'Deducts marks as the value grows.',
+  formula: 'Custom expression over other field keys.',
+}
+
+// Turn ordered threshold cutoffs into explicit From–To bands. Tier N's
+// window starts where tier N-1's cutoff left off, so the resulting bands
+// score identically to the tiers they replace.
+function tiersToBands(tiers = []) {
+  return tiers
+    .filter((t) => String(t.by ?? '').trim() !== '')
+    .map((tier, i, list) => ({
+      from: i === 0 ? '' : list[i - 1].by,
+      to: tier.by,
+      pts: Number(tier.pts) || 0,
+    }))
+}
 const TABS = [
   { key: 'fields', label: 'Fields & Groups', icon: Layers },
   { key: 'calculated', label: 'Calculated Columns', icon: Sigma },
@@ -113,24 +134,94 @@ function GroupsPanel({ groups, onChange, toast, trackerId }) {
   )
 }
 
+// A single From/To/cutoff bound. Time fields get a real time picker so
+// admins can't enter "4:30" and "04:30" inconsistently in the first place.
+// Module-level so it keeps focus between keystrokes.
+function BoundInput({ isTime, value, onChange, placeholder }) {
+  return (
+    <input
+      type={isTime ? 'time' : 'text'}
+      inputMode={isTime ? undefined : 'decimal'}
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={cn(inputBase, '!py-1 text-xs flex-1 min-w-0')}
+    />
+  )
+}
+
+// Shared tail for band/threshold rules: what to award when nothing
+// matches, and how to order clock times that wrap past midnight.
+function BandFallback({ cfg, setCfg, isTime }) {
+  return (
+    <div className="pt-1.5 mt-1 border-t border-[var(--border-color)] space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] text-secondary-token flex-1">Otherwise (no band matches) →</span>
+        <input
+          type="number" step="any" value={cfg.default_pts ?? 0}
+          onChange={(e) => setCfg({ default_pts: Number(e.target.value) })}
+          className={cn(inputBase, '!py-1 text-xs w-20')}
+        />
+      </div>
+      {isTime && (
+        <label className="flex items-start gap-1.5">
+          <input
+            type="checkbox"
+            checked={cfg.midnight_pivot != null}
+            onChange={(e) => setCfg({ midnight_pivot: e.target.checked ? 12 : null })}
+            className="mt-0.5"
+          />
+          <span className="text-[11px] text-secondary-token">
+            Times after midnight are <strong>later</strong>, not earlier
+            <span className="block text-[10px] text-muted-token">
+              Turn on for bed time, so 00:30 counts as after 23:00 instead of before it.
+            </span>
+          </span>
+        </label>
+      )}
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Rule editor — inline, per field
 // ---------------------------------------------------------------------------
-function RuleEditor({ rule, onSave, onDelete }) {
+function RuleEditor({ rule, field, onSave, onDelete }) {
   const [draft, setDraft] = useState(rule)
   const cfg = draft.config ?? {}
   const setCfg = (patch) => setDraft((d) => ({ ...d, config: { ...(d.config ?? {}), ...patch } }))
 
   useEffect(() => { setDraft(rule) }, [rule])
 
+  const isTime = field?.field_type === 'time'
+
+  const setBand = (i, patch) => {
+    const bands = [...(cfg.bands ?? [])]
+    bands[i] = { ...bands[i], ...patch }
+    setCfg({ bands })
+  }
+
   return (
     <div className="rounded-xl border border-[var(--border-color)] p-3 space-y-2 bg-[var(--surface)]">
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
           <span className="text-[11px] text-muted-token">Rule Type</span>
-          <select value={draft.rule_type} onChange={(e) => setDraft((d) => ({ ...d, rule_type: e.target.value, config: {} }))} className={cn(inputBase, '!py-1.5 mt-0.5')}>
+          <select
+            value={draft.rule_type}
+            onChange={(e) => {
+              const next = e.target.value
+              // Switching threshold → band carries the tiers across as
+              // equivalent windows instead of discarding the admin's work.
+              const carried = next === 'band' && draft.rule_type === 'threshold' && Array.isArray(cfg.tiers)
+                ? { bands: tiersToBands(cfg.tiers), default_pts: cfg.default_pts ?? 0, midnight_pivot: cfg.midnight_pivot ?? null }
+                : {}
+              setDraft((d) => ({ ...d, rule_type: next, config: carried }))
+            }}
+            className={cn(inputBase, '!py-1.5 mt-0.5')}
+          >
             {RULE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
+          <span className="block text-[10px] text-muted-token mt-0.5 leading-tight">{RULE_TYPE_HINTS[draft.rule_type]}</span>
         </label>
         <label className="block">
           <span className="text-[11px] text-muted-token">Max Points</span>
@@ -155,15 +246,62 @@ function RuleEditor({ rule, onSave, onDelete }) {
         </div>
       )}
 
+      {draft.rule_type === 'band' && (
+        <div className="space-y-1.5">
+          <span className="text-[11px] text-muted-token">
+            Bands (From – To → marks). Both ends included; first match wins. Leave a side blank for “anything”.
+          </span>
+          <div className="flex gap-2 px-0.5">
+            <span className="text-[10px] font-semibold text-muted-token uppercase tracking-wide flex-1">From</span>
+            <span className="text-[10px] font-semibold text-muted-token uppercase tracking-wide flex-1">To</span>
+            <span className="text-[10px] font-semibold text-muted-token uppercase tracking-wide w-20">Marks</span>
+            <span className="w-4" />
+          </div>
+          {(cfg.bands ?? []).map((band, i) => (
+            <div key={i} className="flex gap-2 items-center">
+              <BoundInput isTime={isTime} value={band.from} onChange={(v) => setBand(i, { from: v })} placeholder={isTime ? '03:30' : 'min'} />
+              <span className="text-[11px] text-muted-token">–</span>
+              <BoundInput isTime={isTime} value={band.to} onChange={(v) => setBand(i, { to: v })} placeholder={isTime ? '03:45' : 'max'} />
+              <input
+                type="number" step="any" value={band.pts ?? 0}
+                onChange={(e) => setBand(i, { pts: Number(e.target.value) })}
+                placeholder="marks" className={cn(inputBase, '!py-1 text-xs w-20')}
+              />
+              <button onClick={() => setCfg({ bands: cfg.bands.filter((_, idx) => idx !== i) })} className="text-muted-token hover:text-red-500">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+          <div className="flex items-center gap-3 flex-wrap pt-0.5">
+            <button
+              onClick={() => {
+                const bands = cfg.bands ?? []
+                // Chain the new band onto the previous one's upper bound.
+                const prev = bands[bands.length - 1]
+                setCfg({ bands: [...bands, { from: prev?.to ?? '', to: '', pts: 0 }] })
+              }}
+              className="text-xs text-saffron-600 font-semibold"
+            >+ Add band</button>
+            {!!(cfg.tiers ?? []).length && !(cfg.bands ?? []).length && (
+              <button
+                onClick={() => setCfg({ bands: tiersToBands(cfg.tiers) })}
+                className="text-xs text-blue-600 font-semibold"
+              >Convert {cfg.tiers.length} old tiers → bands</button>
+            )}
+          </div>
+          <BandFallback cfg={cfg} setCfg={setCfg} isTime={isTime} />
+        </div>
+      )}
+
       {draft.rule_type === 'threshold' && (
         <div className="space-y-1.5">
           <span className="text-[11px] text-muted-token">Tiers (cutoff → points, first match wins)</span>
           {(cfg.tiers ?? []).map((tier, i) => (
-            <div key={i} className="flex gap-2">
-              <input value={tier.by} onChange={(e) => {
-                const tiers = [...cfg.tiers]; tiers[i] = { ...tier, by: e.target.value }; setCfg({ tiers })
-              }} placeholder="e.g. 04:30" className={cn(inputBase, '!py-1 text-xs flex-1')} />
-              <input type="number" value={tier.pts} onChange={(e) => {
+            <div key={i} className="flex gap-2 items-center">
+              <BoundInput isTime={isTime} value={tier.by} onChange={(v) => {
+                const tiers = [...cfg.tiers]; tiers[i] = { ...tier, by: v }; setCfg({ tiers })
+              }} placeholder={isTime ? '04:30' : 'cutoff'} />
+              <input type="number" step="any" value={tier.pts} onChange={(e) => {
                 const tiers = [...cfg.tiers]; tiers[i] = { ...tier, pts: Number(e.target.value) }; setCfg({ tiers })
               }} placeholder="pts" className={cn(inputBase, '!py-1 text-xs w-20')} />
               <button onClick={() => setCfg({ tiers: cfg.tiers.filter((_, idx) => idx !== i) })} className="text-muted-token hover:text-red-500">
@@ -171,10 +309,23 @@ function RuleEditor({ rule, onSave, onDelete }) {
               </button>
             </div>
           ))}
-          <button
-            onClick={() => setCfg({ tiers: [...(cfg.tiers ?? []), { by: '', pts: 0 }] })}
-            className="text-xs text-saffron-600 font-semibold"
-          >+ Add tier</button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => setCfg({ tiers: [...(cfg.tiers ?? []), { by: '', pts: 0 }] })}
+              className="text-xs text-saffron-600 font-semibold"
+            >+ Add tier</button>
+            {!!(cfg.tiers ?? []).length && (
+              <button
+                onClick={() => setDraft((d) => ({
+                  ...d,
+                  rule_type: 'band',
+                  config: { bands: tiersToBands(cfg.tiers), default_pts: cfg.default_pts ?? 0, midnight_pivot: cfg.midnight_pivot ?? null },
+                }))}
+                className="text-xs text-blue-600 font-semibold"
+              >Switch to From–To bands</button>
+            )}
+          </div>
+          <BandFallback cfg={cfg} setCfg={setCfg} isTime={isTime} />
         </div>
       )}
 
@@ -370,7 +521,7 @@ function FieldsPanel({ fields, groups, rules, onFieldsChange, onRulesChange, toa
                       <Button size="sm" variant="secondary" icon={Plus} onClick={() => addRule(field)}>Add Rule</Button>
                     </div>
                     {fieldRules.map((rule) => (
-                      <RuleEditor key={rule.id} rule={rule} onSave={saveRule} onDelete={() => deleteRule(rule)} />
+                      <RuleEditor key={rule.id} rule={rule} field={field} onSave={saveRule} onDelete={() => deleteRule(rule)} />
                     ))}
                     {!fieldRules.length && <p className="text-xs text-muted-token">No scoring rules — this field won't contribute to the score.</p>}
                   </div>

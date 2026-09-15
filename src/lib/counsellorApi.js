@@ -9,7 +9,8 @@
 // =====================================================================
 import { supabase } from '@/lib/supabase'
 import { aggregatePeriod, calculateEntryScore, hasValue } from '@/lib/trackerScoring'
-import { format } from 'date-fns'
+import { buildSheetModel } from '@/lib/trackerSheet'
+import { format, eachDayOfInterval } from 'date-fns'
 
 function toISO(d) { return format(d, 'yyyy-MM-dd') }
 
@@ -144,6 +145,51 @@ export function dailyScoresFromEntries(days, entriesByDate, { rules, fields, gro
     const result = any ? calculateEntryScore({ rules, fields, groups, calculatedColumns, fieldValues: values }) : null
     return { date: d, iso, score: result?.score ?? null, hasEntry: any }
   })
+}
+
+// ---------------------------------------------------------------------
+// Export — build one sheet section per counselli so a counsellor can pull
+// their whole group into a single workbook / PDF. Reuses the same
+// buildSheetModel() the on-screen spreadsheet uses, so an exported sheet
+// is identical in layout and scoring to what everyone sees in the app.
+//
+// RLS still decides what comes back: a counsellor only ever receives
+// entries for members they are actually assigned to.
+// ---------------------------------------------------------------------
+
+/**
+ * @param {{id: string, name: string}[]} members
+ * @returns {Promise<{title, subtitle, sheetName, model, member}[]>} one per
+ *   member that the caller is allowed to read, in the order given.
+ */
+export async function buildMenteeExportSections({
+  trackerId, members, startDate, endDate,
+  fields, groups, rules, calculatedColumns,
+}) {
+  const days = eachDayOfInterval({ start: startDate, end: endDate })
+  const rangeLabel = `${format(startDate, 'dd MMM yyyy')} – ${format(endDate, 'dd MMM yyyy')}`
+
+  const sections = await Promise.all((members ?? []).map(async (m) => {
+    let entriesByDate
+    try {
+      entriesByDate = await fetchEntriesByDate({
+        trackerId, userId: m.id, startDate, endDate, fields,
+      })
+    } catch {
+      // One unreadable member must not sink the whole export; they simply
+      // come through as an empty sheet.
+      entriesByDate = {}
+    }
+    return {
+      member: m,
+      title: m.name,
+      subtitle: rangeLabel,
+      sheetName: m.name,
+      model: buildSheetModel({ fields, groups, rules, calculatedColumns, days, entriesByDate }),
+    }
+  }))
+
+  return sections
 }
 
 // ---------------------------------------------------------------------

@@ -21,6 +21,55 @@ export function hasValue(v) {
   return String(v).trim() !== ''
 }
 
+// ---------------------------------------------------------------------
+// Comparable coercion — turns a raw field value or a rule bound into a
+// number that can be ordered.
+//
+// Sadhana bounds are authored as clock times ("04:30") as often as plain
+// numbers, and admins type them inconsistently ("4:30" vs "04:30"). The
+// original implementation compared them as STRINGS, so "4:30" <= "04:15"
+// was false ("4" sorts after "0") and a devotee waking at 4:30 fell
+// through every tier and scored zero. Always coerce before comparing.
+//
+// Returns null when the value is not orderable as a number, which lets
+// callers fall back to a string comparison for genuinely textual bounds.
+// ---------------------------------------------------------------------
+const TIME_RE = /^(\d{1,2}):([0-5]\d)(?::([0-5]\d))?$/
+
+export function parseComparable(raw, { midnightPivot = null } = {}) {
+  if (raw === null || raw === undefined) return null
+  if (typeof raw === 'boolean') return raw ? 1 : 0
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null
+
+  const s = String(raw).trim()
+  if (s === '') return null
+
+  const time = TIME_RE.exec(s)
+  if (time) {
+    const h = Number(time[1])
+    if (h > 23) return null
+    let minutes = h * 60 + Number(time[2]) + (time[3] ? Number(time[3]) / 60 : 0)
+    // "To Bed Time" style fields wrap past midnight: 00:30 is LATER than
+    // 23:00, not 22.5 hours earlier. When a pivot hour is configured,
+    // anything before it is pushed into the next day so ordering holds.
+    if (midnightPivot != null && minutes < Number(midnightPivot) * 60) minutes += 1440
+    return minutes
+  }
+
+  const num = Number(s)
+  return Number.isFinite(num) ? num : null
+}
+
+/** Order two raw values; numeric when both coerce, else lexicographic. */
+function compareValues(a, b, opts) {
+  const na = parseComparable(a, opts)
+  const nb = parseComparable(b, opts)
+  if (na !== null && nb !== null) return na === nb ? 0 : (na < nb ? -1 : 1)
+  const sa = String(a ?? '')
+  const sb = String(b ?? '')
+  return sa === sb ? 0 : (sa < sb ? -1 : 1)
+}
+
 function keyBy(list, key) {
   const out = {}
   for (const item of list ?? []) out[item[key]] = item
@@ -53,12 +102,34 @@ export function calculateFieldScore(rule, fieldValues) {
 
     case 'threshold': {
       const tiers = Array.isArray(cfg.tiers) ? cfg.tiers : []
-      const val = String(rawValue ?? '')
-      if (!val) return { points: 0, max: maxPoints }
+      if (!hasValue(rawValue)) return { points: 0, max: maxPoints }
+      const opts = { midnightPivot: cfg.midnight_pivot ?? null }
       for (const tier of tiers) {
-        if (val <= tier.by) return { points: Number(tier.pts) || 0, max: maxPoints }
+        if (compareValues(rawValue, tier.by, opts) <= 0) {
+          return { points: Number(tier.pts) || 0, max: maxPoints }
+        }
       }
-      return { points: 0, max: maxPoints }
+      return { points: Number(cfg.default_pts) || 0, max: maxPoints }
+    }
+
+    // Explicit From→To bands, e.g. "03:30 to 03:45 → 25". Bounds are
+    // inclusive at both ends and the FIRST matching band wins, so
+    // adjacent bands that share an edge (…→03:45, 03:45→04:00) resolve to
+    // the earlier, better-scoring one. An open bound (blank) means
+    // unbounded on that side. Works for times and plain numbers alike.
+    case 'band': {
+      const bands = Array.isArray(cfg.bands) ? cfg.bands : []
+      if (!hasValue(rawValue)) return { points: 0, max: maxPoints }
+      const opts = { midnightPivot: cfg.midnight_pivot ?? null }
+      for (const band of bands) {
+        const hasFrom = hasValue(band.from)
+        const hasTo = hasValue(band.to)
+        if (!hasFrom && !hasTo) continue
+        if (hasFrom && compareValues(rawValue, band.from, opts) < 0) continue
+        if (hasTo && compareValues(rawValue, band.to, opts) > 0) continue
+        return { points: Number(band.pts) || 0, max: maxPoints }
+      }
+      return { points: Number(cfg.default_pts) || 0, max: maxPoints }
     }
 
     // Quantity- or duration-based scoring. `full_score_at` is the target;

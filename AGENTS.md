@@ -113,6 +113,56 @@ child (cascades) + its auth user afterwards. Note `adb install -r` can reset
 the accessibility toggle; the emulator clock also drifts, so device-written
 timestamps are unreliable there.
 
+## Sadhana scoring, sheet model & export
+- **Scoring rule types** (`src/lib/trackerScoring.js`): `boolean`, `band`,
+  `threshold`, `range`, `penalty`, `formula`. Editor UI in
+  `src/pages/trackers/TrackerSettings.jsx`.
+  - `band` — explicit `From–To → marks` windows
+    (`config.bands: [{from, to, pts}]`). Both ends INCLUSIVE, first match
+    wins, blank bound = unbounded that side, `config.default_pts` when
+    nothing matches. This is the type to use for "3:30 to 3:45 → 25".
+  - `threshold` — legacy ordered cutoffs; still supported. The editor has
+    a "Switch to From–To bands" button (`tiersToBands()`) that converts
+    tiers to equivalent bands.
+  - **Comparison is type-aware, never lexicographic.** `parseComparable()`
+    coerces "04:30"/"4:30" to minutes and numerics to numbers. This fixed
+    a real bug where tiers typed without a leading zero ("4:30") sorted
+    after "04:15" as strings and scored 0 instead of full marks. Do NOT
+    reintroduce a raw string `<=` on rule bounds.
+  - `config.midnight_pivot` (hours, default off) pushes times before the
+    pivot into the next day so a bed time of 00:30 orders AFTER 23:00.
+    Exposed as the "times after midnight are later" checkbox on time
+    fields.
+- **`src/lib/trackerSheet.js` — the shared LAYOUT model.**
+  `buildSheetModel()` returns `{ groupHeader, columns, maxRow, rows,
+  totals }`. `TrackerSpreadsheet.jsx` renders it AND the exporters emit
+  it, so an exported file can never drift from what is on screen. Row
+  objects carry `fieldTotals/groupTotals/columnTotals` because that shape
+  is persisted verbatim as `tracker_entries.score_detail`.
+  Uses relative (not `@/`) imports so it runs under `node --test`.
+- **`src/lib/trackerExport.js`** — CSV / `.xlsx` / PDF emitters over one or
+  more "sections" (1 = a devotee's own sheet, N = a counsellor's whole
+  group, which become N worksheets / N PDF chapters plus a comparison
+  summary). `write-excel-file` and `jspdf` are **dynamically imported** so
+  they stay out of the initial bundle — keep it that way.
+  - jspdf: use the NAMED `jsPDF` export; its `default` is a namespace
+    object under some interop paths.
+  - write-excel-file rejects a numeric `format` on a `String` cell, so
+    empty cells must drop the format (see `numCell()`).
+- **`src/lib/fileShare.js`** — writes to `Directory.Documents` then opens
+  the native share sheet; falls back to Web Share API / `<a download>` on
+  web. A plain blob download silently does nothing in the Android WebView.
+- **`src/lib/haptics.js`** — `tap/select/heavy/success/warning/error`.
+  Fire-and-forget, never throws, respects `prefers-reduced-motion`.
+  `components/ui/Button.jsx` calls `tap()` (or `heavy()` for
+  `variant="danger"`) on every click, so most of the app gets haptics for
+  free; pass `haptic={false}` to opt out.
+- **Native plugin caveat**: `@capacitor/filesystem`, `@capacitor/share`
+  and `@capacitor/haptics` are NATIVE. An OTA-only bundle ships the JS
+  shim but not the native half, so both modules guard with
+  `Capacitor.isPluginAvailable(...)`. Export needs a **new APK**, not just
+  an OTA push.
+
 ## Known gaps
 - Website "block"/"alert" rules (`pc_website_rules`, categories) ARE
   enforced on-device now, via accessibility service (browser URL blocking)

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Routes, Route, useNavigate, useParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { BookOpen, Plus, Settings, ChevronLeft, Clock, Calendar, TrendingUp, Share2, Flame, Sparkles, ChevronRight, Zap, Table2, Award, Loader2 } from 'lucide-react'
 import { format, parseISO, addDays, subDays, isToday } from 'date-fns'
 import { supabase } from '@/lib/supabase'
@@ -21,6 +22,7 @@ import TrackerSettings from './TrackerSettings'
 import { calculateEntryScore } from '@/lib/trackerScoring'
 import { buildTemplateVariables, renderTemplate, FALLBACK_TEMPLATE, formatFieldValue } from '@/lib/trackerWhatsapp'
 import { fetchTrackerConfig } from '@/lib/trackerApi'
+import { tap } from '@/lib/haptics'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -808,16 +810,23 @@ function TrackerDetail() {
             <button
               key={t.key}
               type="button"
-              onClick={() => setView(t.key)}
+              onClick={() => { tap(); setView(t.key) }}
               className={cn(
-                'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-all duration-200',
+                'relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-colors duration-200',
                 view === t.key
-                  ? 'bg-[var(--surface)] text-[var(--color-primary)] elev-1 shadow-sm'
+                  ? 'text-[var(--color-primary)]'
                   : 'text-secondary-token hover:text-primary-token'
               )}
             >
-              <TabIcon className="w-3.5 h-3.5" />
-              {t.label}
+              {view === t.key && (
+                <motion.span
+                  layoutId="tracker-view-pill"
+                  className="absolute inset-0 rounded-xl bg-[var(--surface)] elev-1 shadow-sm"
+                  transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                />
+              )}
+              <TabIcon className="relative w-3.5 h-3.5" />
+              <span className="relative">{t.label}</span>
             </button>
           )
         })}

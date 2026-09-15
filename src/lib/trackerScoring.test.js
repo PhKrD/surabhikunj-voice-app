@@ -31,6 +31,109 @@ test('threshold rule: first tier the value is <= wins', () => {
   assert.equal(calculateFieldScore(rule, {}).points, 0)
 })
 
+// Regression: tiers used to be compared as strings, so a tier typed
+// without a leading zero ("4:30") sorted after "04:15" and the value fell
+// through every tier, silently scoring 0 instead of 10.
+test('threshold rule: tiers typed without a leading zero still compare as times', () => {
+  const rule = {
+    rule_type: 'threshold', field_key: 'wake_up_time', max_points: 10,
+    config: { tiers: [{ by: '03:45', pts: 25 }, { by: '4:30', pts: 10 }, { by: '5:00', pts: 5 }] },
+  }
+  assert.equal(calculateFieldScore(rule, { wake_up_time: '4:30' }).points, 10)
+  assert.equal(calculateFieldScore(rule, { wake_up_time: '04:30' }).points, 10)
+  assert.equal(calculateFieldScore(rule, { wake_up_time: '03:30' }).points, 25)
+  assert.equal(calculateFieldScore(rule, { wake_up_time: '04:50' }).points, 5)
+})
+
+test('threshold rule: numeric tiers order numerically, not lexicographically', () => {
+  const rule = {
+    rule_type: 'threshold', field_key: 'late_minutes', max_points: 10,
+    config: { tiers: [{ by: 5, pts: 10 }, { by: 30, pts: 4 }] },
+  }
+  // "9" > "30" as a string, but 9 < 30 as a number.
+  assert.equal(calculateFieldScore(rule, { late_minutes: 9 }).points, 4)
+  assert.equal(calculateFieldScore(rule, { late_minutes: 100 }).points, 0)
+})
+
+test('threshold rule: default_pts applies when no tier matches', () => {
+  const rule = {
+    rule_type: 'threshold', field_key: 'wake_up_time', max_points: 10,
+    config: { tiers: [{ by: '04:30', pts: 10 }], default_pts: 2 },
+  }
+  assert.equal(calculateFieldScore(rule, { wake_up_time: '09:00' }).points, 2)
+})
+
+// ── band (From → To → Points) ────────────────────────────────────────────
+test('band rule: an inclusive From–To window awards its points', () => {
+  const rule = {
+    rule_type: 'band', field_key: 'wake_up_time', max_points: 25,
+    config: {
+      bands: [
+        { from: '03:30', to: '03:45', pts: 25 },
+        { from: '03:45', to: '04:00', pts: 20 },
+        { from: '04:00', to: '04:30', pts: 15 },
+      ],
+      default_pts: 0,
+    },
+  }
+  assert.equal(calculateFieldScore(rule, { wake_up_time: '03:30' }).points, 25)
+  assert.equal(calculateFieldScore(rule, { wake_up_time: '03:40' }).points, 25)
+  // Shared edge resolves to the first (better) band.
+  assert.equal(calculateFieldScore(rule, { wake_up_time: '03:45' }).points, 25)
+  assert.equal(calculateFieldScore(rule, { wake_up_time: '03:50' }).points, 20)
+  assert.equal(calculateFieldScore(rule, { wake_up_time: '04:20' }).points, 15)
+})
+
+test('band rule: values outside every band fall to default_pts', () => {
+  const rule = {
+    rule_type: 'band', field_key: 'wake_up_time', max_points: 25,
+    config: { bands: [{ from: '03:30', to: '04:00', pts: 25 }], default_pts: 3 },
+  }
+  assert.equal(calculateFieldScore(rule, { wake_up_time: '06:00' }).points, 3)
+  assert.equal(calculateFieldScore(rule, { wake_up_time: '02:00' }).points, 3)
+  // A missing value is "not filled in", not "out of range" — still zero.
+  assert.equal(calculateFieldScore(rule, {}).points, 0)
+})
+
+test('band rule: open-ended bounds are unbounded on that side', () => {
+  const rule = {
+    rule_type: 'band', field_key: 'japa_rounds', max_points: 20,
+    config: {
+      bands: [
+        { from: 16, to: '', pts: 20 },
+        { from: 8, to: 15, pts: 10 },
+        { from: '', to: 7, pts: 2 },
+      ],
+      default_pts: 0,
+    },
+  }
+  assert.equal(calculateFieldScore(rule, { japa_rounds: 64 }).points, 20)
+  assert.equal(calculateFieldScore(rule, { japa_rounds: 16 }).points, 20)
+  assert.equal(calculateFieldScore(rule, { japa_rounds: 12 }).points, 10)
+  assert.equal(calculateFieldScore(rule, { japa_rounds: 0 }).points, 2)
+})
+
+test('band rule: midnight_pivot orders post-midnight bed times as late', () => {
+  const rule = {
+    rule_type: 'band', field_key: 'to_bed_time', max_points: 15,
+    config: {
+      // Pivot at 12:00 — anything before noon belongs to "after midnight".
+      midnight_pivot: 12,
+      bands: [
+        { from: '21:00', to: '21:30', pts: 15 },
+        { from: '21:30', to: '22:30', pts: 10 },
+        { from: '22:30', to: '00:30', pts: 5 },
+      ],
+      default_pts: 0,
+    },
+  }
+  assert.equal(calculateFieldScore(rule, { to_bed_time: '21:15' }).points, 15)
+  assert.equal(calculateFieldScore(rule, { to_bed_time: '22:00' }).points, 10)
+  // 00:15 is after 22:30, not before it.
+  assert.equal(calculateFieldScore(rule, { to_bed_time: '00:15' }).points, 5)
+  assert.equal(calculateFieldScore(rule, { to_bed_time: '02:00' }).points, 0)
+})
+
 // ── range: partial scoring ────────────────────────────────────────────────────────────
 test('range rule with partial scoring scales linearly to the target', () => {
   const rule = {

@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
 import { Loader2 } from 'lucide-react'
+import { tap, heavy } from '@/lib/haptics'
 
 // Calmer, single-tone premium buttons — solid colors instead of full
 // gradients, with a soft matching shadow rather than a heavy colored glow.
@@ -31,13 +32,23 @@ export default function Button({
   className,
   icon: Icon,
   iconRight: IconRight,
+  haptic = true,
+  onClick,
   ...props
 }) {
   const hasLeft = loading || Boolean(Icon)
   const iconCls = iconSizes[size]
 
+  // Every button in the app taps through here, so wiring feedback in once
+  // gives the whole UI haptics. Destructive actions get a firmer buzz.
+  const handleClick = (e) => {
+    if (haptic) (variant === 'danger' ? heavy : tap)()
+    onClick?.(e)
+  }
+
   return (
     <button
+      onClick={handleClick}
       className={cn(
         'relative inline-flex items-center justify-center font-semibold whitespace-nowrap',
         'transition-all duration-200 press',

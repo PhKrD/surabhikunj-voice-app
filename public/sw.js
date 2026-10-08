@@ -7,7 +7,7 @@
 //   - Same-origin GET assets: stale-while-revalidate for hashed filenames.
 //   - Cross-origin requests (Supabase API/auth): never intercepted.
 
-const CACHE_VERSION = 'skv-cache-v4'
+const CACHE_VERSION = 'skv-cache-v5'
 const APP_SHELL = ['/', '/index.html', '/icon.svg', '/favicon.svg', '/manifest.webmanifest']
 
 self.addEventListener('install', (event) => {
@@ -45,7 +45,12 @@ self.addEventListener('push', (event) => {
     vibrate: [120, 60, 120],
     tag: payload.type || 'general',
     renotify: true,
-    data: { type: payload.type, reference_id: payload.reference_id, url: '/' },
+    data: {
+      type: payload.type,
+      reference_id: payload.reference_id,
+      // Only in-app paths; anything else falls back to the home screen.
+      url: typeof payload.url === 'string' && payload.url.startsWith('/') ? payload.url : '/notifications',
+    },
   }
   event.waitUntil(self.registration.showNotification(title, options))
 })
@@ -56,7 +61,11 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
-        if ('focus' in client) return client.focus()
+        if ('focus' in client) {
+          // Open the screen the notification is about in the existing tab.
+          if ('navigate' in client) client.navigate(target).catch(() => {})
+          return client.focus()
+        }
       }
       if (self.clients.openWindow) return self.clients.openWindow(target)
       return undefined

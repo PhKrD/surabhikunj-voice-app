@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import * as Icons from 'lucide-react'
+import DynamicIcon from '@/components/ui/DynamicIcon'
 import { Plus, Trash2, Globe, Ban, CheckCircle, AlertTriangle, Settings as SettingsIcon, X } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
@@ -25,12 +25,11 @@ const ACTION_SELECT_CLASS = {
 }
 
 function CategoryRow({ category, action, onChange }) {
-  const Icon = Icons[category.icon] ?? Globe
   const effective = action ?? category.defaultAction
   return (
     <div className="flex items-center justify-between py-3 border-b border-[var(--border-color)] last:border-0">
       <div className="flex items-center gap-3">
-        <Icon className="w-4.5 h-4.5 text-secondary-token" />
+        <DynamicIcon name={category.icon} fallback={Globe} className="w-4.5 h-4.5 text-secondary-token" />
         <span className="text-sm text-primary-token">{category.label}</span>
       </div>
       <select

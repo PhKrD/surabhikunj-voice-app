@@ -7,6 +7,8 @@
 //             TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 // Invoke:   await supabase.functions.invoke('notify-whatsapp', { body: { to, message } })
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
 // Ambient declaration so editors using Node/DOM typings don't flag the Deno
 // global. At runtime, Supabase Edge Functions provide `Deno` natively.
 declare const Deno: {
@@ -57,6 +59,19 @@ async function sendViaTwilio(to: string, message: string) {
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
+  // Every message is billed to the organisation's provider account, so only
+  // signed-in members allowed to broadcast may send. (verify_jwt alone also
+  // accepts the public anon key, which anyone can read from the app.)
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const caller = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
+  })
+  const { data: userData } = await caller.auth.getUser()
+  if (!userData?.user) return json({ error: 'Unauthorized' }, 401)
+  const { data: permitted } = await caller.rpc('has_permission', { p_key: 'announcements.manage' })
+  if (!permitted) return json({ error: 'Forbidden' }, 403)
+
   let payload: Payload
   try {
     payload = await req.json()
@@ -73,7 +88,6 @@ Deno.serve(async (req: Request) => {
       const result = await sendViaTwilio(to, message)
       return json({ ok: true, provider, id: result?.sid ?? null })
     }
-    // TODO: implement WATI (or other providers) here.
     return json({ error: `Unsupported WHATSAPP_PROVIDER: ${provider}` }, 400)
   } catch (e) {
     return json({ ok: false, error: (e as Error).message }, 502)

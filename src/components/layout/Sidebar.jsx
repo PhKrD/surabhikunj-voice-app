@@ -1,28 +1,32 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect } from 'react'
-import * as LucideIcons from 'lucide-react'
+import { ChevronsUpDown, LogOut, Moon, Sun, Users, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getIcon } from '@/lib/icons'
+import { registerBackHandler } from '@/lib/backButton'
+import { APP_VERSION } from '@/lib/appVersion'
 import useAuthStore from '@/store/authStore'
 import useOrgStore from '@/store/orgStore'
+import useThemeStore from '@/store/themeStore'
+import useConfigStore from '@/store/configStore'
+import { confirm } from '@/store/dialogStore'
 import Avatar from '@/components/ui/Avatar'
-import Badge from '@/components/ui/Badge'
+import DynamicIcon from '@/components/ui/DynamicIcon'
 import usePermission from '@/hooks/usePermission'
 import { supabase } from '@/lib/supabase'
 import { useDeviceState } from '@/store/childDeviceState'
 
 const BOTTOM_ROUTES = ['/notifications', '/settings']
 
-// Presentational grouping of the dynamic my_navigation() result into the
-// sections a parent would expect (Main / Community / Organization /
-// Special). Purely cosmetic — any nav item whose key isn't listed here
-// still renders, just under a generic "More" group, so a custom/future
-// module enabled for an org never silently disappears.
+// Presentational grouping of the dynamic my_navigation() result. Purely
+// cosmetic — any nav item whose key isn't listed still renders under "More",
+// so a custom/future module enabled for an org never silently disappears.
 const NAV_SECTIONS = [
-  { id: 'main', label: 'Main', keys: ['trackers', 'service', 'tasks', 'cleanliness'] },
+  { id: 'main', label: 'Daily', keys: ['trackers', 'service', 'tasks', 'cleanliness'] },
   { id: 'community', label: 'Community', keys: ['members', 'mentorship', 'events', 'announcements'] },
   { id: 'organization', label: 'Organization', keys: ['departments', 'hierarchy', 'reports', 'resources', 'broadcast'] },
-  { id: 'special', label: 'Special', keys: ['parental_control'] },
+  { id: 'special', label: 'Family', keys: ['parental_control'] },
 ]
 
 function groupNav(items) {
@@ -37,18 +41,13 @@ function groupNav(items) {
   return groups
 }
 
-function resolveIcon(name) {
-  return LucideIcons[name] ?? LucideIcons.Circle
-}
-
 function labelFor(item) {
   const label = typeof item.label === 'string' ? item.label.trim() : ''
-  const key   = typeof item.key   === 'string' ? item.key.trim()   : ''
+  const key = typeof item.key === 'string' ? item.key.trim() : ''
   return label || key || 'Menu'
 }
 
-function NavItem({ item, collapsed, onClick }) {
-  const Icon = resolveIcon(item.icon)
+function NavItem({ item, onClick }) {
   return (
     <NavLink
       to={item.route}
@@ -56,31 +55,21 @@ function NavItem({ item, collapsed, onClick }) {
       onClick={onClick}
       className={({ isActive }) =>
         cn(
-          'relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group press',
+          'flex items-center gap-3 h-11 px-3 rounded-[var(--radius-md)] text-sm transition-colors duration-150',
           isActive
-            ? 'text-white font-semibold bg-[var(--color-primary)]'
-            : 'text-secondary-token hover:bg-[var(--surface-muted)] hover:text-primary-token'
+            ? 'bg-[var(--color-primary-soft)] text-[var(--color-primary-strong)] font-semibold'
+            : 'text-secondary-token font-medium hover:bg-[var(--surface-muted)] hover:text-primary-token',
         )
       }
     >
       {({ isActive }) => (
         <>
-          <span
-            className={cn(
-              'flex items-center justify-center w-7 h-7 rounded-lg flex-shrink-0 transition-all duration-150',
-              isActive ? 'bg-white/20' : 'group-hover:bg-[var(--color-primary-100)] dark:group-hover:bg-[var(--color-primary-900)]'
-            )}
-          >
-            <Icon
-              className={cn(
-                'w-4 h-4 flex-shrink-0 transition-all duration-150',
-                isActive ? 'text-white' : 'text-muted-token group-hover:text-[var(--color-primary)]'
-              )}
-            />
-          </span>
-          {!collapsed && (
-            <span className="text-sm truncate">{labelFor(item)}</span>
-          )}
+          <DynamicIcon
+            name={item.icon}
+            className={cn('w-5 h-5 flex-shrink-0', isActive ? 'text-[var(--color-primary)]' : 'text-muted-token')}
+            aria-hidden="true"
+          />
+          <span className="truncate">{labelFor(item)}</span>
         </>
       )}
     </NavLink>
@@ -97,17 +86,18 @@ function OrgSwitcher({ currentOrgId, onSwitch }) {
   }, [])
 
   if (orgs.length <= 1) return null
-
   const current = orgs.find((o) => o.org_id === currentOrgId)
 
   return (
-    <div className="mx-3 mt-2 relative">
+    <div className="mx-3 mt-3 relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-3 py-2 rounded-xl surface-muted border text-xs font-medium text-secondary-token hover:bg-[var(--color-primary-50)] dark:hover:bg-[var(--color-primary-900)] transition-all"
+        disabled={switching}
+        className="w-full flex items-center justify-between h-10 px-3 rounded-[var(--radius-md)] bg-[var(--surface-muted)] text-sm font-medium text-secondary-token"
+        aria-expanded={open}
       >
-        <span className="truncate">{current?.org_name ?? 'Switch org'}</span>
-        <LucideIcons.ChevronsUpDown className="w-3.5 h-3.5 flex-shrink-0 text-muted-token" />
+        <span className="truncate">{current?.org_name ?? 'Switch organization'}</span>
+        <ChevronsUpDown className="w-4 h-4 flex-shrink-0 text-muted-token" aria-hidden="true" />
       </button>
       <AnimatePresence>
         {open && (
@@ -115,7 +105,7 @@ function OrgSwitcher({ currentOrgId, onSwitch }) {
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="absolute left-0 right-0 mt-1 surface border rounded-xl shadow-lg z-50 overflow-hidden"
+            className="absolute left-0 right-0 mt-1 bg-[var(--surface-elevated)] border border-[var(--border-color)] rounded-[var(--radius-md)] shadow-[var(--shadow-3)] z-50 overflow-hidden py-1"
           >
             {orgs.map((o) => (
               <button
@@ -124,14 +114,17 @@ function OrgSwitcher({ currentOrgId, onSwitch }) {
                 onClick={async () => {
                   setSwitching(true)
                   setOpen(false)
-                  await onSwitch(o.org_id)
-                  setSwitching(false)
+                  try {
+                    await onSwitch(o.org_id)
+                  } finally {
+                    setSwitching(false)
+                  }
                 }}
                 className={cn(
-                  'w-full text-left px-3 py-2.5 text-xs transition-colors',
+                  'w-full text-left px-3.5 py-2.5 text-sm',
                   o.org_id === currentOrgId
-                    ? 'bg-[var(--color-primary-50)] text-[var(--color-primary-700)] dark:bg-[var(--color-primary-900)] dark:text-[var(--color-primary-200)] font-semibold cursor-default'
-                    : 'text-secondary-token hover:bg-[var(--surface-muted)]'
+                    ? 'text-[var(--color-primary-strong)] font-semibold cursor-default'
+                    : 'text-secondary-token hover:bg-[var(--surface-muted)]',
                 )}
               >
                 {o.org_name}
@@ -147,103 +140,109 @@ function OrgSwitcher({ currentOrgId, onSwitch }) {
 export default function Sidebar({ mobileOpen, onClose }) {
   const { profile, signOut, loginType, setLoginType } = useAuthStore()
   const { org, settings, nav, switchOrg } = useOrgStore()
+  const { isDark, toggle } = useThemeStore()
+  const native = useConfigStore((s) => s.native)
   const navigate = useNavigate()
   const [signingOut, setSigningOut] = useState(false)
 
-  // This device is ALSO paired as a supervised child device (see
-  // src/lib/deviceStore.js isOrgMemberDevice() / src/App.jsx) — show a
-  // "Family" entry point to the setup checklist, SOS and bonus-time
-  // request pages alongside the rest of the org app.
+  // This device is ALSO paired as a supervised child device — show a
+  // "Family" entry point alongside the rest of the org app.
   const familyEnrolled = useDeviceState((s) => s.enrolled)
   const familyIsOrgMember = useDeviceState((s) => s.isOrgMember)
   const showFamilyNav = familyEnrolled && familyIsOrgMember
   const familyItem = { key: 'family', label: 'Family', icon: 'Baby', route: '/family' }
 
-  const canMentor    = usePermission('mentorship.view_own')
-  const canSeeMembers = usePermission('members.manage')
+  const canMentor = usePermission('mentorship.view_own')
 
-  const branding    = settings?.branding    ?? {}
+  const branding = settings?.branding ?? {}
   const terminology = settings?.terminology ?? {}
 
-  const OrgIcon = branding.iconName ? (LucideIcons[branding.iconName] ?? LucideIcons.Flame) : LucideIcons.Flame
-
   const dashboardItem = nav.find((n) => n.key === 'dashboard' && n.route)
-  const mainNav   = nav.filter((n) => n.key && n.route && n.key !== 'dashboard' && !BOTTOM_ROUTES.includes(n.route) && n.key !== 'settings')
+  const mainNav = nav.filter((n) => n.key && n.route && n.key !== 'dashboard' && !BOTTOM_ROUTES.includes(n.route) && n.key !== 'settings')
   const bottomNav = nav.filter((n) => n.key && n.route && (BOTTOM_ROUTES.includes(n.route) || n.key === 'settings'))
   const navGroups = groupNav(mainNav)
 
+  // Android back closes the drawer before doing anything else.
+  useEffect(() => {
+    if (!mobileOpen) return undefined
+    return registerBackHandler(() => {
+      onClose?.()
+      return true
+    })
+  }, [mobileOpen, onClose])
+
   const toggleLoginType = () => {
-    const newType = loginType === 'counsellor' ? 'counsellee' : 'counsellor'
-    setLoginType(newType)
+    setLoginType(loginType === 'counsellor' ? 'counsellee' : 'counsellor')
     navigate('/mentorship')
     onClose?.()
   }
 
   const handleSignOut = async () => {
     if (signingOut) return
-
+    const ok = await confirm({
+      title: 'Sign out?',
+      message: 'You’ll need your email and password to sign in again on this device.',
+      confirmLabel: 'Sign out',
+    })
+    if (!ok) return
     setSigningOut(true)
-    const { error } = await signOut()
-    if (error) {
-      console.error('Sign out failed in sidebar:', error.message)
-    }
-
     onClose?.()
+    await signOut()
+    setSigningOut(false)
     navigate('/login', { replace: true })
-
-    setTimeout(() => {
-      if (window.location.pathname !== '/login') {
-        window.location.assign('/login')
-      }
-      setSigningOut(false)
-    }, 100)
   }
 
   const content = (
     <div className="flex flex-col h-full">
-      {/* Logo — driven by org branding */}
-      <div
-        className="flex items-center gap-3 px-4 pb-4 border-b"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.25rem)' }}
-      >
-        <div
-          className="w-10 h-10 rounded-2xl flex items-center justify-center"
-          style={{ background: `var(--color-primary)` }}
-        >
-          {branding.logoUrl
-            ? <img src={branding.logoUrl} alt="logo" className="w-7 h-7 object-contain" />
-            : <OrgIcon className="w-5 h-5 text-white" />}
-        </div>
-        <div className="min-w-0">
-          <p className="font-extrabold text-primary-token text-sm leading-tight tracking-tight">
-            {branding.shortName ?? org?.name ?? 'Platform'}
-          </p>
-          {branding.tagline && (
-            <p className="text-[11px] font-bold tracking-widest" style={{ color: `var(--color-primary)` }}>
-              {branding.tagline}
-            </p>
+      {/* Brand — driven by org branding */}
+      <div className="flex items-center gap-3 px-4 pb-4 pt-5" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1.25rem)' }}>
+        <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--color-primary)] flex items-center justify-center flex-shrink-0">
+          {branding.logoUrl ? (
+            <img src={branding.logoUrl} alt="" className="w-7 h-7 object-contain" />
+          ) : (
+            <DynamicIcon name={branding.iconName} fallback={getIcon('Flame')} className="w-5 h-5 text-white" aria-hidden="true" />
           )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-primary-token text-[0.9375rem] leading-tight truncate">
+            {branding.shortName ?? org?.name ?? 'VOICE'}
+          </p>
+          {branding.tagline && <p className="text-overline !text-[var(--color-primary)] truncate">{branding.tagline}</p>}
         </div>
         <button
           onClick={onClose}
-          className="ml-auto lg:hidden p-1 rounded-lg text-muted-token hover:text-primary-token"
+          className="lg:hidden w-10 h-10 -mr-1 flex items-center justify-center rounded-full text-muted-token hover:bg-[var(--surface-muted)]"
+          aria-label="Close menu"
         >
-          <LucideIcons.X className="w-5 h-5" />
+          <X className="w-5 h-5" />
         </button>
       </div>
 
-      {/* Org switcher — shown only when user belongs to multiple orgs */}
+      {/* Profile card — phones only (desktop has it in the header) */}
+      {profile && (
+        <button
+          onClick={() => { navigate('/settings'); onClose?.() }}
+          className="lg:hidden mx-3 mb-1 p-3 rounded-[var(--radius-lg)] bg-[var(--surface-muted)] flex items-center gap-3 text-left"
+        >
+          <Avatar name={profile.display_name} url={profile.avatar_url} size="md" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-primary-token truncate">{profile.display_name}</p>
+            <p className="text-caption truncate">{profile.email}</p>
+          </div>
+        </button>
+      )}
+
       <OrgSwitcher currentOrgId={org?.id} onSwitch={switchOrg} />
 
       {/* Nav — sourced from my_navigation(), grouped into sections */}
-      <nav className="flex-1 px-3 py-4 space-y-4 scroll-container scrollbar-hide">
-        {dashboardItem && <NavItem item={dashboardItem} onClick={onClose} />}
-        {showFamilyNav && <NavItem item={familyItem} onClick={onClose} />}
+      <nav aria-label="All sections" className="flex-1 px-3 py-3 space-y-5 scroll-container scrollbar-hide">
+        <div className="space-y-0.5">
+          {dashboardItem && <NavItem item={dashboardItem} onClick={onClose} />}
+          {showFamilyNav && <NavItem item={familyItem} onClick={onClose} />}
+        </div>
         {navGroups.map((group) => (
           <div key={group.id}>
-            <p className="px-3 mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-token">
-              {group.label}
-            </p>
+            <p className="px-3 mb-1.5 text-overline">{group.label}</p>
             <div className="space-y-0.5">
               {group.items.map((item) => (
                 <NavItem key={item.key} item={item} onClick={onClose} />
@@ -253,64 +252,53 @@ export default function Sidebar({ mobileOpen, onClose }) {
         ))}
       </nav>
 
-      {/* Bottom nav */}
-      <div className="px-3 pb-3 space-y-0.5 border-t pt-3">
+      <div className="px-3 pt-3 pb-3 space-y-0.5 border-t border-[var(--border-color)]">
         {bottomNav.map((item) => (
           <NavItem key={item.key} item={item} onClick={onClose} />
         ))}
+        {canMentor && (
+          <button
+            onClick={toggleLoginType}
+            className="w-full flex items-center gap-3 h-11 px-3 rounded-[var(--radius-md)] text-sm font-medium text-secondary-token hover:bg-[var(--surface-muted)]"
+          >
+            <Users className="w-5 h-5 text-muted-token" aria-hidden="true" />
+            <span className="truncate">
+              Viewing as{' '}
+              <span className="font-semibold text-primary-token">
+                {loginType === 'counsellor' ? (terminology.mentor ?? 'Mentor') : (terminology.mentee ?? 'Mentee')}
+              </span>
+            </span>
+          </button>
+        )}
+        <button
+          onClick={toggle}
+          className="lg:hidden w-full flex items-center gap-3 h-11 px-3 rounded-[var(--radius-md)] text-sm font-medium text-secondary-token hover:bg-[var(--surface-muted)]"
+        >
+          {isDark ? <Sun className="w-5 h-5 text-muted-token" /> : <Moon className="w-5 h-5 text-muted-token" />}
+          {isDark ? 'Light mode' : 'Dark mode'}
+        </button>
         <button
           onClick={handleSignOut}
           disabled={signingOut}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-secondary-token hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 transition-all duration-150"
+          className="w-full flex items-center gap-3 h-11 px-3 rounded-[var(--radius-md)] text-sm font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] disabled:opacity-50"
         >
-          <LucideIcons.LogOut className="w-5 h-5 flex-shrink-0" />
-          <span className="text-sm">{signingOut ? 'Signing out...' : 'Sign Out'}</span>
+          <LogOut className="w-5 h-5" aria-hidden="true" />
+          {signingOut ? 'Signing out…' : 'Sign out'}
         </button>
+        <p className="px-3 pt-2 text-[0.6875rem] text-muted-token tabular">
+          Version {APP_VERSION}{native.versionCode ? ` · build ${native.versionCode}` : ''}
+        </p>
       </div>
-
-      {/* Profile */}
-      {profile && (
-        <div className="mx-3 mb-4 p-3 rounded-2xl surface-muted border flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <Avatar name={profile.display_name ?? profile.spiritual_name} url={profile.avatar_url} size="sm" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-primary-token truncate">
-                {profile.display_name ?? profile.spiritual_name}
-              </p>
-              <Badge variant="primary" className="text-xs">
-                {terminology.member ?? profile.role ?? 'Member'}
-              </Badge>
-            </div>
-          </div>
-          {canMentor && (
-            <button
-              onClick={toggleLoginType}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl surface border text-xs font-medium text-secondary-token hover:bg-[var(--color-primary-50)] hover:text-[var(--color-primary-700)] dark:hover:bg-[var(--color-primary-900)] dark:hover:text-[var(--color-primary-200)] transition-all"
-            >
-              <LucideIcons.Users className="w-4 h-4" />
-              <span>
-                View as:{' '}
-                <span className="font-semibold">
-                  {loginType === 'counsellor'
-                    ? (terminology.mentor ?? 'Mentor')
-                    : (terminology.mentee ?? 'Mentee')}
-                </span>
-              </span>
-            </button>
-          )}
-        </div>
-      )}
+      <div className="lg:hidden pb-safe" />
     </div>
   )
 
   return (
     <>
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-64 border-r surface backdrop-blur-xl h-screen sticky top-0">
+      <aside className="hidden lg:flex flex-col w-72 border-r border-[var(--border-color)] bg-[var(--surface)] h-svh sticky top-0">
         {content}
       </aside>
 
-      {/* Mobile drawer */}
       <AnimatePresence>
         {mobileOpen && (
           <>
@@ -318,15 +306,19 @@ export default function Sidebar({ mobileOpen, onClose }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/30 z-40 lg:hidden"
+              className="fixed inset-0 bg-black/40 z-50 lg:hidden"
               onClick={onClose}
+              aria-hidden="true"
             />
             <motion.aside
-              initial={{ x: -280 }}
+              initial={{ x: '-100%' }}
               animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-72 surface z-50 shadow-2xl lg:hidden"
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 32, stiffness: 340 }}
+              className="fixed inset-y-0 left-0 w-[86%] max-w-[20rem] bg-[var(--surface)] z-50 shadow-[var(--shadow-4)] lg:hidden"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu"
             >
               {content}
             </motion.aside>

@@ -1,10 +1,13 @@
 import { create } from 'zustand'
+import { syncStatusBar } from '@/lib/native'
 
 const STORAGE_KEY = 'voice.theme'
 
 function apply(isDark) {
   const root = document.documentElement
   root.classList.toggle('dark', isDark)
+  root.style.colorScheme = isDark ? 'dark' : 'light'
+  syncStatusBar(isDark)
 }
 
 function resolveInitial() {

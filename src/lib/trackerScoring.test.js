@@ -3,7 +3,6 @@ import assert from 'node:assert/strict'
 import {
   calculateFieldScore,
   calculateFieldTotals,
-  resolveGroupTotals,
   resolveCalculatedColumns,
   calculateEntryScore,
   aggregatePeriod,

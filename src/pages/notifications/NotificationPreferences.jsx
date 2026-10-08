@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import * as LucideIcons from 'lucide-react'
+import { Bell, BellOff, Smartphone, MessageCircle, Moon, Lock, Check, Loader2, Save, SlidersHorizontal } from 'lucide-react'
+import { getIcon } from '@/lib/icons'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
 import useToastStore from '@/store/toastStore'
@@ -7,18 +8,6 @@ import Card, { CardBody, CardHeader } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
-const {
-  Bell,
-  BellOff,
-  Smartphone,
-  MessageCircle,
-  Moon,
-  Lock,
-  Check,
-  Loader2,
-  Save,
-  SlidersHorizontal,
-} = LucideIcons
 
 const GROUP_LABELS = {
   services: 'Services',
@@ -33,8 +22,8 @@ const GROUP_LABELS = {
 const GROUP_ORDER = ['services', 'sadhana', 'cleanliness', 'announcements', 'events', 'personal', 'system']
 
 function iconFor(category) {
-  const Resolved = category?.icon ? LucideIcons[category.icon] : null
-  return Resolved ?? LucideIcons.Bell
+  const Resolved = category?.icon ? getIcon(category.icon, null) : null
+  return Resolved ?? Bell
 }
 
 function normalizeTime(value) {

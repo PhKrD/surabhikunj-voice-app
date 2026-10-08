@@ -81,24 +81,57 @@ async function getFcmAccessToken(sa: { client_email: string; private_key: string
   return data.access_token
 }
 
+/** Length-independent comparison, so the key cannot be guessed by timing. */
+function safeEqual(a: string, b: string): boolean {
+  const ea = new TextEncoder().encode(a)
+  const eb = new TextEncoder().encode(b)
+  let diff = ea.length ^ eb.length
+  for (let i = 0; i < Math.max(ea.length, eb.length); i++) diff |= (ea[i] ?? 0) ^ (eb[i] ?? 0)
+  return diff === 0
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
-  let payload: { profile_id?: string; title?: string; body?: string; type?: string; reference_id?: string }
+  const url = Deno.env.get('SUPABASE_URL')!
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+
+  // Deployed with --no-verify-jwt (the database trigger calls it), so the
+  // caller must prove it holds the service-role key. Without this, anyone
+  // with the public URL could push arbitrary messages to any user.
+  const bearer = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+  if (!bearer || !safeEqual(bearer, serviceKey)) return json({ error: 'Unauthorized' }, 401)
+
+  let payload: {
+    profile_id?: string
+    title?: string
+    body?: string
+    type?: string
+    reference_id?: string
+    action_url?: string
+    notification_id?: string
+  }
   try {
     payload = await req.json()
   } catch {
     return json({ error: 'Invalid JSON body' }, 400)
   }
 
-  const { profile_id, title, body, type, reference_id } = payload
+  const { profile_id, title, body, type, reference_id, action_url, notification_id } = payload
   if (!profile_id || !title) return json({ error: 'profile_id and title required' }, 400)
 
-  const url = Deno.env.get('SUPABASE_URL')!
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
 
-  const notif = { title, body: body ?? '', type: type ?? 'general', reference_id: reference_id ?? null }
+  // action_url + notification_id let a tap open the right screen and mark
+  // the notification read. Only in-app paths are forwarded.
+  const notif = {
+    title,
+    body: body ?? '',
+    type: type ?? 'general',
+    reference_id: reference_id ?? null,
+    url: typeof action_url === 'string' && action_url.startsWith('/') ? action_url : '',
+    notification_id: notification_id ?? '',
+  }
   const results = { web: 0, fcm: 0, errors: [] as string[] }
 
   // ---------- Web Push ----------
@@ -159,7 +192,13 @@ Deno.serve(async (req: Request) => {
                 message: {
                   token: d.token,
                   notification: { title: notif.title, body: notif.body },
-                  data: { type: notif.type, reference_id: String(notif.reference_id ?? '') },
+                  // FCM data values must all be strings.
+                  data: {
+                    type: notif.type,
+                    reference_id: String(notif.reference_id ?? ''),
+                    url: notif.url,
+                    notification_id: String(notif.notification_id),
+                  },
                   android: {
                     priority: 'high',
                     notification: { sound: 'default', channel_id: 'voice_default' },

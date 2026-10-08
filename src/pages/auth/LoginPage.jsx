@@ -1,289 +1,228 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Flame, Mail, Lock, User, Eye, EyeOff, Building2, ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Mail, Lock, User, ArrowLeft, MailCheck, AlertCircle } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import Button from '@/components/ui/Button'
+import { AppInput } from '@/components/ui/Field'
+import { friendlyError } from '@/lib/friendlyError'
 import { cn } from '@/lib/utils'
+import AuthLayout from './AuthLayout'
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const MIN_PASSWORD = 8
+
+const COPY = {
+  login: { title: 'Welcome back', subtitle: 'Sign in to continue to your community.', cta: 'Sign in' },
+  signup: { title: 'Create your account', subtitle: 'Then start or join your organization with a code.', cta: 'Create account' },
+  forgot: { title: 'Reset your password', subtitle: 'We’ll email you a link to choose a new one.', cta: 'Send reset link' },
+}
+
+function validate(mode, { email, password, name }) {
+  const errors = {}
+  if (mode === 'signup' && !name.trim()) errors.name = 'Please enter your name.'
+  if (!email.trim()) errors.email = 'Please enter your email.'
+  else if (!EMAIL_RE.test(email.trim())) errors.email = 'That doesn’t look like an email address.'
+  if (mode !== 'forgot') {
+    if (!password) errors.password = 'Please enter your password.'
+    else if (mode === 'signup' && password.length < MIN_PASSWORD) {
+      errors.password = `Use at least ${MIN_PASSWORD} characters.`
+    }
+  }
+  return errors
+}
 
 export default function LoginPage() {
-  const [mode, setMode] = useState('login') // 'login' | 'signup' | 'forgot'
+  const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [spiritualName, setSpiritualName] = useState('')
-  const [showPass, setShowPass] = useState(false)
+  const [name, setName] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [formError, setFormError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [resetSent, setResetSent] = useState(false)
+  // 'reset' | 'confirm' — a "check your inbox" message after sending email.
+  const [sent, setSent] = useState(null)
 
-  const { signInWithEmail, signUpWithEmail, resetPassword } = useAuthStore()
+  const { user, signInWithEmail, signUpWithEmail, resetPassword } = useAuthStore()
   const navigate = useNavigate()
+
+  if (user && !sent) return <Navigate to="/" replace />
 
   const switchMode = (next) => {
     setMode(next)
-    setError('')
-    setResetSent(false)
+    setFieldErrors({})
+    setFormError('')
+    setSent(null)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
+    if (loading) return
+    const errors = validate(mode, { email, password, name })
+    setFieldErrors(errors)
+    setFormError('')
+    if (Object.keys(errors).length) return
+
     setLoading(true)
     try {
       if (mode === 'login') {
         await signInWithEmail(email, password)
-        navigate('/')
+        navigate('/', { replace: true })
       } else if (mode === 'signup') {
-        await signUpWithEmail(email, password, spiritualName)
-        navigate('/')
+        const data = await signUpWithEmail(email, password, name)
+        // With email confirmation on, there is no session yet: say so,
+        // instead of sending the user to a screen that bounces them back.
+        if (data?.session) navigate('/', { replace: true })
+        else setSent('confirm')
       } else {
-        // forgot password
         await resetPassword(email)
-        setResetSent(true)
+        setSent('reset')
       }
     } catch (err) {
-      setError(err.message || 'Something went wrong')
+      setFormError(friendlyError(err))
     } finally {
       setLoading(false)
     }
   }
 
-  const subtitleText = {
-    login: 'Sign in to your organization',
-    signup: 'Create an account, then start or join an organization',
-    forgot: 'Enter your email and we\'ll send a reset link',
+  if (sent) {
+    return (
+      <AuthLayout title="Check your inbox">
+        <div className="rounded-[var(--radius-xl)] bg-[var(--surface)] border border-[var(--border-color)] shadow-[var(--shadow-2)] p-6 text-center">
+          <div className="w-14 h-14 mx-auto rounded-full bg-[var(--color-success-soft)] flex items-center justify-center">
+            <MailCheck className="w-7 h-7 text-[var(--color-success)]" aria-hidden="true" />
+          </div>
+          <p className="text-body text-secondary-token mt-4">
+            {sent === 'reset' ? 'We sent a password reset link to ' : 'We sent a confirmation link to '}
+            <span className="font-semibold text-primary-token break-all">{email.trim()}</span>.
+            {sent === 'confirm' && ' Open it to activate your account, then sign in.'}
+          </p>
+          <p className="text-caption mt-2">Can’t find it? Check your spam folder.</p>
+          <Button variant="secondary" className="w-full mt-6" icon={ArrowLeft} onClick={() => switchMode('login')}>
+            Back to sign in
+          </Button>
+        </div>
+      </AuthLayout>
+    )
   }
 
+  const copy = COPY[mode]
+
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden app-bg">
-      {/* Animated gradient orbs */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 -left-32 w-[28rem] h-[28rem] rounded-full grad-saffron opacity-30 blur-3xl animate-float-slow" />
-        <div className="absolute top-1/4 -right-32 w-[26rem] h-[26rem] rounded-full grad-lotus opacity-25 blur-3xl animate-float-slow" style={{ animationDelay: '1.2s' }} />
-        <div className="absolute -bottom-32 left-1/4 w-[26rem] h-[26rem] rounded-full grad-blue opacity-20 blur-3xl animate-float-slow" style={{ animationDelay: '2.4s' }} />
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 24, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-md"
-      >
-        {/* Header */}
-        <div className="text-center mb-7">
-          <motion.div
-            initial={{ scale: 0.6, rotate: -12, opacity: 0 }}
-            animate={{ scale: 1, rotate: 0, opacity: 1 }}
-            transition={{ delay: 0.1, type: 'spring', stiffness: 200, damping: 14 }}
-            className="w-16 h-16 grad-saffron rounded-3xl flex items-center justify-center mx-auto mb-4 glow-saffron animate-float-slow"
+    <AuthLayout
+      title={copy.title}
+      subtitle={copy.subtitle}
+      footer={<p className="text-caption">Hare Krishna 🙏 · All glories to Srila Prabhupada</p>}
+    >
+      <div className="rounded-[var(--radius-xl)] bg-[var(--surface)] border border-[var(--border-color)] shadow-[var(--shadow-2)] p-5 sm:p-6">
+        {mode === 'forgot' ? (
+          <button
+            type="button"
+            onClick={() => switchMode('login')}
+            className="mb-4 -ml-1 inline-flex items-center gap-1.5 h-9 px-2 rounded-[var(--radius-sm)] text-sm font-medium text-secondary-token hover:bg-[var(--surface-muted)]"
           >
-            <Flame className="w-8 h-8 text-white" />
-          </motion.div>
-          <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-saffron-600 via-saffron-500 to-lotus-500 bg-clip-text text-transparent">
-            VOICE
-          </h1>
-          <p className="text-slate-500 text-sm mt-1.5 max-w-xs mx-auto">
-            {subtitleText[mode]}
-          </p>
-        </div>
-
-        {/* Glass Card */}
-        <div className="bg-white/70 backdrop-blur-2xl rounded-[2rem] shadow-[0_24px_70px_-20px_rgba(15,23,42,0.30)] border border-white/60 p-7 sm:p-8">
-
-          {/* ── Tabs (Sign In / Sign Up) — hidden in forgot mode ── */}
-          <AnimatePresence mode="wait">
-            {mode !== 'forgot' && (
-              <motion.div
-                key="tabs"
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2 }}
-                className="relative flex bg-slate-100/80 rounded-2xl p-1 mb-6"
-              >
-                {['login', 'signup'].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => switchMode(tab)}
-                    className="relative flex-1 py-2.5 text-sm font-semibold rounded-xl z-10"
-                  >
-                    {mode === tab && (
-                      <motion.span
-                        layoutId="authTabPill"
-                        className="absolute inset-0 bg-white rounded-xl shadow-sm"
-                        transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                      />
-                    )}
-                    <span className={cn('relative transition-colors', mode === tab ? 'text-saffron-600' : 'text-slate-500')}>
-                      {tab === 'login' ? 'Sign In' : 'Sign Up'}
-                    </span>
-                  </button>
-                ))}
-              </motion.div>
-            )}
-
-            {/* ── Forgot password header ── */}
-            {mode === 'forgot' && (
-              <motion.div
-                key="forgot-header"
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2 }}
-                className="flex items-center gap-2 mb-6"
-              >
-                <button
-                  type="button"
-                  onClick={() => switchMode('login')}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-saffron-500 hover:bg-saffron-50 transition-all"
-                  aria-label="Back to sign in"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </button>
-                <span className="text-sm font-semibold text-slate-700">Reset your password</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* ── Success state (after reset email sent) ── */}
-          <AnimatePresence mode="wait">
-            {resetSent ? (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="flex flex-col items-center gap-4 py-4 text-center"
-              >
-                <div className="w-14 h-14 rounded-full bg-green-50 border border-green-100 flex items-center justify-center">
-                  <CheckCircle2 className="w-7 h-7 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-700">Check your inbox</p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    We sent a password reset link to{' '}
-                    <span className="font-medium text-slate-600">{email}</span>.
-                    Check your spam folder if you don't see it.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => switchMode('login')}
-                  className="text-xs font-semibold text-saffron-600 hover:text-saffron-700 transition-colors mt-1"
-                >
-                  Back to Sign In
-                </button>
-              </motion.div>
-            ) : (
-              <motion.form
-                key={`form-${mode}`}
-                initial={{ opacity: 0, x: mode === 'forgot' ? 20 : 0 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                onSubmit={handleSubmit}
-                className="space-y-3.5"
-              >
-                {mode === 'signup' && (
-                  <div className="relative group">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-saffron-500 transition-colors" />
-                    <input
-                      type="text"
-                      placeholder="Spiritual Name (e.g. Palanhar Krsna Das)"
-                      value={spiritualName}
-                      onChange={(e) => setSpiritualName(e.target.value)}
-                      required
-                      className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/60 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-400/60 focus:border-saffron-300 focus:bg-white transition-all"
-                    />
-                  </div>
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back to sign in
+          </button>
+        ) : (
+          <div role="tablist" aria-label="Account" className="grid grid-cols-2 p-1 mb-5 rounded-[var(--radius-md)] bg-[var(--surface-muted)]">
+            {['login', 'signup'].map((tab) => (
+              <button
+                key={tab}
+                role="tab"
+                type="button"
+                aria-selected={mode === tab}
+                onClick={() => switchMode(tab)}
+                className={cn(
+                  'relative h-10 rounded-[calc(var(--radius-md)-4px)] text-sm font-semibold transition-colors',
+                  mode === tab ? 'text-primary-token' : 'text-muted-token hover:text-secondary-token',
                 )}
-
-                <div className="relative group">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-saffron-500 transition-colors" />
-                  <input
-                    type="email"
-                    placeholder="Email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="w-full pl-11 pr-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/60 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-400/60 focus:border-saffron-300 focus:bg-white transition-all"
+              >
+                {mode === tab && (
+                  <motion.span
+                    layoutId="auth-tab"
+                    className="absolute inset-0 rounded-[calc(var(--radius-md)-4px)] bg-[var(--surface)] shadow-[var(--shadow-1)]"
+                    transition={{ type: 'spring', stiffness: 500, damping: 38 }}
                   />
-                </div>
-
-                {mode !== 'forgot' && (
-                  <>
-                    <div className="relative group">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-saffron-500 transition-colors" />
-                      <input
-                        type={showPass ? 'text' : 'password'}
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        className="w-full pl-11 pr-11 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/60 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-400/60 focus:border-saffron-300 focus:bg-white transition-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPass(!showPass)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-saffron-500 transition-colors"
-                      >
-                        {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-
-                    {/* Forgot password link — only on Sign In tab */}
-                    {mode === 'login' && (
-                      <div className="flex justify-end -mt-1">
-                        <button
-                          type="button"
-                          onClick={() => switchMode('forgot')}
-                          className="text-xs font-medium text-saffron-600 hover:text-saffron-700 transition-colors"
-                        >
-                          Forgot password?
-                        </button>
-                      </div>
-                    )}
-                  </>
                 )}
+                <span className="relative">{tab === 'login' ? 'Sign in' : 'Create account'}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
-                <AnimatePresence>
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      className="bg-red-50 border border-red-100 rounded-2xl px-4 py-3"
-                    >
-                      <p className="text-sm text-red-600">{error}</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
+          {mode === 'signup' && (
+            <AppInput
+              label="Your name"
+              icon={User}
+              autoComplete="name"
+              placeholder="e.g. Palanhar Krsna Das"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              error={fieldErrors.name}
+            />
+          )}
 
-                <Button type="submit" loading={loading} size="lg" className="w-full mt-1">
-                  {mode === 'login' && 'Sign In'}
-                  {mode === 'signup' && 'Create Account'}
-                  {mode === 'forgot' && 'Send Reset Link'}
-                </Button>
-              </motion.form>
-            )}
-          </AnimatePresence>
+          <AppInput
+            label="Email"
+            type="email"
+            icon={Mail}
+            inputMode="email"
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={fieldErrors.email}
+          />
 
-          {mode === 'signup' && !resetSent && (
-            <div className="mt-4 flex items-start gap-2.5 px-4 py-3 rounded-2xl bg-slate-50 border border-slate-100">
-              <Building2 className="w-4 h-4 text-saffron-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-slate-500 leading-relaxed">
-                After signing up you'll choose to{' '}
-                <span className="font-semibold text-slate-600">create a new organization</span> or{' '}
-                <span className="font-semibold text-slate-600">join an existing one</span> with a join code.
-              </p>
+          {mode !== 'forgot' && (
+            <div>
+              <AppInput
+                label="Password"
+                type="password"
+                icon={Lock}
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                placeholder={mode === 'signup' ? `At least ${MIN_PASSWORD} characters` : 'Your password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                error={fieldErrors.password}
+              />
+              {mode === 'login' && (
+                <div className="flex justify-end mt-1">
+                  <button
+                    type="button"
+                    onClick={() => switchMode('forgot')}
+                    className="h-9 px-1 text-sm font-semibold text-[var(--color-primary)] hover:underline underline-offset-2"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
-          <p className="text-center text-xs text-slate-400 mt-6">
-            Hare Krishna 🙏 — All glories to Srila Prabhupada
-          </p>
-        </div>
-      </motion.div>
-    </div>
+          <AnimatePresence>
+            {formError && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                role="alert"
+                className="flex items-start gap-2.5 rounded-[var(--radius-md)] bg-[var(--color-danger-soft)] px-3.5 py-3 text-sm text-[var(--color-danger)]"
+              >
+                <AlertCircle className="w-[18px] h-[18px] flex-shrink-0 mt-px" aria-hidden="true" />
+                <span>{formError}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <Button type="submit" size="lg" loading={loading} className="w-full">
+            {copy.cta}
+          </Button>
+        </form>
+      </div>
+    </AuthLayout>
   )
 }

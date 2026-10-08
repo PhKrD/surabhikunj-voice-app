@@ -1,6 +1,7 @@
 // Pure helpers for sadhana streaks and weekly/monthly rollups.
 // report_date values are 'YYYY-MM-DD' strings; all date math is done in UTC so
 // it matches how reports are stored.
+import { localDateISO } from './dates.js'
 
 function addDays(dateStr, delta) {
   const d = new Date(dateStr + 'T00:00:00Z')
@@ -8,7 +9,7 @@ function addDays(dateStr, delta) {
   return d.toISOString().split('T')[0]
 }
 
-export function computeSadhanaStats(reports, todayStr = new Date().toISOString().split('T')[0]) {
+export function computeSadhanaStats(reports, todayStr = localDateISO()) {
   const list = reports || []
   const dates = new Set(list.map((r) => r.report_date))
 

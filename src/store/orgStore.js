@@ -24,9 +24,11 @@ const useOrgStore = create((set, get) => ({
     }
   },
 
+  // loading stays true until the next sign-in loads the org again, so a
+  // freshly signed-in user never briefly sees an empty dashboard/menu.
   reset: () => set({
     org: null, settings: null, nav: [], permissions: [],
-    loading: false, initialized: false, needsOnboarding: false,
+    loading: true, initialized: false, needsOnboarding: false,
   }),
 
   // Re-run the bootstrap after founding or joining an organization
@@ -40,6 +42,22 @@ const useOrgStore = create((set, get) => ({
       console.error('[org] refresh failed:', e)
     } finally {
       set({ loading: false, initialized: true })
+    }
+  },
+
+  /**
+   * Background refresh (app resumed / reconnected): picks up an admin's
+   * changes to navigation, permissions, notices and branding without a
+   * spinner, and keeps the current state if the network fails.
+   */
+  refreshQuietly: async () => {
+    const { initialized, needsOnboarding, _lastQuiet = 0 } = get()
+    if (!initialized || needsOnboarding || Date.now() - _lastQuiet < 60_000) return
+    set({ _lastQuiet: Date.now() })
+    try {
+      await get()._load()
+    } catch {
+      // Offline: keep what we have.
     }
   },
 
@@ -95,7 +113,10 @@ const useOrgStore = create((set, get) => ({
     // the needsOnboarding path rather than crashing the whole store.
     const orgRes = await supabase
       .from('organizations')
-      .select('id, name, slug, logo_url, status, timezone, locale, join_code, organization_settings(branding, terminology, features)')
+      // organization_settings(*) rather than a column list, so the app keeps
+      // working whether or not newer columns (e.g. `content`, migration 73)
+      // exist yet in this database.
+      .select('id, name, slug, logo_url, status, timezone, locale, join_code, organization_settings(*)')
       .eq('id', activeOrgRow.org_id)
       .maybeSingle()
 
@@ -108,7 +129,13 @@ const useOrgStore = create((set, get) => ({
     }
 
     const orgData = orgRes.data
-    const settings = orgData.organization_settings ?? { branding: {}, terminology: {}, features: {} }
+    const raw = orgData.organization_settings ?? {}
+    const settings = {
+      branding: raw.branding ?? {},
+      terminology: raw.terminology ?? {},
+      features: raw.features ?? {},
+      content: raw.content ?? {},
+    }
 
     // Apply CSS custom properties for theming
     applyBranding(settings.branding ?? {})

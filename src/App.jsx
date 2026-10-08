@@ -1,14 +1,22 @@
-import { Component, useEffect, lazy, Suspense } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { Component, useEffect, useRef, lazy, Suspense } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { MotionConfig } from 'framer-motion'
+import { AlertTriangle } from 'lucide-react'
 import useAuthStore from '@/store/authStore'
 import useThemeStore from '@/store/themeStore'
+import useToastStore from '@/store/toastStore'
+import useConfigStore from '@/store/configStore'
 import ProtectedRoute, { RequireAuth } from '@/components/ProtectedRoute'
-// Imported for its module-level side effect only (starts the singleton
-// HealthMonitor's 30s polling loop on app boot) — no named binding needed.
-import '@/lib/healthCheck'
+import { reportError } from '@/lib/errorReporter'
+import { setNavigator } from '@/lib/navigation'
+import { handleOverlayBack, isRootPath } from '@/lib/backButton'
+import { exitApp, hideSplash, initNative, onAppResume, syncStatusBar } from '@/lib/native'
+import { markBundleHealthy } from '@/lib/liveUpdate'
 import Toaster from '@/components/ui/Toaster'
 import Button from '@/components/ui/Button'
+import { LoadingState } from '@/components/ui/States'
+import { ConfirmDialogHost } from '@/components/ui/Dialog'
+import AppGate from '@/components/system/AppGate'
 import { useDeviceModeStore } from '@/store/deviceModeStore'
 import { useDeviceState } from '@/store/childDeviceState'
 import ChildDeviceShell from '@/components/child-device/ChildDeviceShell'
@@ -16,6 +24,7 @@ import FamilySupervision from '@/components/family/FamilySupervision'
 
 const AppLayout = lazy(() => import('@/components/layout/AppLayout'))
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
+const ResetPasswordPage = lazy(() => import('@/pages/auth/ResetPasswordPage'))
 const OnboardingPage = lazy(() => import('@/pages/auth/OnboardingPage'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const ResidentsPage = lazy(() => import('@/pages/residents/ResidentsPage'))
@@ -53,8 +62,7 @@ class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     this.setState({ info })
-    // Surface the real error in console for anyone with dev tools open
-    console.error('[ErrorBoundary]', error, info)
+    reportError(error, { kind: 'render', componentStack: info?.componentStack?.slice(0, 1500) })
   }
 
   handleReload = () => {
@@ -68,16 +76,16 @@ class ErrorBoundary extends Component {
         const keys = await caches.keys()
         await Promise.all(keys.map((k) => caches.delete(k)))
       }
-    } catch (e) {
-      console.error('Cache clear failed', e)
+    } catch {
+      // Best effort: a reload still happens below.
     }
     try {
       if (window.navigator?.serviceWorker?.controller) {
         const reg = await navigator.serviceWorker.ready
         if (reg.unregister) await reg.unregister()
       }
-    } catch (e) {
-      console.error('SW unregister failed', e)
+    } catch {
+      // Best effort.
     }
     window.location.reload()
   }
@@ -87,17 +95,15 @@ class ErrorBoundary extends Component {
       return (
         <div className="min-h-screen flex items-center justify-center p-6 app-bg">
           <div className="w-full max-w-md glass elev-2 rounded-3xl p-6 text-center space-y-4">
-            <div className="w-14 h-14 rounded-2xl bg-red-50 dark:bg-red-950/40 flex items-center justify-center mx-auto">
-              <span className="text-2xl">💥</span>
+            <div className="w-14 h-14 rounded-2xl bg-[var(--color-danger-soft)] flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-7 h-7 text-[var(--color-danger)]" aria-hidden="true" />
             </div>
             <div>
-              <h2 className="text-lg font-extrabold text-primary-token">Something went wrong</h2>
+              <h2 className="text-lg font-bold text-primary-token">Something went wrong</h2>
               <p className="text-sm text-secondary-token mt-1">
-                The app crashed. This can happen on iOS PWAs when cached files get out of sync.
+                This screen hit an unexpected problem. It has been reported automatically.
+                Reloading usually fixes it.
               </p>
-            </div>
-            <div className="text-left rounded-2xl surface-muted p-3 text-xs font-mono text-secondary-token overflow-auto max-h-40">
-              {this.state.error?.message || String(this.state.error)}
             </div>
             <div className="flex flex-col gap-2">
               <Button onClick={this.handleClearAndReload} loading={this.state.clearing} className="w-full">
@@ -116,14 +122,83 @@ class ErrorBoundary extends Component {
 }
 
 function PageFallback() {
-  return (
-    <div className="min-h-screen flex items-center justify-center app-bg">
-      <div className="text-center">
-        <div className="w-8 h-8 border-2 rounded-full animate-spin mx-auto mb-2" style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
-        <p className="text-sm text-secondary-token">Loading page...</p>
-      </div>
-    </div>
-  )
+  return <LoadingState fullScreen label="Loading…" />
+}
+
+/**
+ * Connects the router to code outside React (notification taps, back
+ * button), and owns app-wide lifecycle: native setup, remote config,
+ * background refresh on resume, and marking an OTA bundle healthy.
+ */
+function NativeBridge() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const locationRef = useRef(location)
+  const navigateRef = useRef(navigate)
+  const lastBackRef = useRef(0)
+  const isDark = useThemeStore((s) => s.isDark)
+  const sessionExpired = useAuthStore((s) => s.sessionExpired)
+  const passwordRecovery = useAuthStore((s) => s.passwordRecovery)
+
+  useEffect(() => {
+    locationRef.current = location
+  }, [location])
+
+  useEffect(() => {
+    navigateRef.current = navigate
+    setNavigator(navigate)
+  }, [navigate])
+
+  useEffect(() => {
+    const isolatedChild = () =>
+      useDeviceModeStore.getState().mode === 'child' && !useDeviceState.getState().isOrgMember
+    initNative({
+      onBack: () => {
+        if (handleOverlayBack()) return
+        const { pathname } = locationRef.current
+        if (!isRootPath(pathname) && window.history.length > 1) {
+          navigateRef.current(-1)
+          return
+        }
+        // A supervised child's locked screen must not be escapable with back.
+        if (isolatedChild()) return
+        if (Date.now() - lastBackRef.current < 2000) {
+          exitApp()
+        } else {
+          lastBackRef.current = Date.now()
+          useToastStore.getState().info('Press back again to exit', '', { duration: 2000 })
+        }
+      },
+    })
+    useConfigStore.getState().start()
+    const offResume = onAppResume(() => {
+      import('@/store/orgStore').then((m) => m.default.getState().refreshQuietly())
+    })
+    // The app has rendered: the running OTA bundle works, and the native
+    // splash can give way to the real UI.
+    markBundleHealthy()
+    hideSplash()
+    return offResume
+  }, [])
+
+  useEffect(() => {
+    syncStatusBar(isDark)
+  }, [isDark])
+
+  useEffect(() => {
+    if (!sessionExpired) return
+    useToastStore.getState().info('Your session has ended', 'Please sign in again to continue.', { duration: 5000 })
+    useAuthStore.getState().dismissSessionExpired()
+  }, [sessionExpired])
+
+  // Opening a password-reset link always lands on the new-password form.
+  useEffect(() => {
+    if (passwordRecovery && location.pathname !== '/reset-password') {
+      navigate('/reset-password', { replace: true })
+    }
+  }, [passwordRecovery, location.pathname, navigate])
+
+  return null
 }
 
 function AppBootstrap() {
@@ -178,6 +253,7 @@ function AppRoutes() {
     <Suspense fallback={<PageFallback />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         <Route
           path="/onboarding"
@@ -265,9 +341,13 @@ export default function App() {
     >
       <BrowserRouter>
         <ErrorBoundary>
+          <NativeBridge />
           <AppBootstrap />
-          <AppRoutes />
-          <FamilySupervision />
+          <AppGate>
+            <AppRoutes />
+            <FamilySupervision />
+          </AppGate>
+          <ConfirmDialogHost />
         </ErrorBoundary>
         <Toaster />
       </BrowserRouter>

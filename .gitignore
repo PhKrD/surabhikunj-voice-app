@@ -25,3 +25,8 @@ dist-ssr
 .vercel
 .env*
 supabase/.temp/
+
+# Release signing (never commit)
+android/keystore.properties
+*.jks
+*.keystore

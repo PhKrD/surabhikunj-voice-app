@@ -26,6 +26,7 @@ import { resetScreenTimeEnforcement } from './screenTimeEngine.js'
 import { enforceRules, resetRuleEngine } from './ruleEngine.js'
 import { invalidateDeviceIdentity } from './deviceIdentity.js'
 import { deriveCommandState } from './commandStatus.js'
+import { logger } from './logger'
 
 const BONUS_KEY = 'vk_bonus_expires_at'
 
@@ -65,7 +66,7 @@ async function ensureFreshSession() {
 
   refreshing = true
   try {
-    console.log('[commandPoller] Session expiring soon, refreshing...')
+    logger.debug('[commandPoller] Session expiring soon, refreshing...')
     const { data: refreshed, error } = await supabase.auth.refreshSession({
       refresh_token: session.refresh_token,
     })
@@ -75,7 +76,7 @@ async function ensureFreshSession() {
     }
     if (refreshed?.session) {
       updateDeviceTokens(refreshed.session.access_token, refreshed.session.refresh_token)
-      console.log('[commandPoller] Session refreshed successfully')
+      logger.debug('[commandPoller] Session refreshed successfully')
     }
   } finally {
     refreshing = false
@@ -96,11 +97,11 @@ export function startCommandPoller(onCommand) {
 
   const creds = loadDeviceCreds()
   if (!creds?.deviceId) {
-    console.log('[commandPoller] No device credentials, skipping')
+    logger.debug('[commandPoller] No device credentials, skipping')
     return () => {}
   }
 
-  console.log('[commandPoller] Starting polling for device:', creds.deviceId)
+  logger.debug('[commandPoller] Starting polling for device:', creds.deviceId)
 
   // Clean up any prior polling
   stopCommandPoller()
@@ -150,7 +151,7 @@ export function startCommandPoller(onCommand) {
       for (const cmd of commands) {
         if (generation !== pollGeneration) return
         if (deriveCommandState(cmd) === 'timed_out') continue
-        console.log('[commandPoller] Processing command:', cmd.command_type, cmd.id)
+        logger.debug('[commandPoller] Processing command:', cmd.command_type, cmd.id)
 
         // ACK delivery
         await supabase
@@ -159,7 +160,7 @@ export function startCommandPoller(onCommand) {
           .eq('id', cmd.id)
 
         const result = await handleCommand(cmd)
-        console.log('[commandPoller] Command result:', result)
+        logger.debug('[commandPoller] Command result:', result)
 
         // ACK execution (or failure)
         await supabase
@@ -172,7 +173,7 @@ export function startCommandPoller(onCommand) {
           .eq('id', cmd.id)
 
         if (!result.success) {
-          console.log('[commandPoller] Command failed, reporting to parent')
+          logger.debug('[commandPoller] Command failed, reporting to parent')
           await reportCommandFailure(cmd, result)
         }
 

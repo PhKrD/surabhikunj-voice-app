@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import * as LucideIcons from 'lucide-react'
+import { Bell, CheckCheck, Search, Inbox, SlidersHorizontal } from 'lucide-react'
+import { getIcon } from '@/lib/icons'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
@@ -10,7 +11,6 @@ import Button from '@/components/ui/Button'
 import { formatDate, cn } from '@/lib/utils'
 import NotificationPreferences from './NotificationPreferences'
 
-const { Bell, CheckCheck, Search, Inbox, SlidersHorizontal } = LucideIcons
 
 const GROUP_LABELS = {
   services: 'Services',
@@ -25,8 +25,8 @@ const GROUP_LABELS = {
 const GROUP_ORDER = ['services', 'sadhana', 'cleanliness', 'announcements', 'events', 'personal', 'system']
 
 function iconFor(category) {
-  const Resolved = category?.icon ? LucideIcons[category.icon] : null
-  return Resolved ?? LucideIcons.Bell
+  const Resolved = category?.icon ? getIcon(category.icon, null) : null
+  return Resolved ?? Bell
 }
 
 export default function NotificationsPage() {

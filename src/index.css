@@ -52,8 +52,16 @@
   --color-lotus-800: #86198f;
   --color-lotus-900: #701a75;
 
-  --font-sans: 'Inter', system-ui, sans-serif;
+  /* Inter is bundled (@fontsource-variable/inter in main.jsx) so the APK
+     looks identical offline and on every Android skin. */
+  --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-devanagari: 'Noto Serif Devanagari', Georgia, serif;
+
+  /* ---- Radius scale: 4 steps, used everywhere ---- */
+  --radius-sm: 0.625rem;  /* 10px  chips, small buttons */
+  --radius-md: 0.875rem;  /* 14px  inputs, buttons */
+  --radius-lg: 1.25rem;   /* 20px  cards */
+  --radius-xl: 1.75rem;   /* 28px  sheets, dialogs */
 }
 
 /* =====================================================================
@@ -64,41 +72,109 @@
    utilities or the .surface/.surface-elevated helpers below over raw
    Tailwind slate/white classes when redesigning a screen.
    ===================================================================== */
+/* =====================================================================
+   DESIGN SYSTEM — the single source of truth for colour, elevation and
+   type. Primary = VOICE purple (actions, selection, focus). Accent =
+   saffron (highlights, streaks, devotional moments) — used sparingly.
+   Semantic colours each come with a "-soft" background for badges,
+   alerts and icon chips, so nothing hard-codes red-50/green-100 again.
+   ===================================================================== */
 :root {
   --color-primary: var(--color-primary-600);
+  --color-primary-soft: var(--color-primary-50);
+  --color-primary-strong: var(--color-primary-700);
+  --color-on-primary: #ffffff;
   --color-accent: var(--color-saffron-500);
+  --color-accent-soft: var(--color-saffron-50);
 
-  --surface-app: #f7f6fb;
+  --surface-app: #f6f5fa;
   --surface: #ffffff;
   --surface-elevated: #ffffff;
-  --surface-muted: #f1f0f8;
-  --text-primary: #1e1b2e;
-  --text-secondary: #56526b;
-  --text-muted: #8a8699;
-  --border-color: #e9e7f2;
-  --color-success: #16a34a;
-  --color-warning: #ea6c0a;
-  --color-danger: #e11d48;
+  --surface-muted: #f2f1f7;
+  --surface-sunken: #ebe9f2;
+  --text-primary: #17152a;
+  --text-secondary: #57536b;
+  --text-muted: #8b879c;
+  --border-color: #e7e5ef;
+  --border-strong: #d6d3e2;
+
+  --color-success: #15803d;
+  --color-success-soft: #ecfdf3;
+  --color-warning: #c2410c;
+  --color-warning-soft: #fff4ea;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
   --color-info: #2563eb;
+  --color-info-soft: #eff5ff;
+
+  /* Soft, neutral, two-layer shadows: depth without "glow". */
+  --shadow-1: 0 1px 2px rgba(23, 21, 42, 0.04), 0 1px 3px rgba(23, 21, 42, 0.04);
+  --shadow-2: 0 1px 2px rgba(23, 21, 42, 0.04), 0 6px 16px -6px rgba(23, 21, 42, 0.10);
+  --shadow-3: 0 2px 4px rgba(23, 21, 42, 0.04), 0 16px 36px -12px rgba(23, 21, 42, 0.18);
+  --shadow-4: 0 4px 8px rgba(23, 21, 42, 0.05), 0 28px 64px -20px rgba(23, 21, 42, 0.28);
+
+  /* Mobile chrome heights (used for padding so content never hides). */
+  --bottom-nav-h: 4.25rem;
 }
 
 .dark {
   --color-primary: var(--color-primary-400);
+  --color-primary-soft: color-mix(in srgb, var(--color-primary-400) 16%, transparent);
+  --color-primary-strong: var(--color-primary-300);
+  --color-on-primary: #ffffff;
   --color-accent: var(--color-saffron-400);
+  --color-accent-soft: color-mix(in srgb, var(--color-saffron-400) 14%, transparent);
 
-  --surface-app: #16141f;
-  --surface: #1e1c2a;
-  --surface-elevated: #262433;
-  --surface-muted: #2a2839;
-  --text-primary: #f2f1f7;
-  --text-secondary: #b5b1c6;
-  --text-muted: #837f96;
-  --border-color: #34324a;
+  --surface-app: #14121c;
+  --surface: #1c1a27;
+  --surface-elevated: #24222f;
+  --surface-muted: #262433;
+  --surface-sunken: #110f18;
+  --text-primary: #f3f2f8;
+  --text-secondary: #b8b4c8;
+  --text-muted: #85819a;
+  --border-color: #2f2d40;
+  --border-strong: #3d3a52;
+
   --color-success: #4ade80;
-  --color-warning: #ffb870;
-  --color-danger: #fb7185;
+  --color-success-soft: rgba(74, 222, 128, 0.12);
+  --color-warning: #fdba74;
+  --color-warning-soft: rgba(253, 186, 116, 0.12);
+  --color-danger: #f87171;
+  --color-danger-soft: rgba(248, 113, 113, 0.12);
   --color-info: #60a5fa;
+  --color-info-soft: rgba(96, 165, 250, 0.12);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 16px -6px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 2px 4px rgba(0, 0, 0, 0.3), 0 16px 36px -12px rgba(0, 0, 0, 0.55);
+  --shadow-4: 0 4px 8px rgba(0, 0, 0, 0.35), 0 28px 64px -20px rgba(0, 0, 0, 0.65);
 }
+
+/* =====================================================================
+   TYPE SCALE — use these instead of ad-hoc text-xl font-extrabold mixes.
+   ===================================================================== */
+.text-display { font-size: 1.75rem; line-height: 2.125rem; font-weight: 750; letter-spacing: -0.025em; }
+.text-title   { font-size: 1.375rem; line-height: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
+.text-heading { font-size: 1.0625rem; line-height: 1.5rem; font-weight: 650; letter-spacing: -0.012em; }
+.text-body    { font-size: 0.9375rem; line-height: 1.4rem; }
+.text-caption { font-size: 0.8125rem; line-height: 1.15rem; color: var(--text-secondary); }
+.text-overline { font-size: 0.6875rem; line-height: 1rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* =====================================================================
+   DARK-MODE SAFETY NET
+   Older screens hard-code light-only utilities (bg-white, text-slate-*).
+   Until each is migrated to tokens, these keep them readable in dark mode.
+   Unlayered CSS beats Tailwind's utilities layer, so this always applies.
+   ===================================================================== */
+.dark .bg-white { background-color: var(--surface); }
+.dark .bg-slate-50, .dark .bg-gray-50 { background-color: var(--surface-muted); }
+.dark .bg-slate-100, .dark .bg-gray-100 { background-color: var(--surface-sunken); }
+.dark .text-slate-900, .dark .text-slate-800, .dark .text-gray-900, .dark .text-gray-800 { color: var(--text-primary); }
+.dark .text-slate-700, .dark .text-slate-600, .dark .text-gray-700, .dark .text-gray-600 { color: var(--text-secondary); }
+.dark .text-slate-500, .dark .text-slate-400, .dark .text-gray-500, .dark .text-gray-400 { color: var(--text-muted); }
+.dark .border-slate-100, .dark .border-slate-200, .dark .border-gray-100, .dark .border-gray-200 { border-color: var(--border-color); }
 
 * {
   box-sizing: border-box;
@@ -158,6 +234,12 @@ body {
    ===================================================================== */
 @layer base {
 
+  /* Tailwind v4 defaults borders to currentColor (dark lines on every bare
+     `border`). The design system's hairline colour is the right default. */
+  *, ::before, ::after, ::backdrop {
+    border-color: var(--border-color);
+  }
+
   /* ---- Text-like inputs & textarea ---- */
   input[type="text"],
   input[type="email"],
@@ -172,14 +254,15 @@ body {
   textarea,
   select {
     width: 100%;
-    padding: 0.7rem 0.95rem;
-    border-radius: 1rem;
-    border: 1.5px solid var(--border-color);
+    min-height: 3rem; /* 48px: comfortable thumb target */
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-strong);
     background-color: var(--surface);
     color: var(--text-primary);
-    font-size: 0.9rem;
+    font-size: 0.9375rem;
     font-family: inherit;
-    font-weight: 500;
+    font-weight: 450;
     line-height: 1.4;
     outline: none;
     transition: border-color 0.18s ease, box-shadow 0.18s ease,
@@ -221,8 +304,14 @@ body {
   select:focus {
     border-color: var(--color-primary);
     background-color: var(--surface);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 16%, transparent),
-                0 4px 14px -6px color-mix(in srgb, var(--color-primary) 35%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+  }
+
+  input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="true"] {
+    border-color: var(--color-danger);
+  }
+  input[aria-invalid="true"]:focus, textarea[aria-invalid="true"]:focus, select[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 18%, transparent);
   }
 
   input:disabled, textarea:disabled, select:disabled {
@@ -258,7 +347,7 @@ body {
   input[type="time"]::-webkit-calendar-picker-indicator:hover,
   input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
     opacity: 1;
-    background-color: rgba(249, 115, 22, 0.12);
+    background-color: var(--color-primary-soft);
   }
 
   /* Kill number spin buttons — steppers are provided in the UI instead */
@@ -412,13 +501,9 @@ body {
 .grad-emerald  { background-image: linear-gradient(135deg, #34d399 0%, #10b981 50%, #059669 100%); }
 .grad-violet   { background-image: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 50%, #7c3aed 100%); }
 
-/* App shell background — a very subtle wash, not a competing rainbow.
-   Kept intentionally quiet so cards/content provide the visual hierarchy. */
+/* App shell background: flat and quiet so cards carry the hierarchy. */
 .app-bg {
   background-color: var(--surface-app);
-  background-image:
-    radial-gradient(at 0% 0%, rgba(124, 92, 245, 0.06) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(249, 115, 22, 0.05) 0px, transparent 50%);
 }
 
 /* =====================================================================
@@ -457,21 +542,33 @@ body {
    SURFACES & ELEVATION
    ===================================================================== */
 
-/* Frosted-glass panel */
+/* Panel. Formerly frosted glass — backdrop blur is expensive on low-end
+   Android GPUs and made scrolling stutter, so it is now a solid surface. */
 .glass {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(22px) saturate(180%);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: var(--surface);
+  border: 1px solid var(--border-color);
 }
 
-/* Layered elevation scale — soft, multi-stop shadows.
+/* Elevation scale, driven by the design-system shadow tokens.
    `isolation: isolate` gives each card its own stacking context so
-   their shadows/blurs never invalidate the parent scroll GPU layer.  */
-.elev-1 { box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 2px 8px -2px rgba(15,23,42,0.06); isolation: isolate; }
-.elev-2 { box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 6px 20px -6px rgba(15,23,42,0.10); isolation: isolate; }
-.elev-3 { box-shadow: 0 2px 4px rgba(15,23,42,0.04), 0 14px 38px -12px rgba(15,23,42,0.16); isolation: isolate; }
-.elev-4 { box-shadow: 0 4px 8px rgba(15,23,42,0.05), 0 26px 60px -18px rgba(15,23,42,0.24); isolation: isolate; }
+   their shadows never invalidate the parent scroll GPU layer. */
+.elev-1 { box-shadow: var(--shadow-1); isolation: isolate; }
+.elev-2 { box-shadow: var(--shadow-2); isolation: isolate; }
+.elev-3 { box-shadow: var(--shadow-3); isolation: isolate; }
+.elev-4 { box-shadow: var(--shadow-4); isolation: isolate; }
+
+/* Skeleton placeholder: matches the shape of content that is loading. */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-muted) 25%, var(--surface-sunken) 50%, var(--surface-muted) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* Space for the mobile bottom navigation + the phone's gesture bar. */
+.pb-safe-nav { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 1rem); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
 
 /* Gradient ring / border */
 .ring-grad {

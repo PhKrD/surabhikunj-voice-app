@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { logger } from '@/lib/logger'
 
 // Unified push-notification registration.
 //   - Native (Capacitor / Android APK): FCM via @capacitor/push-notifications
@@ -20,6 +21,45 @@ function urlBase64ToUint8Array(base64String) {
   const output = new Uint8Array(raw.length)
   for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i)
   return output
+}
+
+// Where a notification opens when it carries no explicit in-app URL
+// (older notifications, or a push function not yet redeployed).
+const ROUTE_BY_TYPE = [
+  [/announce|broadcast/, '/announcements'],
+  [/event/, '/events'],
+  [/seva|service|task/, '/services'],
+  [/clean/, '/cleanliness'],
+  [/sadhana|tracker/, '/trackers'],
+  [/mentor|counsel/, '/mentorship'],
+  [/sos|alert|bonus|child|device|parental/, '/parental-control'],
+]
+
+export function routeForNotification({ url, type } = {}) {
+  if (typeof url === 'string' && url.startsWith('/')) return url
+  const t = String(type ?? '').toLowerCase()
+  return ROUTE_BY_TYPE.find(([re]) => re.test(t))?.[1] ?? '/notifications'
+}
+
+let tapListenerInstalled = false
+
+/**
+ * Tapping a system notification opens the screen it is about (and marks it
+ * read). Installed at app start — not only after sign-in — so a tap that
+ * cold-starts the app is not lost.
+ */
+export async function installNotificationTapHandler() {
+  if (!isNative() || tapListenerInstalled) return
+  tapListenerInstalled = true
+  const { PushNotifications } = await import('@capacitor/push-notifications')
+  const { navigateTo } = await import('@/lib/navigation')
+  PushNotifications.addListener('pushNotificationActionPerformed', ({ notification }) => {
+    const data = notification?.data ?? {}
+    navigateTo(routeForNotification(data))
+    if (data.notification_id) {
+      supabase.from('notifications').update({ is_read: true }).eq('id', data.notification_id).then(() => {}, () => {})
+    }
+  })
 }
 
 // ---------------- Native (FCM) ----------------
@@ -59,14 +99,14 @@ async function registerNative(profileId) {
           { onConflict: 'token' }
         )
       } catch (e) {
-        console.error('[push] save device token failed:', e)
+        logger.warn('[push] save device token failed:', e)
       }
       onReg.then?.((h) => h.remove?.())
       resolve({ ok: true, channel: 'fcm' })
     })
 
     PushNotifications.addListener('registrationError', (err) => {
-      console.error('[push] FCM registration error:', err)
+      logger.warn('[push] FCM registration error:', err)
       resolve({ ok: false, reason: 'registration_error' })
     })
 
@@ -80,7 +120,7 @@ async function registerWeb(profileId) {
     return { ok: false, reason: 'unsupported' }
   }
   if (!VAPID_PUBLIC_KEY) {
-    console.warn('[push] VITE_VAPID_PUBLIC_KEY not set — web push disabled')
+    logger.warn('[push] VITE_VAPID_PUBLIC_KEY not set — web push disabled')
     return { ok: false, reason: 'no_vapid_key' }
   }
 
@@ -109,7 +149,7 @@ async function registerWeb(profileId) {
       { onConflict: 'endpoint' }
     )
   } catch (e) {
-    console.error('[push] save web subscription failed:', e)
+    logger.warn('[push] save web subscription failed:', e)
     return { ok: false, reason: 'save_failed' }
   }
   return { ok: true, channel: 'web' }
@@ -120,7 +160,7 @@ export async function registerPush(profileId) {
   try {
     return isNative() ? await registerNative(profileId) : await registerWeb(profileId)
   } catch (e) {
-    console.error('[push] registration failed:', e)
+    logger.warn('[push] registration failed:', e)
     return { ok: false, reason: 'error' }
   }
 }

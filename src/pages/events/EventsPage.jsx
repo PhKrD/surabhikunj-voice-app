@@ -12,6 +12,7 @@ import Button from '@/components/ui/Button'
 import useOrgStore from '@/store/orgStore'
 import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
+import { localDateISO } from '@/lib/dates'
 
 const eventTypeColors = {
   program: 'bg-blue-50 border-blue-100 text-blue-700',
@@ -82,7 +83,7 @@ export default function EventsPage() {
     return () => clearTimeout(id)
   }, [focusedEventId])
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = localDateISO()
   const { data: events = [], loading, refetch } = useCachedQuery(
     orgId ? `events:${orgId}:${todayStr}` : null,
     async () => {

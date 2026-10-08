@@ -7,6 +7,7 @@
 // auth.uid() — this file does not implement any access control itself.
 // =====================================================================
 import { supabase } from '@/lib/supabase'
+import { localDateISO } from './dates.js'
 
 // ---------------------------------------------------------------------
 // Audit log helper (internal)
@@ -265,7 +266,7 @@ export async function upsertRestrictedTimes({ childId, cells, action, isEnabled 
 export async function getUsageHistory(childId, { days = 7 } = {}) {
   const start = new Date()
   start.setDate(start.getDate() - (days - 1))
-  const startIso = start.toISOString().slice(0, 10)
+  const startIso = localDateISO(start)
   const { data, error } = await supabase
     .from('pc_app_usage_events')
     .select('usage_date, package_name, app_name, total_foreground_ms')
@@ -277,7 +278,7 @@ export async function getUsageHistory(childId, { days = 7 } = {}) {
   for (let i = 0; i < days; i++) {
     const d = new Date(start)
     d.setDate(start.getDate() + i)
-    byDate[d.toISOString().slice(0, 10)] = { date: d.toISOString().slice(0, 10), totalMs: 0, apps: {} }
+    byDate[localDateISO(d)] = { date: localDateISO(d), totalMs: 0, apps: {} }
   }
   for (const row of data ?? []) {
     const bucket = byDate[row.usage_date]
@@ -759,7 +760,7 @@ export async function deleteAppRule(ruleId) {
 
 // Get today's app usage for a child to help parents set time limits
 export async function getAppUsageToday(childId) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDateISO()
   const { data, error } = await supabase
     .from('pc_app_usage_events')
     .select('*')
@@ -899,7 +900,7 @@ export async function listRecentLocations(childId, { limit = 20 } = {}) {
 // ---------------------------------------------------------------------
 
 export async function getTodayUsage(childId) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localDateISO()
   const { data, error } = await supabase
     .from('pc_app_usage_events')
     .select('*')

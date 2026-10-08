@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ListChecks, Plus, ChevronLeft, ChevronRight, CheckCircle2, MinusCircle, XCircle, AlertCircle } from 'lucide-react'
-import { format, addDays, subDays, parseISO } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
 import useToastStore from '@/store/toastStore'
@@ -10,6 +10,7 @@ import Button from '@/components/ui/Button'
 import Can from '@/components/Can'
 import { useTerm } from '@/hooks/usePermission'
 import { cn } from '@/lib/utils'
+import { localDateISO, shiftDateISO } from '@/lib/dates'
 
 const STATUS_CONFIG = {
   pending:  { label: 'Pending',  color: 'bg-[var(--surface-muted)] text-secondary-token',    icon: null },
@@ -29,7 +30,7 @@ export default function TasksPage() {
   const orgId = org?.id ?? profile?.org_id
   const label = useTerm('tasks', 'Tasks')
 
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(() => localDateISO())
   const [assignments, setAssignments] = useState([])
   const [logs, setLogs]               = useState({})  // { [assignmentId]: { status, notes } }
   const [expanded, setExpanded]       = useState(null) // id of card showing notes input
@@ -86,7 +87,7 @@ export default function TasksPage() {
     }
   }
 
-  const isToday = date === new Date().toISOString().split('T')[0]
+  const isToday = date === localDateISO()
 
   if (loading) return <div className="p-8 text-center text-muted-token">Loading {label}…</div>
 
@@ -103,7 +104,7 @@ export default function TasksPage() {
       {/* Date navigator */}
       <div className="flex items-center justify-between bg-[var(--surface)] border border-[var(--border-color)] rounded-2xl px-4 py-2.5 shadow-sm">
         <button
-          onClick={() => setDate(subDays(parseISO(date), 1).toISOString().split('T')[0])}
+          onClick={() => setDate(shiftDateISO(date, -1))}
           className="p-1.5 rounded-lg text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)]"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -112,7 +113,7 @@ export default function TasksPage() {
           {isToday ? 'Today' : format(parseISO(date), 'EEEE, dd MMM')}
         </span>
         <button
-          onClick={() => setDate(addDays(parseISO(date), 1).toISOString().split('T')[0])}
+          onClick={() => setDate(shiftDateISO(date, 1))}
           disabled={isToday}
           className="p-1.5 rounded-lg text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)] disabled:opacity-30"
         >

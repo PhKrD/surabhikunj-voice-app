@@ -20,7 +20,7 @@ import WhatsAppShareModal from './WhatsAppShareModal'
 import TrackerBuilder from './TrackerBuilder'
 import TrackerSettings from './TrackerSettings'
 import { calculateEntryScore } from '@/lib/trackerScoring'
-import { buildTemplateVariables, renderTemplate, FALLBACK_TEMPLATE, formatFieldValue } from '@/lib/trackerWhatsapp'
+import { buildTemplateVariables, renderTemplate, formatFieldValue } from '@/lib/trackerWhatsapp'
 import { fetchTrackerConfig } from '@/lib/trackerApi'
 import { tap } from '@/lib/haptics'
 

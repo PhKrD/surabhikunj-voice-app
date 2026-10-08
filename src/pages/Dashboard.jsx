@@ -1,131 +1,125 @@
-import { motion } from 'framer-motion'
-import { BookOpen, UtensilsCrossed, CalendarDays, ListChecks, TrendingUp, Clock, MapPin, Megaphone, MessageCircle, AlertCircle, RefreshCw, CheckCircle2, Users, Building2, GitBranch, BarChart3 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
+import {
+  BookOpen, CalendarDays, CheckCircle2, ChevronRight, Circle, Clock, MapPin, Megaphone,
+  MessageCircle, Sparkles, TrendingUp, UserPlus, UtensilsCrossed, ListChecks,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCachedQuery } from '@/lib/useCachedQuery'
+import { localDateISO } from '@/lib/dates'
+import { cn, formatDate, formatTime, scoreBg } from '@/lib/utils'
 import useAuthStore from '@/store/authStore'
 import useOrgStore from '@/store/orgStore'
-import StatCard from '@/components/ui/StatCard'
-import Card, { CardHeader, CardBody } from '@/components/ui/Card'
-import Badge from '@/components/ui/Badge'
+import Card, { CardHeader, CardBody, CardTitle } from '@/components/ui/Card'
+import Badge, { StatusBadge } from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
-import Button from '@/components/ui/Button'
-import { scoreBg, formatDate, formatTime } from '@/lib/utils'
+import { buttonClass } from '@/components/ui/buttonStyles'
+import DynamicIcon from '@/components/ui/DynamicIcon'
+import ProgressRing from '@/components/ui/ProgressRing'
+import { EmptyState, ErrorState, Skeleton } from '@/components/ui/States'
 
 const FALLBACK_QUOTE = {
-  label: 'Verse of the Day',
+  label: 'Verse of the day',
   text: 'One who has taken birth in this human form of life, if he does not utilize this opportunity for self-realization, is certainly the killer of his own self.',
   source: 'Śrīmad-Bhāgavatam 11.20.17',
 }
 
-const TASK_STATUS_VARIANT = { done: 'tulasi', pending: 'yellow', missed: 'red', excused: 'blue', partial: 'yellow', verified: 'blue' }
+function greetingFor(hour) {
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
 
-const QUICK_ICON_MAP = {
-  trackers: BookOpen, mentorship: MessageCircle, tasks: ListChecks,
-  resources: UtensilsCrossed, events: CalendarDays, departments: Building2,
-  announcements: Megaphone, hierarchy: GitBranch, members: Users,
-  reports: BarChart3,
+function ViewAll({ to, label = 'View all' }) {
+  return (
+    <Link
+      to={to}
+      className="inline-flex items-center gap-0.5 h-9 -mr-2 px-2 rounded-[var(--radius-sm)] text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)]"
+    >
+      {label}
+      <ChevronRight className="w-4 h-4" aria-hidden="true" />
+    </Link>
+  )
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-5" aria-label="Loading">
+      <Skeleton className="h-8 w-56" />
+      <Skeleton className="h-36 w-full rounded-[var(--radius-lg)]" />
+      <div className="grid grid-cols-4 gap-3">
+        {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-[var(--radius-lg)]" />)}
+      </div>
+      <Skeleton className="h-48 w-full rounded-[var(--radius-lg)]" />
+    </div>
+  )
 }
 
 export default function Dashboard() {
   const { profile, profileLoading, profileError, user, fetchProfile } = useAuthStore()
-  const { org, nav, t, settings } = useOrgStore()
+  const { org, nav, t, settings, hasPermission } = useOrgStore()
   const orgId = org?.id ?? profile?.org_id
   const quote = settings?.branding?.dailyQuote ?? FALLBACK_QUOTE
+  const canApprove = hasPermission('members.approve') || hasPermission('members.manage')
+  const trackerLabel = t('tracker', 'Sadhana')
 
-  const quickNav = nav.filter((n) => !['settings', 'notifications', 'dashboard'].includes(n.key)).slice(0, 6)
+  const quickNav = nav
+    .filter((n) => n.route && !['settings', 'notifications', 'dashboard'].includes(n.key))
+    .slice(0, 8)
 
-  const greeting = t('greeting', 'Welcome')
-  const displayName = profile?.display_name ?? profile?.spiritual_name ?? profile?.legal_name ?? ''
+  const displayName = profile?.display_name ?? ''
   const firstName = displayName.split(' ')[0] || t('member', 'Member')
-  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
-  const todayISO = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const todayLabel = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
+  const todayISO = localDateISO(now)
 
-  const { data, loading: queryLoading } = useCachedQuery(
-    profile && orgId ? `dashboard:${profile.id}:${orgId}:${todayISO}` : null,
+  const { data, loading, error, refetch } = useCachedQuery(
+    profile && orgId ? `dashboard:${profile.id}:${orgId}:${todayISO}:${canApprove}` : null,
     async () => {
       const nowISO = new Date().toISOString()
-
-      // Fetch from new primitive tables; gracefully returns empty on pre-migration DB
       const [
-        trackerEntriesRes,
-        taskAssignRes,
-        taskLogRes,
-        resourcePlansRes,
-        eventsRes,
-        recentTrackerRes,
-        announcementsRes,
-        mentorRes,
+        trackerEntriesRes, taskAssignRes, taskLogRes, resourcePlansRes,
+        eventsRes, recentTrackerRes, announcementsRes, mentorRes, pendingRes,
       ] = await Promise.all([
-        // Today's tracker entries (all trackers)
         supabase.from('tracker_entries')
           .select('id, score, tracker_definitions(id, name, color)')
-          .eq('user_id', profile.id)
-          .eq('org_id', orgId)
-          .eq('period_date', todayISO),
-
-        // Today's task assignments
+          .eq('user_id', profile.id).eq('org_id', orgId).eq('period_date', todayISO),
         supabase.from('task_assignments')
           .select('id, task_time, task_templates(name)')
-          .eq('user_id', profile.id)
-          .eq('task_date', todayISO)
-          .order('task_time'),
-
-        // Today's task logs (for status)
+          .eq('user_id', profile.id).eq('task_date', todayISO).order('task_time'),
         supabase.from('task_logs')
           .select('assignment_id, status')
-          .eq('user_id', profile.id)
-          .eq('log_date', todayISO),
-
-        // Today's resource plans
+          .eq('user_id', profile.id).eq('log_date', todayISO),
         supabase.from('resource_plans')
           .select('id, resource_types(name, icon, color), resource_plan_items(name, quantity, sort_order)')
-          .eq('org_id', orgId)
-          .eq('plan_date', todayISO),
-
-        // Upcoming events
+          .eq('org_id', orgId).eq('plan_date', todayISO),
         supabase.from('events')
           .select('id, title, start_datetime, venue, event_type, is_mandatory')
-          .eq('org_id', orgId)
-          .eq('is_active', true)
-          .gte('start_datetime', nowISO)
-          .order('start_datetime', { ascending: true })
-          .limit(4),
-
-        // Recent tracker entries (across all trackers, last 5)
+          .eq('org_id', orgId).eq('is_active', true).gte('start_datetime', nowISO)
+          .order('start_datetime', { ascending: true }).limit(4),
         supabase.from('tracker_entries')
           .select('id, period_date, score, tracker_definitions(name, color)')
-          .eq('user_id', profile.id)
-          .eq('org_id', orgId)
-          .order('period_date', { ascending: false })
-          .limit(5),
-
-        // Announcements
+          .eq('user_id', profile.id).eq('org_id', orgId)
+          .order('period_date', { ascending: false }).limit(5),
         supabase.from('announcements')
           .select('id, title, body, is_pinned, created_at')
           .eq('org_id', orgId)
-          .order('is_pinned', { ascending: false })
-          .order('created_at', { ascending: false })
-          .limit(2),
-
-        // Mentor via RPC
+          .order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(3),
         supabase.rpc('my_mentor'),
+        canApprove
+          ? supabase.from('memberships').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'pending')
+          : Promise.resolve({ count: 0 }),
       ])
+
+      // The essentials failing means the screen is wrong, not just empty.
+      if (trackerEntriesRes.error && announcementsRes.error && eventsRes.error) throw trackerEntriesRes.error
 
       const taskLogMap = {}
       for (const l of taskLogRes.data ?? []) taskLogMap[l.assignment_id] = l.status
+      const tasks = (taskAssignRes.data ?? []).map((a) => ({ ...a, status: taskLogMap[a.id] ?? 'pending' }))
 
-      const tasks = (taskAssignRes.data ?? []).map((a) => ({
-        ...a,
-        status: taskLogMap[a.id] ?? 'pending',
-      }))
-
-      // Score: average of today's tracker entries that have a score
-      const scoredEntries = (trackerEntriesRes.data ?? []).filter((e) => e.score != null)
-      const avgScore = scoredEntries.length
-        ? Math.round(scoredEntries.reduce((s, e) => s + e.score, 0) / scoredEntries.length)
-        : null
+      const scored = (trackerEntriesRes.data ?? []).filter((e) => e.score != null)
+      const avgScore = scored.length ? Math.round(scored.reduce((s, e) => s + e.score, 0) / scored.length) : null
 
       return {
         trackerScore: avgScore,
@@ -136,406 +130,316 @@ export default function Dashboard() {
         recentEntries: recentTrackerRes.data ?? [],
         announcements: announcementsRes.data ?? [],
         mentor: (mentorRes.data ?? [])[0] ?? null,
+        pendingApprovals: pendingRes.count ?? 0,
       }
-    }
+    },
   )
 
-  const {
-    trackerScore = null,
-    trackerCount = 0,
-    tasks = [],
-    resourcePlans = [],
-    events = [],
-    recentEntries = [],
-    announcements = [],
-    mentor = null,
-  } = data ?? {}
-
-  const loading = queryLoading
-  const tasksDone = tasks.filter((t) => t.status === 'done' || t.status === 'verified').length
-
-  // Profile failed to load → show recoverable error instead of hanging forever
   if (profileError && !profile) {
     return (
-      <div className="max-w-md mx-auto mt-16">
-        <Card>
-          <CardBody className="text-center py-10">
-            <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
-            <h3 className="font-semibold text-primary-token mb-1">Could not load your profile</h3>
-            <p className="text-sm text-secondary-token mb-4">{profileError}</p>
-            <Button icon={RefreshCw} onClick={() => user?.id && fetchProfile(user.id)} loading={profileLoading}>
-              Retry
-            </Button>
-          </CardBody>
-        </Card>
-      </div>
+      <Card className="max-w-md mx-auto mt-10">
+        <ErrorState
+          title="Couldn’t load your profile"
+          error={profileError}
+          onRetry={() => user?.id && fetchProfile(user.id)}
+        />
+        {profileLoading && <p className="sr-only">Retrying</p>}
+      </Card>
     )
   }
 
-  // First-time profile fetch → show skeleton (not a stuck spinner)
-  if (!profile) {
-    return (
-      <div className="max-w-6xl mx-auto space-y-4 animate-pulse">
-        <div className="h-20 surface-muted rounded-2xl" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="h-24 surface-muted rounded-2xl" />
-          <div className="h-24 surface-muted rounded-2xl" />
-          <div className="h-24 surface-muted rounded-2xl" />
-          <div className="h-24 surface-muted rounded-2xl" />
-        </div>
-      </div>
-    )
-  }
+  if (!profile || (loading && !data)) return <DashboardSkeleton />
+
+  const {
+    trackerScore = null, trackerCount = 0, tasks = [], resourcePlans = [], events = [],
+    recentEntries = [], announcements = [], mentor = null, pendingApprovals = 0,
+  } = data ?? {}
+  const tasksDone = tasks.filter((x) => x.status === 'done' || x.status === 'verified').length
+  const filledToday = trackerCount > 0
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* Greeting */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-      >
-        <div>
-          <h2 className="text-2xl font-bold text-primary-token">
-            {greeting}, {firstName} <span aria-hidden>👋</span>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-caption">{todayLabel}</p>
+          <h2 className="text-display text-primary-token mt-0.5 truncate">
+            {greetingFor(now.getHours())}, {firstName}
           </h2>
-          <p className="text-sm text-secondary-token mt-0.5">{today}</p>
         </div>
-        {profile && (
-          <Badge variant="primary">
-            {profile.role ?? t('member', 'Member')}
-          </Badge>
-        )}
-      </motion.div>
+        {profile.role && <Badge variant="primary" className="mt-1 capitalize">{String(profile.role).replace(/_/g, ' ')}</Badge>}
+      </div>
+
+      {error && !data && <Card><ErrorState error={error} onRetry={refetch} compact /></Card>}
+
+      {/* Admin: something needs a decision */}
+      {pendingApprovals > 0 && (
+        <Link to="/members" className="block">
+          <Card hover className="flex items-center gap-4 p-4 border-[var(--color-warning-soft)]">
+            <span className="w-11 h-11 rounded-[var(--radius-md)] bg-[var(--color-warning-soft)] flex items-center justify-center flex-shrink-0">
+              <UserPlus className="w-5 h-5 text-[var(--color-warning)]" aria-hidden="true" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-heading text-primary-token">
+                {pendingApprovals} {pendingApprovals === 1 ? 'person is' : 'people are'} waiting to join
+              </p>
+              <p className="text-caption">Review and approve new members</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-token flex-shrink-0" aria-hidden="true" />
+          </Card>
+        </Link>
+      )}
+
+      {/* Today */}
+      <Card className="p-5">
+        <div className="flex items-center gap-5">
+          <div className="flex-shrink-0">
+            {trackerScore != null ? (
+              <ProgressRing value={trackerScore} size={76} strokeWidth={7} color="var(--color-primary)" />
+            ) : (
+              <span
+                className={cn(
+                  'w-[76px] h-[76px] rounded-full flex items-center justify-center',
+                  filledToday ? 'bg-[var(--color-success-soft)]' : 'bg-[var(--color-primary-soft)]',
+                )}
+              >
+                {filledToday
+                  ? <CheckCircle2 className="w-9 h-9 text-[var(--color-success)]" aria-hidden="true" />
+                  : <BookOpen className="w-8 h-8 text-[var(--color-primary)]" aria-hidden="true" />}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-overline">Today’s {trackerLabel}</p>
+            <p className="text-title text-primary-token mt-1">
+              {filledToday ? (trackerScore != null ? `${trackerScore}% complete` : 'Submitted') : 'Not filled yet'}
+            </p>
+            {tasks.length > 0 && (
+              <p className="text-caption mt-1">
+                {tasksDone} of {tasks.length} {t('tasks', 'tasks').toLowerCase()} done
+              </p>
+            )}
+          </div>
+        </div>
+        <Link
+          to="/trackers"
+          className={buttonClass({ variant: filledToday ? 'secondary' : 'primary', className: 'w-full mt-5' })}
+        >
+          {filledToday ? `Review today’s ${trackerLabel}` : `Fill today’s ${trackerLabel}`}
+        </Link>
+      </Card>
+
+      {/* Quick actions — driven by my_navigation() */}
+      {quickNav.length > 0 && (
+        <section aria-label="Quick actions">
+          <div className="grid grid-cols-4 gap-2 sm:gap-3">
+            {quickNav.map((mod) => {
+              return (
+                <Link
+                  key={mod.route}
+                  to={mod.route}
+                  className="press flex flex-col items-center gap-2 py-3 px-1 rounded-[var(--radius-lg)] bg-[var(--surface)] border border-[var(--border-color)] hover:shadow-[var(--shadow-2)] transition-shadow"
+                >
+                  <span className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--color-primary-soft)] flex items-center justify-center">
+                    <DynamicIcon name={mod.icon} fallback={BookOpen} className="w-5 h-5 text-[var(--color-primary)]" aria-hidden="true" />
+                  </span>
+                  <span className="text-[0.75rem] font-medium text-secondary-token text-center leading-tight line-clamp-2 w-full">
+                    {mod.label || mod.key}
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Main column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Verse of the Day — quiet spiritual accent, not a huge banner */}
-          {quote && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="relative overflow-hidden rounded-2xl p-5 text-white"
-              style={{ background: `linear-gradient(135deg, var(--color-primary-700), var(--color-primary-500))` }}
-            >
-              <div className="flex items-start justify-between gap-3 relative">
-                <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-2">{quote.label ?? 'Verse of the Day'}</p>
-                  <p className="text-base font-medium leading-relaxed italic">"{quote.text}"</p>
-                  {quote.source && (
-                    <p className="text-xs text-white/75 mt-3 font-semibold">— {quote.source}</p>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-2 lg:grid-cols-4 gap-3"
-          >
-            <StatCard
-              label={t('tracker', 'Tracker') + ' Today'}
-              value={trackerScore != null ? `${trackerScore}%` : trackerCount > 0 ? '✓' : '—'}
-              progress={trackerScore != null ? trackerScore : undefined}
-              icon={BookOpen}
-              color="lotus"
-            />
-            <StatCard
-              label={t('tasks', 'Tasks') + ' Today'}
-              value={tasks.length ? `${tasksDone}/${tasks.length}` : '—'}
-              icon={ListChecks}
-              color="saffron"
-            />
-            <StatCard
-              label="Resources Today"
-              value={resourcePlans.length || '—'}
-              icon={UtensilsCrossed}
-              color="amber"
-            />
-            <StatCard label="Upcoming Events" value={events.length || '—'} icon={CalendarDays} color="blue" />
-          </motion.div>
-
-          {/* Quick Access Modules — driven by my_navigation() */}
-          {quickNav.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <h3 className="text-sm font-semibold text-secondary-token mb-2.5">Quick Access</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {quickNav.map((mod) => {
-                  const ModIcon = QUICK_ICON_MAP[mod.key] ?? BookOpen
-                  return (
-                    <Link key={mod.route} to={mod.route} className="group block">
-                      <div className="flex items-center gap-3 rounded-xl p-3 surface border hover:border-[var(--color-primary-200)] hover:bg-[var(--color-primary-50)] dark:hover:bg-[var(--color-primary-900)] transition-colors">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[var(--color-primary-50)] dark:bg-[var(--color-primary-900)] flex-shrink-0">
-                          <ModIcon className="w-4.5 h-4.5 text-[var(--color-primary-600)] dark:text-[var(--color-primary-300)]" />
-                        </div>
-                        <p className="font-semibold text-sm text-primary-token truncate">{mod.label || mod.key}</p>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Today's Tasks */}
+          {/* Today's tasks */}
           {tasks.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-primary-token">Today's {t('tasks', 'Tasks')}</h3>
-                    <Link to="/tasks" className="text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
-                      View all →
-                    </Link>
-                  </div>
-                </CardHeader>
-                <CardBody className="pt-0">
-                  <div className="divide-y divide-[var(--border-color)]">
-                    {tasks.map((task) => (
-                      <div key={task.id} className="flex items-center justify-between gap-3 py-2.5">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {task.status === 'done' || task.status === 'verified'
-                            ? <CheckCircle2 className="w-4 h-4 text-tulasi-600 flex-shrink-0" />
-                            : <ListChecks className="w-4 h-4 text-saffron-400 flex-shrink-0" />
-                          }
-                          <span className="text-sm text-primary-token truncate">
-                            {task.task_templates?.name ?? 'Task'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {task.task_time && (
-                            <span className="flex items-center gap-1 text-xs text-muted-token">
-                              <Clock className="w-3 h-3" />
-                              {formatTime(task.task_time)}
-                            </span>
-                          )}
-                          <Badge variant={TASK_STATUS_VARIANT[task.status] ?? 'default'}>
-                            {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardBody>
-              </Card>
-            </motion.div>
-          )}
-
-          {/* Today's Resources */}
-          {resourcePlans.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-primary-token">Today's Resources</h3>
-                    <Link to="/resources" className="text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
-                      View all →
-                    </Link>
-                  </div>
-                </CardHeader>
-                <CardBody className="pt-0">
-                  <div className="divide-y divide-[var(--border-color)]">
-                    {resourcePlans.map((plan) => (
-                      <div key={plan.id} className="flex items-start gap-3 py-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-saffron-50 dark:bg-saffron-900/30 flex items-center justify-center flex-shrink-0">
-                          <UtensilsCrossed className="w-4 h-4 text-saffron-600 dark:text-saffron-300" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-primary-token">
-                            {plan.resource_types?.name ?? 'Resource'}
-                          </p>
-                          {(plan.resource_plan_items ?? []).length > 0 && (
-                            <p className="text-sm text-secondary-token mt-0.5">
-                              {[...plan.resource_plan_items]
-                                .sort((a, b) => a.sort_order - b.sort_order)
-                                .map((i) => i.name)
-                                .join(', ')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardBody>
-              </Card>
-            </motion.div>
-          )}
-
-          {/* Recent Activity — recent tracker entries */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-primary-token">Recent Activity</h3>
-                  <Link to="/trackers" className="text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
-                    View all →
-                  </Link>
-                </div>
+                <CardTitle icon={ListChecks} action={<ViewAll to="/services" />}>
+                  Today’s {t('tasks', 'Tasks')}
+                </CardTitle>
               </CardHeader>
-              <CardBody>
-                {loading ? (
-                  <div className="text-center py-8 text-muted-token text-sm">Loading...</div>
-                ) : recentEntries.length === 0 ? (
-                  <div className="flex flex-col items-center py-8 text-muted-token">
-                    <TrendingUp className="w-10 h-10 mb-3 opacity-30" />
-                    <p className="text-sm">Your {t('tracker', 'Sadhana').toLowerCase()} journey starts today.</p>
-                    <Link to="/trackers" className="mt-3 text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
-                      Add Today's Entry →
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-[var(--border-color)]">
-                    {recentEntries.map((r) => (
-                      <div key={r.id} className="flex items-center justify-between gap-3 py-2.5">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-primary-token">{formatDate(r.period_date)}</p>
-                          {r.tracker_definitions?.name && (
-                            <p className="text-xs text-muted-token mt-0.5">{r.tracker_definitions.name}</p>
-                          )}
-                        </div>
-                        {r.score != null && (
-                          <div className={`px-3 py-1.5 rounded-xl text-sm font-bold ${scoreBg(r.score)}`}>
-                            {r.score.toFixed(1)}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardBody>
+              <ul className="px-4 sm:px-5 pb-2 divide-y divide-[var(--border-color)]">
+                {tasks.map((task) => {
+                  const done = task.status === 'done' || task.status === 'verified'
+                  return (
+                    <li key={task.id} className="flex items-center gap-3 py-3">
+                      {done
+                        ? <CheckCircle2 className="w-5 h-5 text-[var(--color-success)] flex-shrink-0" aria-hidden="true" />
+                        : <Circle className="w-5 h-5 text-[var(--border-strong)] flex-shrink-0" aria-hidden="true" />}
+                      <span className={cn('flex-1 min-w-0 text-body truncate', done ? 'text-muted-token line-through' : 'text-primary-token')}>
+                        {task.task_templates?.name ?? 'Task'}
+                      </span>
+                      {task.task_time && (
+                        <span className="hidden sm:flex items-center gap-1 text-caption">
+                          <Clock className="w-3.5 h-3.5" aria-hidden="true" />
+                          {formatTime(task.task_time)}
+                        </span>
+                      )}
+                      <StatusBadge status={task.status} />
+                    </li>
+                  )
+                })}
+              </ul>
             </Card>
-          </motion.div>
+          )}
+
+          {/* Announcements */}
+          <Card>
+            <CardHeader>
+              <CardTitle icon={Megaphone} action={announcements.length > 0 && <ViewAll to="/announcements" />}>
+                Announcements
+              </CardTitle>
+            </CardHeader>
+            {announcements.length === 0 ? (
+              <EmptyState compact icon={Megaphone} title="No announcements" description="Updates from your organization will appear here." />
+            ) : (
+              <ul className="px-4 sm:px-5 pb-2 divide-y divide-[var(--border-color)]">
+                {announcements.map((a) => (
+                  <li key={a.id} className="py-3">
+                    <div className="flex items-center gap-2">
+                      <p className="text-body font-semibold text-primary-token min-w-0 truncate">{a.title}</p>
+                      {a.is_pinned && <Badge variant="accent">Pinned</Badge>}
+                    </div>
+                    {a.body && <p className="text-caption mt-1 line-clamp-2">{a.body}</p>}
+                    <p className="text-[0.75rem] text-muted-token mt-1.5">{formatDate(a.created_at)}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          {/* Recent activity */}
+          <Card>
+            <CardHeader>
+              <CardTitle icon={TrendingUp} action={recentEntries.length > 0 && <ViewAll to="/trackers" />}>
+                Recent activity
+              </CardTitle>
+            </CardHeader>
+            {recentEntries.length === 0 ? (
+              <EmptyState
+                compact
+                icon={Sparkles}
+                title={`Your ${trackerLabel.toLowerCase()} journey starts today`}
+                description="Your recent entries and scores will show here."
+              />
+            ) : (
+              <ul className="px-4 sm:px-5 pb-2 divide-y divide-[var(--border-color)]">
+                {recentEntries.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="text-body font-medium text-primary-token">{formatDate(r.period_date)}</p>
+                      {r.tracker_definitions?.name && <p className="text-caption">{r.tracker_definitions.name}</p>}
+                    </div>
+                    {r.score != null && (
+                      <span className={cn('px-3 h-8 inline-flex items-center rounded-full text-sm font-bold tabular', scoreBg(r.score))}>
+                        {Number(r.score).toFixed(1)}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
         </div>
 
-        {/* Right rail */}
+        {/* Side column */}
         <div className="space-y-6">
-          {/* Announcements */}
-          {announcements.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Megaphone className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
-                      <h3 className="font-semibold text-primary-token">Announcements</h3>
-                    </div>
-                    <Link to="/announcements" className="text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
-                      View all →
-                    </Link>
-                  </div>
-                </CardHeader>
-                <CardBody className="pt-0">
-                  <div className="divide-y divide-[var(--border-color)]">
-                    {announcements.map((a) => (
-                      <div key={a.id} className="py-2.5">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-primary-token">{a.title}</p>
-                          {a.is_pinned && <Badge variant="saffron">Pinned</Badge>}
-                        </div>
-                        {a.body && <p className="text-sm text-secondary-token mt-0.5 line-clamp-2">{a.body}</p>}
-                        <p className="text-xs text-muted-token mt-1">{formatDate(a.created_at)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardBody>
-              </Card>
-            </motion.div>
+          {/* Verse */}
+          {quote?.text && (
+            <Card variant="muted" className="p-5">
+              <p className="text-overline !text-[var(--color-accent)]">{quote.label ?? 'Verse of the day'}</p>
+              <blockquote className="mt-2 text-body text-primary-token leading-relaxed italic">“{quote.text}”</blockquote>
+              {quote.source && <p className="text-caption mt-3 font-semibold">— {quote.source}</p>}
+            </Card>
           )}
 
-          {/* Upcoming Events */}
-          {events.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-primary-token">Upcoming Events</h3>
-                    <Link to="/events" className="text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
-                      View all →
-                    </Link>
-                  </div>
-                </CardHeader>
-                <CardBody className="pt-0">
-                  <div className="divide-y divide-[var(--border-color)]">
-                    {events.map((e) => (
-                      <div key={e.id} className="flex items-start justify-between gap-3 py-2.5">
-                        <div className="flex items-start gap-2 min-w-0">
-                          <CalendarDays className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-primary-token truncate">{e.title}</p>
-                            {e.venue && (
-                              <span className="flex items-center gap-1 text-xs text-muted-token mt-0.5">
-                                <MapPin className="w-3 h-3" />
-                                {e.venue}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                          <span className="text-xs text-secondary-token">{format(new Date(e.start_datetime), 'dd MMM, h:mm a')}</span>
-                          {e.is_mandatory && <Badge variant="red">Mandatory</Badge>}
-                        </div>
+          {/* Upcoming events */}
+          <Card>
+            <CardHeader>
+              <CardTitle icon={CalendarDays} action={events.length > 0 && <ViewAll to="/events" />}>
+                Upcoming events
+              </CardTitle>
+            </CardHeader>
+            {events.length === 0 ? (
+              <EmptyState compact icon={CalendarDays} title="Nothing scheduled" />
+            ) : (
+              <ul className="px-4 sm:px-5 pb-2 divide-y divide-[var(--border-color)]">
+                {events.map((e) => {
+                  const start = new Date(e.start_datetime)
+                  return (
+                    <li key={e.id} className="flex items-center gap-3 py-3">
+                      <div className="w-12 h-12 rounded-[var(--radius-md)] bg-[var(--color-primary-soft)] flex flex-col items-center justify-center flex-shrink-0">
+                        <span className="text-[0.625rem] font-bold uppercase text-[var(--color-primary)] leading-none">{format(start, 'MMM')}</span>
+                        <span className="text-lg font-bold text-primary-token leading-tight tabular">{format(start, 'd')}</span>
                       </div>
-                    ))}
-                  </div>
-                </CardBody>
-              </Card>
-            </motion.div>
-          )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-body font-semibold text-primary-token truncate">{e.title}</p>
+                        <p className="text-caption flex items-center gap-1 truncate">
+                          {format(start, 'h:mm a')}
+                          {e.venue && (<><span aria-hidden="true">·</span><MapPin className="w-3 h-3 flex-shrink-0" aria-hidden="true" /><span className="truncate">{e.venue}</span></>)}
+                        </p>
+                      </div>
+                      {e.is_mandatory && <Badge variant="danger">Required</Badge>}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </Card>
 
-          {/* Your Mentor */}
-          {mentor && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Card>
-                <CardHeader>
-                  <h3 className="font-semibold text-primary-token">Your {t('mentor', 'Mentor')}</h3>
-                </CardHeader>
-                <CardBody className="pt-0">
-                  <div className="flex items-center gap-3">
-                    <Avatar name={mentor.mentor_name} url={mentor.mentor_avatar} size="md" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-primary-token truncate">{mentor.mentor_name}</p>
-                      {mentor.type_name && <Badge variant="default">{mentor.type_name}</Badge>}
-                    </div>
-                    {mentor.mentor_phone && (
-                      <a
-                        href={`https://wa.me/${mentor.mentor_phone.replace(/[^0-9]/g, '')}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-tulasi-600 hover:bg-tulasi-700 text-white text-sm font-medium transition-colors flex-shrink-0"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        Message
-                      </a>
+          {/* Today's resources */}
+          {resourcePlans.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle icon={UtensilsCrossed} action={<ViewAll to="/resources" />}>Today’s resources</CardTitle>
+              </CardHeader>
+              <ul className="px-4 sm:px-5 pb-2 divide-y divide-[var(--border-color)]">
+                {resourcePlans.map((plan) => (
+                  <li key={plan.id} className="py-3">
+                    <p className="text-body font-semibold text-primary-token">{plan.resource_types?.name ?? 'Resource'}</p>
+                    {(plan.resource_plan_items ?? []).length > 0 && (
+                      <p className="text-caption mt-0.5">
+                        {[...plan.resource_plan_items].sort((a, b) => a.sort_order - b.sort_order).map((i) => i.name).join(', ')}
+                      </p>
                     )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {/* Mentor */}
+          {mentor && (
+            <Card>
+              <CardHeader>
+                <h3 className="text-heading text-primary-token">Your {t('mentor', 'mentor')}</h3>
+              </CardHeader>
+              <CardBody className="pt-0">
+                <div className="flex items-center gap-3">
+                  <Avatar name={mentor.mentor_name} url={mentor.mentor_avatar} size="md" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-body font-semibold text-primary-token truncate">{mentor.mentor_name}</p>
+                    {mentor.type_name && <p className="text-caption truncate">{mentor.type_name}</p>}
                   </div>
-                </CardBody>
-              </Card>
-            </motion.div>
+                  {mentor.mentor_phone && (
+                    <a
+                      href={`https://wa.me/${mentor.mentor_phone.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-[var(--radius-md)] bg-[var(--color-success)] text-white text-sm font-semibold flex-shrink-0"
+                    >
+                      <MessageCircle className="w-4 h-4" aria-hidden="true" />
+                      Message
+                    </a>
+                  )}
+                </div>
+              </CardBody>
+            </Card>
           )}
         </div>
       </div>

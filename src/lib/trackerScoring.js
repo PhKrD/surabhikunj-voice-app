@@ -11,6 +11,8 @@
 // module, so a devotee enters Sadhana once and every view of it agrees.
 // =====================================================================
 
+import { evaluateExpression } from './safeExpression.js'
+
 function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100
 }
@@ -177,11 +179,8 @@ export function calculateFieldScore(rule, fieldValues) {
 
     case 'formula': {
       try {
-        const ctx = Object.entries(fieldValues ?? {})
-          .map(([k, v]) => `const ${k} = ${JSON.stringify(v)};`)
-          .join('')
-        // eslint-disable-next-line no-new-func
-        const raw = new Function(`${ctx}return (${cfg.expr ?? 0});`)()
+        // Parsed, never executed as code (see safeExpression.js).
+        const raw = evaluateExpression(cfg.expr ?? '0', fieldValues ?? {})
         const points = Math.min(maxPoints, Math.max(0, Number(raw) || 0))
         return { points: round2(points), max: maxPoints }
       } catch {

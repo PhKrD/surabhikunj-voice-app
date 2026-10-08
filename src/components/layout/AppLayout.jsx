@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import BottomNav from './BottomNav'
-import { NoticeBanner, OfflineBanner, UpdateBanner } from '@/components/system/Banners'
+import { MaintenanceAdminBanner, NoticeBanner, OfflineBanner, UpdateBanner } from '@/components/system/Banners'
 
 // ─── Scroll restoration ──────────────────────────────────────────────────────
 // Pages re-fetch data async, so the scroll container is initially SHORT. A
@@ -84,6 +84,7 @@ export default function AppLayout() {
       <Sidebar mobileOpen={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header />
+        <MaintenanceAdminBanner />
         <OfflineBanner />
         <UpdateBanner />
         <NoticeBanner />

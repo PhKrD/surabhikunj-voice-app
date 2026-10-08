@@ -16,7 +16,13 @@
     </style>
 
 
+    <!-- Launch screen. Android 12+ draws the system splash from the two
+         windowSplashScreen* attributes (brand colour + flame); older
+         versions show @drawable/splash. Both match the app's purple. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>

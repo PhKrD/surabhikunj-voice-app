@@ -128,6 +128,9 @@ const useAuthStore = create((set, get) => ({
     await get().fetchProfile(userId)
     const { default: useOrgStore } = await import('@/store/orgStore')
     useOrgStore.getState().initialize()
+    // Re-check platform-admin status (it lifts maintenance mode for admins).
+    const { default: useConfigStore } = await import('@/store/configStore')
+    useConfigStore.getState().load({ force: true })
   },
 
   _resetLocalState: async ({ expired = false } = {}) => {
@@ -137,6 +140,8 @@ const useAuthStore = create((set, get) => ({
     clearCache()
     const { default: useOrgStore } = await import('@/store/orgStore')
     useOrgStore.getState().reset()
+    const { default: useConfigStore } = await import('@/store/configStore')
+    useConfigStore.setState({ isPlatformAdmin: false })
     set({
       user: null,
       profile: null,

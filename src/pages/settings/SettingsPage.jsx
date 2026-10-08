@@ -2,8 +2,11 @@ import { useMemo, useState, useEffect, useCallback } from 'react'
 import {
   Settings, User, Phone, Home, Save, ShieldCheck,
   Building2, LayoutGrid, Lock, ToggleLeft, ToggleRight,
-  Plus, Trash2, ChevronDown, ChevronUp, Palette, KeyRound, Copy, Check
+  Plus, Trash2, ChevronDown, ChevronUp, Palette, KeyRound, Copy, Check, Megaphone, Smartphone
 } from 'lucide-react'
+import useConfigStore from '@/store/configStore'
+import ContentSettingsTab from './ContentSettingsTab'
+import PlatformSettingsTab from './PlatformSettingsTab'
 import useAuthStore from '@/store/authStore'
 import useOrgStore from '@/store/orgStore'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
@@ -638,48 +641,61 @@ function ProfileTab() {
 const TABS = [
   { key: 'profile',  label: 'Profile',      icon: User,        permission: null },
   { key: 'org',      label: 'Organization', icon: Building2,   permission: 'org.settings.manage' },
+  { key: 'content',  label: 'Notices & support', icon: Megaphone, permission: 'org.settings.manage' },
   { key: 'modules',  label: 'Modules',      icon: LayoutGrid,  permission: 'org.modules.manage' },
   { key: 'roles',    label: 'Roles',        icon: Lock,        permission: 'roles.manage' },
+  { key: 'platform', label: 'App & updates', icon: Smartphone, platformAdmin: true },
 ]
 
 export default function SettingsPage() {
   const { hasPermission } = useOrgStore()
-  const visibleTabs = TABS.filter((t) => !t.permission || hasPermission(t.permission))
+  const isPlatformAdmin = useConfigStore((s) => s.isPlatformAdmin)
+  const visibleTabs = TABS.filter((t) =>
+    t.platformAdmin ? isPlatformAdmin : (!t.permission || hasPermission(t.permission)),
+  )
   const [activeTab, setActiveTab] = useState('profile')
 
   const activeKey = visibleTabs.find((t) => t.key === activeTab)?.key ?? visibleTabs[0]?.key
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 p-6">
-      <div className="flex items-center gap-2">
+    <div className="max-w-3xl mx-auto space-y-5">
+      <div className="hidden lg:flex items-center gap-2">
         <Settings className="w-5 h-5 text-secondary-token" />
-        <h1 className="text-xl font-bold text-primary-token">Settings</h1>
+        <h1 className="text-title text-primary-token">Settings</h1>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex items-center gap-1 p-1 bg-[var(--surface-muted)] rounded-2xl w-fit">
-        {visibleTabs.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setActiveTab(key)}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all',
-              activeKey === key
-                ? 'bg-[var(--surface)] text-primary-token shadow-sm'
-                : 'text-secondary-token hover:text-primary-token'
-            )}
-          >
-            <Icon className="w-4 h-4" />
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* Tab bar: scrolls sideways on phones instead of overflowing the page */}
+      {visibleTabs.length > 1 && (
+        <div role="tablist" className="-mx-4 px-4 lg:mx-0 lg:px-0 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-1 p-1 bg-[var(--surface-muted)] rounded-[var(--radius-md)] w-max">
+            {visibleTabs.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                role="tab"
+                aria-selected={activeKey === key}
+                onClick={() => setActiveTab(key)}
+                className={cn(
+                  'flex items-center gap-2 h-10 px-3.5 rounded-[calc(var(--radius-md)-4px)] text-sm font-medium whitespace-nowrap transition-colors',
+                  activeKey === key
+                    ? 'bg-[var(--surface)] text-primary-token shadow-[var(--shadow-1)]'
+                    : 'text-secondary-token hover:text-primary-token'
+                )}
+              >
+                <Icon className="w-4 h-4" aria-hidden="true" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Tab panels */}
       {activeKey === 'profile'  && <ProfileTab />}
       {activeKey === 'org'      && <Can permission="org.settings.manage"><OrgSettingsTab /></Can>}
       {activeKey === 'modules'  && <Can permission="org.modules.manage"><ModulesTab /></Can>}
       {activeKey === 'roles'    && <Can permission="roles.manage"><RolesTab /></Can>}
+      {activeKey === 'content'  && <Can permission="org.settings.manage"><ContentSettingsTab /></Can>}
+      {activeKey === 'platform' && isPlatformAdmin && <PlatformSettingsTab />}
     </div>
   )
 }

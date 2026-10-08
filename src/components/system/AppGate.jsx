@@ -1,5 +1,6 @@
+import { useLocation } from 'react-router-dom'
 import { Download, Wrench, RefreshCw } from 'lucide-react'
-import useConfigStore, { selectGate } from '@/store/configStore'
+import useConfigStore, { useGate } from '@/store/configStore'
 import useOrgStore from '@/store/orgStore'
 import { useDeviceModeStore } from '@/store/deviceModeStore'
 import { useDeviceState } from '@/store/childDeviceState'
@@ -31,11 +32,12 @@ function FullScreenMessage({ icon: Icon, tone = 'primary', title, message, child
  * for maintenance; the update screen links straight to the new APK.
  */
 export default function AppGate({ children }) {
-  const gate = useConfigStore(selectGate)
+  const gate = useGate()
   const platform = useConfigStore((s) => s.platform)
   const native = useConfigStore((s) => s.native)
   const reload = useConfigStore((s) => s.load)
   const support = useOrgStore((s) => s.settings?.content?.support)
+  const location = useLocation()
   const deviceMode = useDeviceModeStore((s) => s.mode)
   const isOrgMember = useDeviceState((s) => s.isOrgMember)
   const isolatedChild = deviceMode === 'child' && !isOrgMember
@@ -44,7 +46,11 @@ export default function AppGate({ children }) {
   // button; enforcement is native and does not depend on this UI.
   if (isolatedChild) return children
 
-  if (gate.status === 'maintenance') {
+  // Sign-in stays reachable during maintenance so a platform admin can get
+  // in and switch it off.
+  const authRoute = location.pathname === '/login' || location.pathname === '/reset-password'
+
+  if (gate.status === 'maintenance' && !authRoute) {
     return (
       <FullScreenMessage
         icon={Wrench}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Download, WifiOff, X, Info, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import useConfigStore, { selectGate } from '@/store/configStore'
+import useConfigStore, { useGate } from '@/store/configStore'
 import useOrgStore from '@/store/orgStore'
 import { openExternal } from '@/lib/native'
 
@@ -53,6 +53,20 @@ function Bar({ tone = 'info', icon, children, action, onDismiss }) {
   )
 }
 
+/** Reminds a platform admin that everyone else is locked out right now. */
+export function MaintenanceAdminBanner() {
+  const on = useConfigStore((s) => Boolean(s.platform?.maintenance_enabled && s.isPlatformAdmin))
+  return (
+    <AnimatePresence>
+      {on && (
+        <Bar tone="danger">
+          Maintenance mode is on — only platform admins can use the app. Turn it off in Settings → App &amp; updates.
+        </Bar>
+      )}
+    </AnimatePresence>
+  )
+}
+
 /** Connection status. Shown while offline; the app keeps its cached data. */
 export function OfflineBanner() {
   const online = useOnline()
@@ -69,7 +83,7 @@ export function OfflineBanner() {
 
 /** "A newer version of the app is available" — dismissible. */
 export function UpdateBanner() {
-  const gate = useConfigStore(selectGate)
+  const gate = useGate()
   const url = useConfigStore((s) => s.platform?.apk_download_url)
   const dismiss = useConfigStore((s) => s.dismissRecommended)
   return (

@@ -13,10 +13,11 @@
     "ios": "vite build && cap sync ios && cap open ios",
     "android": "vite build && cap sync android && cap open android",
     "apk": "bash scripts/build-apk.sh",
-    "deploy:ota": "vite build && node scripts/deploy-ota.mjs",
+    "deploy:ota": "node scripts/deploy-ota.mjs",
     "gen:vapid": "node scripts/gen-vapid.mjs",
     "import:devotees": "node scripts/import-devotees.mjs",
-    "test:smoke": "node --env-file=.env scripts/dev/smoke-test.mjs"
+    "test:smoke": "node --env-file=.env scripts/dev/smoke-test.mjs",
+    "assets:android": "bash scripts/generate-app-assets.sh"
   },
   "dependencies": {
     "@capacitor/app": "8.1.1",
@@ -66,5 +67,9 @@
   },
   "overrides": {
     "dompurify": "3.4.16"
+  },
+  "ota": {
+    "minNativeVersionCode": 2,
+    "//": "Oldest APK versionCode the current JS supports. Every native call is guarded (src/lib/native.js), so 2 = also the original APK."
   }
 }

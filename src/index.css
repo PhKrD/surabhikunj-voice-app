@@ -477,6 +477,18 @@ body {
   min-height: 100svh;
 }
 
+/* Android 15+ draws the app edge-to-edge: without this, scrolled content
+   shows through the status bar. A strip of app background sits under it. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--surface-app);
+  z-index: 80;
+  pointer-events: none;
+}
+
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }

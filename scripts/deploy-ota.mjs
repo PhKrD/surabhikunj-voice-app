@@ -2,10 +2,12 @@
 // Free self-hosted OTA deploy: zip the Vite build and upload it to Supabase
 // Storage, then publish a version.json manifest the app reads on launch.
 //
-// Usage:
-//   npm run build
+// Usage (builds for you):
 //   npm run deploy:ota            # auto-bumps patch version
-//   npm run deploy:ota 1.4.0      # explicit version
+//   npm run deploy:ota -- 1.4.0   # explicit version
+//
+// Rolling back a bad release: publish the previous version number again
+// (npm run deploy:ota -- <old version>); installed apps switch to it.
 //
 // Requires these env vars (in .env or the shell):
 //   VITE_SUPABASE_URL            your project URL
@@ -43,10 +45,6 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 }
 
 const distDir = join(ROOT, 'dist')
-if (!existsSync(join(distDir, 'index.html'))) {
-  console.error('dist/index.html not found. Run "npm run build" first.')
-  process.exit(1)
-}
 
 // --- Resolve version ------------------------------------------------------
 const pkgPath = join(ROOT, 'package.json')
@@ -60,6 +58,14 @@ if (!version) {
 pkg.version = version
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
 console.log(`Deploying OTA bundle v${version}...`)
+
+// Build AFTER bumping, so the bundle reports the version it is published as
+// (shown in the app menu and attached to crash reports).
+execSync('npx vite build', { cwd: ROOT, stdio: 'inherit' })
+if (!existsSync(join(distDir, 'index.html'))) {
+  console.error('Build did not produce dist/index.html.')
+  process.exit(1)
+}
 
 // --- Zip the dist contents (index.html at the zip root) -------------------
 const work = mkdtempSync(join(tmpdir(), 'ota-'))
@@ -93,7 +99,17 @@ if (up.error) {
 }
 
 const bundleUrl = `${SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/public/${BUCKET}/${objectPath}`
-const manifest = JSON.stringify({ version, url: bundleUrl }, null, 2)
+
+// The oldest installed APK (Android versionCode) this JavaScript can run on.
+// Raise it in package.json → "ota.minNativeVersionCode" whenever a release
+// starts calling a native plugin that older APKs do not contain; those APKs
+// then keep their current bundle instead of breaking.
+const minNativeVersionCode = Number(pkg.ota?.minNativeVersionCode ?? 0)
+const manifest = JSON.stringify(
+  { version, url: bundleUrl, minNativeVersionCode, publishedAt: new Date().toISOString() },
+  null,
+  2,
+)
 
 const man = await supabase.storage
   .from(BUCKET)
@@ -107,7 +123,7 @@ if (man.error) {
   process.exit(1)
 }
 
-console.log(`\n✅ OTA v${version} published.`)
+console.log(`\n✅ OTA v${version} published (runs on APK build ${minNativeVersionCode || 'any'} and newer).`)
 console.log(`   Bundle:   ${bundleUrl}`)
 console.log(`   Manifest: ${SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/public/${BUCKET}/version.json`)
 console.log('\nUsers will receive it on their next app launch.')

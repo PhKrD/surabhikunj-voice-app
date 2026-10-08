@@ -11,8 +11,11 @@ android {
         applicationId "com.surabhikunj.voice"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1"
+        // versionCode: bump for every APK you distribute. It is what the
+        // remote config compares against (app_platform_config min/recommended)
+        // and what OTA bundles declare as minNativeVersionCode.
+        versionCode 3
+        versionName "1.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -27,10 +30,32 @@ android {
     kotlinOptions {
         jvmTarget = '21'
     }
+    // Release signing. Credentials live in android/keystore.properties
+    // (gitignored), never in this file. The key MUST stay the same for the
+    // app's whole life: Android only installs an update over an existing app
+    // when it is signed by the same key.
+    def keystorePropsFile = rootProject.file('keystore.properties')
+    def keystoreProps = new Properties()
+    if (keystorePropsFile.exists()) {
+        keystorePropsFile.withInputStream { keystoreProps.load(it) }
+    }
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
+            // Not minified: Capacitor plugins are reached by reflection, and
+            // the web layer (where nearly all code is) is minified by Vite.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (keystorePropsFile.exists()) signingConfig signingConfigs.release
         }
     }
 }

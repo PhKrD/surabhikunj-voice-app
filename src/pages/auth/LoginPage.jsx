@@ -44,6 +44,8 @@ export default function LoginPage() {
   const [sent, setSent] = useState(null)
 
   const { user, signInWithEmail, signUpWithEmail, resetPassword } = useAuthStore()
+  // Typing in a field clears its error; the rest stay until the next submit.
+  const clearError = (key) => setFieldErrors((e) => (e[key] ? { ...e, [key]: undefined } : e))
   const navigate = useNavigate()
 
   if (user && !sent) return <Navigate to="/" replace />
@@ -158,7 +160,7 @@ export default function LoginPage() {
               autoComplete="name"
               placeholder="e.g. Palanhar Krsna Das"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); clearError('name') }}
               error={fieldErrors.name}
             />
           )}
@@ -173,7 +175,7 @@ export default function LoginPage() {
             spellCheck={false}
             placeholder="you@example.com"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => { setEmail(e.target.value); clearError('email') }}
             error={fieldErrors.email}
           />
 
@@ -186,7 +188,7 @@ export default function LoginPage() {
                 autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                 placeholder={mode === 'signup' ? `At least ${MIN_PASSWORD} characters` : 'Your password'}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); clearError('password') }}
                 error={fieldErrors.password}
               />
               {mode === 'login' && (

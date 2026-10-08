@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import { supabase } from '@/lib/supabase'
 import { getNativeInfo, onAppResume } from '@/lib/native'
 import { logger } from '@/lib/logger'
@@ -27,6 +28,8 @@ function readCache() {
 const useConfigStore = create((set, get) => ({
   platform: readCache(),
   native: { versionCode: null, versionName: null, legacy: false },
+  /** Platform admins edit this config and are never locked out by it. */
+  isPlatformAdmin: false,
   loaded: false,
   lastFetched: 0,
 
@@ -43,6 +46,13 @@ const useConfigStore = create((set, get) => ({
       if (data) {
         set({ platform: data })
         localStorage.setItem(CACHE_KEY, JSON.stringify(data))
+      }
+      const { data: session } = await supabase.auth.getSession()
+      if (session?.session) {
+        const { data: admin } = await supabase.rpc('is_platform_admin')
+        set({ isPlatformAdmin: admin === true })
+      } else {
+        set({ isPlatformAdmin: false })
       }
     } catch (e) {
       logger.debug('[config] using cached platform config:', e?.message)
@@ -73,7 +83,7 @@ const useConfigStore = create((set, get) => ({
 export function selectGate(state) {
   const p = state.platform
   const code = state.native.versionCode
-  if (p?.maintenance_enabled) return { status: 'maintenance', recommended: false }
+  if (p?.maintenance_enabled && !state.isPlatformAdmin) return { status: 'maintenance', recommended: false }
   if (code != null && p?.min_native_version_code && code < p.min_native_version_code) {
     return { status: 'update_required', recommended: false }
   }
@@ -85,6 +95,15 @@ export function selectGate(state) {
       dismissed < p.recommended_native_version_code,
   )
   return { status: 'ok', recommended }
+}
+
+/**
+ * Hook form of selectGate. useShallow is required: selectGate builds a new
+ * object each call, and zustand v5 re-renders on every new reference — an
+ * infinite render loop without it.
+ */
+export function useGate() {
+  return useConfigStore(useShallow(selectGate))
 }
 
 export default useConfigStore

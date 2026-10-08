@@ -29,9 +29,7 @@ export default function LockedPage() {
   const { setLastCommand, lockReason, lockLabel, screenTime } = useDeviceState()
 
   // Keep listening — parent may unlock, resume, or grant bonus time.
-  useEffect(() => {
-    startCommandPoller((cmd) => setLastCommand(cmd))
-  }, [setLastCommand])
+  useEffect(() => startCommandPoller((cmd) => setLastCommand(cmd)), [setLastCommand])
 
   // Block back button
   useEffect(() => {

@@ -25,12 +25,16 @@ import { dpc } from './dpcPlugin.js'
 import { resetScreenTimeEnforcement } from './screenTimeEngine.js'
 import { enforceRules, resetRuleEngine } from './ruleEngine.js'
 import { invalidateDeviceIdentity } from './deviceIdentity.js'
+import { deriveCommandState } from './commandStatus.js'
 
 const BONUS_KEY = 'vk_bonus_expires_at'
 
 let pollInterval = null
 let heartbeatInterval = null
 let refreshing = false
+let pollInFlight = false
+let pollGeneration = 0
+const commandListeners = new Set()
 
 // A command the child ACKed (status='delivered') but never confirmed
 // executing — e.g. the app was killed mid-execution — would otherwise hang
@@ -79,16 +83,29 @@ async function ensureFreshSession() {
 }
 
 export function startCommandPoller(onCommand) {
+  const listener = typeof onCommand === 'function' ? onCommand : () => {}
+  const unsubscribe = () => {
+    commandListeners.delete(listener)
+    if (commandListeners.size === 0) stopCommandPoller()
+  }
+
+  if (pollInterval) {
+    commandListeners.add(listener)
+    return unsubscribe
+  }
+
   const creds = loadDeviceCreds()
   if (!creds?.deviceId) {
     console.log('[commandPoller] No device credentials, skipping')
-    return
+    return () => {}
   }
 
   console.log('[commandPoller] Starting polling for device:', creds.deviceId)
 
   // Clean up any prior polling
   stopCommandPoller()
+  commandListeners.add(listener)
+  const generation = pollGeneration
 
   // Heartbeat so the parent dashboard can show online/offline accurately.
   sendHeartbeat(creds.deviceId)
@@ -96,8 +113,11 @@ export function startCommandPoller(onCommand) {
 
   // Poll every 2 seconds for pending (and stuck-delivered) commands
   pollInterval = setInterval(async () => {
+    if (pollInFlight) return
+    pollInFlight = true
     try {
       await ensureFreshSession()
+      if (generation !== pollGeneration) return
 
       let { data: commands, error } = await fetchActionableCommands(creds.deviceId)
 
@@ -113,6 +133,7 @@ export function startCommandPoller(onCommand) {
         error = retry.error
       }
 
+      if (generation !== pollGeneration) return
       if (error) {
         console.error('[commandPoller] Query error:', error.message)
         return
@@ -127,6 +148,8 @@ export function startCommandPoller(onCommand) {
       if (!commands || commands.length === 0) return
 
       for (const cmd of commands) {
+        if (generation !== pollGeneration) return
+        if (deriveCommandState(cmd) === 'timed_out') continue
         console.log('[commandPoller] Processing command:', cmd.command_type, cmd.id)
 
         // ACK delivery
@@ -153,15 +176,27 @@ export function startCommandPoller(onCommand) {
           await reportCommandFailure(cmd, result)
         }
 
-        onCommand?.(cmd)
+        for (const notify of commandListeners) {
+          try {
+            notify(cmd, result)
+          } catch (err) {
+            console.warn('[commandPoller] Command listener failed:', err?.message)
+          }
+        }
       }
     } catch (err) {
       console.error('[commandPoller] Polling error:', err.message)
+    } finally {
+      pollInFlight = false
     }
   }, 2000)
+
+  return unsubscribe
 }
 
 export function stopCommandPoller() {
+  pollGeneration += 1
+  commandListeners.clear()
   if (pollInterval) {
     clearInterval(pollInterval)
     pollInterval = null

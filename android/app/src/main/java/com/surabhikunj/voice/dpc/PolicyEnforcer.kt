@@ -89,7 +89,7 @@ object PolicyEnforcer {
         val schedule: JSONObject? = null,
     ) {
         val blocksApps: Boolean get() = action in setOf("block_all", "allow_list_only", "lock_navigation", "lock_device")
-        val pausesInternet: Boolean get() = action in setOf("block_internet", "lock_navigation", "lock_device")
+        val pausesInternet: Boolean get() = action in setOf("block_all", "block_internet", "lock_navigation", "lock_device")
         val wantsHardLock: Boolean get() = action == "lock_device" || (action == "block_all" && schedule?.optJSONArray("always_allowed_packages")?.let { it.length() == 0 } ?: true)
     }
 
@@ -101,6 +101,7 @@ object PolicyEnforcer {
      * stops app-rule/schedule enforcement.
      */
     private class PolicyInputs(
+        val childId: String,
         val policyVersion: Long?,
         val schedules: JSONArray,
         val rules: JSONArray,
@@ -134,7 +135,7 @@ object PolicyEnforcer {
         val policyVersion = childRow?.optLong("policy_version", -1L)?.takeIf { it >= 0 }
         val cached = cachedInputs
         val now = System.currentTimeMillis()
-        if (cached != null && policyVersion != null && cached.policyVersion == policyVersion &&
+        if (cached != null && cached.childId == childId && policyVersion != null && cached.policyVersion == policyVersion &&
             now - cached.fetchedAt < INPUT_CACHE_MAX_AGE_MS) {
             return cached
         }
@@ -143,6 +144,7 @@ object PolicyEnforcer {
         val rules = fetchRows(context, "pc_app_rules", "child_id=eq.$childId&select=*")
         if (schedules == null || rules == null) return null
         val inputs = PolicyInputs(
+            childId = childId,
             policyVersion = policyVersion,
             schedules = schedules,
             rules = rules,
@@ -353,12 +355,7 @@ object PolicyEnforcer {
         val signature = "v=$policyVersion|lock=${lock?.key}:${lock?.action}|pause=$manualPause|" +
             "${blockList.sorted()}|${allowList.sorted()}|${alertOnUse.sorted()}|${blockedDomains?.sorted()}|" +
             "$blockUnknownWebsites|$enforceSafeSearch|${allowedDomains.sorted()}|${alertDomains.sorted()}"
-        val appliedSignature = VoiceKidsPrefs.appliedSignature(context)
         val appliedLockKey = VoiceKidsPrefs.appliedLockKey(context)
-
-        if (signature == appliedSignature && lock == null && appliedLockKey.isEmpty()) {
-            return // nothing changed since the last successful pass
-        }
 
         val deviceAdmin = DpcActions.isDeviceAdmin(context)
         val deviceOwner = DpcActions.isDeviceOwner(context)
@@ -367,9 +364,11 @@ object PolicyEnforcer {
         // accessibility service keeps every internet-using app off screen
         // (VoiceKidsPrefs.internetPauseActive). The tunnel, when consented,
         // is an extra layer that also stops background traffic.
+        val previousInternetPause = VoiceKidsPrefs.internetPauseActive(context)
         val internetPauseWanted = lock?.pausesInternet == true || manualPause
         VoiceKidsPrefs.setInternetPauseActive(context, internetPauseWanted)
-        val internetPausedByLock = internetPauseWanted && vpnConsent
+        if (previousInternetPause && !internetPauseWanted) DpcActions.resumeInternet(context)
+        val vpnPauseActive = internetPauseWanted && vpnConsent
         // Accessibility-based soft blocking (VoiceKidsAccessibilityService)
         // needs no Device Admin/Owner at all — it's a separate OS permission.
         // Device Admin is only needed here for lockDevice()/pauseInternet().
@@ -473,17 +472,17 @@ object PolicyEnforcer {
             // (MODE_BLOCK_ALL) — domain filtering would be moot underneath a
             // full internet pause, and only one VPN mode can hold the tunnel
             // at a time anyway.
-            val lockOwnsVpn = internetPausedByLock
+            val lockOwnsVpn = vpnPauseActive
             val desiredWebsiteFilter = useVpn &&
                 (blockedDomains.isNotEmpty() || blockUnknownWebsites || enforceSafeSearch || alertDomains.isNotEmpty()) &&
                 !lockOwnsVpn && vpnConsent
-            if (desiredWebsiteFilter != websiteFilterActive) {
-                if (desiredWebsiteFilter) {
-                    if (DpcActions.startWebsiteFilter(context)) {
-                        websiteFilterActive = true
-                        VoiceKidsPrefs.setWebsiteFilterActive(context, true)
-                    }
-                } else if (lockOwnsVpn) {
+            if (desiredWebsiteFilter) {
+                if (DpcActions.startWebsiteFilter(context)) {
+                    websiteFilterActive = true
+                    VoiceKidsPrefs.setWebsiteFilterActive(context, true)
+                }
+            } else if (desiredWebsiteFilter != websiteFilterActive) {
+                if (lockOwnsVpn) {
                     // pauseInternet() (MODE_BLOCK_ALL) took the tunnel THIS
                     // pass — never call stopWebsiteFilter() here, it would
                     // tear that back down. Just record we no longer drive it.
@@ -506,7 +505,7 @@ object PolicyEnforcer {
             "active_schedule" to (activeSchedule?.optString("name")),
             "lock_reason" to (lock?.reason?.takeIf { it.isNotEmpty() }),
             "lock_action" to lock?.action,
-            "internet_paused" to internetPausedByLock,
+            "internet_paused" to internetPauseWanted,
             "manual_internet_pause" to manualPause,
             "screen_time_today_min" to (if (usageAvailable) usedMin else null),
             "screen_time_limit_min" to limitMin,

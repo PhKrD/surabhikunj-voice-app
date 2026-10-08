@@ -14,7 +14,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { ShieldAlert, Plus, Settings, Send, WifiOff, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useDeviceState } from '../../store/childDeviceState.js'
-import { startCommandPoller, stopCommandPoller } from '../../lib/commandPoller.js'
+import { startCommandPoller } from '../../lib/commandPoller.js'
 import { syncSessionAndStartTracking } from '../../lib/locationPlugin.js'
 import { getTodayUsage, hasUsageAccess, openUsageAccessSettings, syncInstalledApps } from '../../lib/usageStatsPlugin.js'
 import SetupChecklistCard from '../../components/child-device/SetupChecklistCard.jsx'
@@ -31,10 +31,7 @@ export default function HomePage() {
   // Command handler — updates UI when DPC commands arrive. Lock/unlock
   // navigation is driven by the native enforcement snapshot in
   // ChildDeviceShell, not by individual commands.
-  useEffect(() => {
-    startCommandPoller((cmd) => setLastCommand(cmd))
-    return () => stopCommandPoller()
-  }, [setLastCommand])
+  useEffect(() => startCommandPoller((cmd) => setLastCommand(cmd)), [setLastCommand])
 
   // Ensure the background monitoring service is (re)running — cheap no-op
   // if it's already alive, and handles the "service was killed" case.
@@ -62,7 +59,8 @@ export default function HomePage() {
     }
   }, [refreshUsage])
 
-  const used = usageMinutes ?? 0
+  const used = screenTime.usedMin ?? usageMinutes ?? 0
+  const usageKnown = screenTime.usedMin != null || usageMinutes != null
   const limit = screenTime.limitMin
   const pct = limit && limit > 0 ? Math.min(100, (used / limit) * 100) : 0
   const over = limit != null && used >= limit
@@ -93,7 +91,7 @@ export default function HomePage() {
                   />
                 )}
               </svg>
-              <p className="text-4xl font-bold tabular-nums">{usageMinutes === null ? '—' : formatMinutes(used)}</p>
+              <p className="text-4xl font-bold tabular-nums">{usageKnown ? formatMinutes(used) : '—'}</p>
               <p className="text-xs text-indigo-200 mt-1">
                 {limit == null ? 'used today' : over ? "today's limit reached" : `of ${formatMinutes(limit)}`}
               </p>

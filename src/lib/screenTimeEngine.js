@@ -35,7 +35,7 @@ export async function enforceScreenTime() {
   const limit = snap.screenTimeLimitMin ?? null
   const remaining = total !== null && limit !== null ? Math.max(0, limit - total) : null
   return {
-    overLimit: total !== null && limit !== null && total >= limit,
+    overLimit: !snap.bonusActive && total !== null && limit !== null && total >= limit,
     locked: Boolean(snap.locked),
     lockReason: snap.lockReason ?? null,
     lockLabel: snap.lockLabel ?? '',

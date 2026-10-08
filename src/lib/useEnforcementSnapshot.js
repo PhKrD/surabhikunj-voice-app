@@ -23,15 +23,22 @@ export function useEnforcementSnapshot(active = true) {
     if (!active) return undefined
     let cancelled = false
     let timer = null
+    let running = false
 
     const tick = async () => {
+      if (cancelled || running) return
+      running = true
+      if (timer) clearTimeout(timer)
+      timer = null
       try {
         const snap = await dpc.getEnforcementSnapshot()
         if (!cancelled && !snap?.webPlatform) applySnapshot(snap)
       } catch {
         /* native bridge unavailable — leave the last state alone */
+      } finally {
+        running = false
+        if (!cancelled) timer = setTimeout(tick, POLL_MS)
       }
-      if (!cancelled) timer = setTimeout(tick, POLL_MS)
     }
 
     tick()

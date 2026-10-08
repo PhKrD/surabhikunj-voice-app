@@ -12,7 +12,7 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { isEnrolled, updateDeviceTokens, clearDeviceCreds } from '@/lib/deviceStore.js'
 import { supabase } from '@/lib/supabase.js'
-import { syncSession } from '@/lib/locationPlugin.js'
+import { clearNativeSession, syncSession } from '@/lib/locationPlugin.js'
 import { startCommandPoller, stopCommandPoller } from '@/lib/commandPoller.js'
 import { useEnforcementSnapshot } from '@/lib/useEnforcementSnapshot.js'
 import { useDeviceState } from '@/store/childDeviceState.js'
@@ -35,6 +35,7 @@ export default function ChildDeviceShell() {
   const enrolled = useDeviceState((s) => s.enrolled)
   const isLocked = useDeviceState((s) => s.isLocked)
   const setRevoked = useDeviceState((s) => s.setRevoked)
+  const setLastCommand = useDeviceState((s) => s.setLastCommand)
 
   // Mirror the native engine's lock state (daily limit / restricted time /
   // schedule / parent lock) into the store, then route on it: the lock
@@ -53,6 +54,7 @@ export default function ChildDeviceShell() {
   useEffect(() => {
     const onRevoked = () => {
       console.warn('[ChildDeviceShell] Device revoked by parent — clearing credentials')
+      clearNativeSession().catch(() => {})
       clearDeviceCreds()
       setRevoked()
       stopCommandPoller()
@@ -78,9 +80,8 @@ export default function ChildDeviceShell() {
     // Lock/unlock navigation is driven by the native snapshot above (the
     // parent's lock_device becomes a persistent parent_lock there), so the
     // poller only needs to keep running for command acks + bonus/SOS.
-    startCommandPoller(() => {})
-    return () => stopCommandPoller()
-  }, [enrolled])
+    return startCommandPoller((cmd) => setLastCommand(cmd))
+  }, [enrolled, setLastCommand])
 
   return (
     <Routes>

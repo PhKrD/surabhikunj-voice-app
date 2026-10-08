@@ -55,12 +55,10 @@ class VoiceKidsLocationPlugin : Plugin() {
 
     @PluginMethod
     fun startTracking(call: PluginCall) {
-        if (!hasLocationPermission()) {
-            requestPermissionForAlias("location", call, "locationPermsCallback")
-            return
-        }
         startService()
-        call.resolve(successResult())
+        val result = successResult()
+        result.put("hasLocationPermission", hasLocationPermission())
+        call.resolve(result)
     }
 
     @PermissionCallback
@@ -79,6 +77,18 @@ class VoiceKidsLocationPlugin : Plugin() {
     @PluginMethod
     fun stopTracking(call: PluginCall) {
         context.stopService(Intent(context, VoiceKidsMonitorService::class.java))
+        call.resolve(successResult())
+    }
+
+    @PluginMethod
+    fun clearSession(call: PluginCall) {
+        context.stopService(Intent(context, VoiceKidsMonitorService::class.java))
+        val suspended = VoiceKidsPrefs.appliedSuspended(context).toList()
+        if (suspended.isNotEmpty()) DpcActions.setPackagesSuspended(context, suspended, false)
+        if (DpcActions.isDeviceOwner(context)) DpcActions.setAllowedPackages(context, emptyList())
+        DpcActions.resumeInternet(context)
+        VoiceKidsPrefs.clear(context)
+        PolicyEnforcer.invalidateCache()
         call.resolve(successResult())
     }
 

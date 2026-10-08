@@ -28,8 +28,9 @@ import { useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Clock, Moon, Lock, Hourglass, Plus } from 'lucide-react'
 import { useDeviceState } from '../../store/childDeviceState.js'
-import { startCommandPoller, stopCommandPoller } from '../../lib/commandPoller.js'
-import { syncSessionAndStartTracking } from '../../lib/locationPlugin.js'
+import { startCommandPoller } from '../../lib/commandPoller.js'
+import { clearNativeSession, syncSessionAndStartTracking } from '../../lib/locationPlugin.js'
+import { clearDeviceCreds } from '../../lib/deviceStore.js'
 import { syncInstalledApps } from '../../lib/usageStatsPlugin.js'
 import { useEnforcementSnapshot } from '../../lib/useEnforcementSnapshot.js'
 import { LOCK_REASON_COPY, formatMinutes } from '../../lib/screenTimePolicy.js'
@@ -95,11 +96,22 @@ export default function FamilySupervision() {
   const lockLabel = useDeviceState((s) => s.lockLabel)
   const screenTime = useDeviceState((s) => s.screenTime)
   const setLastCommand = useDeviceState((s) => s.setLastCommand)
+  const setRevoked = useDeviceState((s) => s.setRevoked)
   const location = useLocation()
 
   const active = enrolled && isOrgMember
 
   useEnforcementSnapshot(active)
+
+  useEffect(() => {
+    const onRevoked = () => {
+      clearNativeSession().catch(() => {})
+      clearDeviceCreds()
+      setRevoked()
+    }
+    window.addEventListener('vk:device_revoked', onRevoked)
+    return () => window.removeEventListener('vk:device_revoked', onRevoked)
+  }, [setRevoked])
 
   useEffect(() => {
     if (!active) return
@@ -108,8 +120,7 @@ export default function FamilySupervision() {
     // Lock state comes from the native snapshot above (the parent's
     // lock_device becomes a persistent parent_lock there); the poller only
     // needs to keep running for command acks + bonus/SOS.
-    startCommandPoller((cmd) => setLastCommand(cmd))
-    return () => stopCommandPoller()
+    return startCommandPoller((cmd) => setLastCommand(cmd))
   }, [active, setLastCommand])
 
   // SOS + request pages must stay reachable even while locked — don't

@@ -68,6 +68,11 @@ export async function stopTracking() {
   return NativeLocation.stopTracking()
 }
 
+export async function clearNativeSession() {
+  if (!isNative()) return webFallback()
+  return NativeLocation.clearSession()
+}
+
 export async function isTracking() {
   if (!isNative()) return { configured: false, hasLocationPermission: false }
   return NativeLocation.isTracking()

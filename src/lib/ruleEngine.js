@@ -31,6 +31,7 @@ import { loadDeviceCreds } from './deviceStore.js'
 import { dpc } from './dpcPlugin.js'
 import { resolveDeviceIdentity } from './deviceIdentity.js'
 import { saveEnforcementState } from './enforcementStore.js'
+import { syncSession } from './locationPlugin.js'
 
 // Nudge the native engine at most this often from the 2s poll loop; it runs
 // on its own every 4s anyway, so this only matters for forced passes.
@@ -71,6 +72,13 @@ async function runPass({ force }) {
   }
 
   if (!identity.childId) return { skipped: true, reason: 'no_child' }
+
+  if (identity.reassigned) {
+    const syncResult = await syncSession()
+    if (syncResult?.success === false && syncResult.reason !== 'web_platform') {
+      return { skipped: true, reason: 'native_session_sync_failed' }
+    }
+  }
 
   const now = Date.now()
   if (force || identity.reassigned || now - lastNudgeAt > NUDGE_INTERVAL_MS) {

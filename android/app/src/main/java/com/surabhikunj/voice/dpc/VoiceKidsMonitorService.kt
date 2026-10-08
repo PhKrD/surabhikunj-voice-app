@@ -322,6 +322,12 @@ class VoiceKidsMonitorService : Service() {
             val cmd = commands.getJSONObject(i)
             val commandId = cmd.optString("id", "")
             if (commandId.isEmpty()) continue
+            val expiresAt = cmd.optString("expires_at", "").takeIf { it.isNotEmpty() && it != "null" }
+                ?.let { parseIsoToEpochMillis(it) }
+            if (expiresAt != null && expiresAt <= System.currentTimeMillis()) {
+                pendingCommandFirstSeen.remove(commandId)
+                continue
+            }
             seenIds.add(commandId)
 
             val firstSeen = pendingCommandFirstSeen.getOrPut(commandId) { System.currentTimeMillis() }

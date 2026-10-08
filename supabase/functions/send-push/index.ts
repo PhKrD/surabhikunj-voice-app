@@ -100,7 +100,15 @@ Deno.serve(async (req: Request) => {
   // caller must prove it holds the service-role key. Without this, anyone
   // with the public URL could push arbitrary messages to any user.
   const bearer = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
-  if (!bearer || !safeEqual(bearer, serviceKey)) return json({ error: 'Unauthorized' }, 401)
+  if (!bearer) return json({ error: 'Unauthorized' }, 401)
+  if (!safeEqual(bearer, serviceKey)) {
+    // Not the legacy service-role JWT — it may still be a valid service key in
+    // Supabase's newer format (sb_secret_…). Only a real service key can list
+    // users, so ask Supabase to verify it; anything else is rejected.
+    const probe = createClient(url, bearer, { auth: { persistSession: false } })
+    const { error: probeErr } = await probe.auth.admin.listUsers({ page: 1, perPage: 1 })
+    if (probeErr) return json({ error: 'Unauthorized' }, 401)
+  }
 
   let payload: {
     profile_id?: string

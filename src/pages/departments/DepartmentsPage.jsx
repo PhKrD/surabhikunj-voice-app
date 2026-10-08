@@ -14,6 +14,7 @@ import Button from '@/components/ui/Button'
 import useOrgStore from '@/store/orgStore'
 import useToastStore from '@/store/toastStore'
 import DepartmentDetail from './DepartmentDetail'
+import { confirm } from '@/store/dialogStore'
 
 // Curated map so departments can render a lucide icon by stored name WITHOUT
 // pulling the entire icon set into the bundle. Unknown names (e.g. emojis)
@@ -144,7 +145,7 @@ export default function DepartmentsPage() {
   }
 
   const removeDepartment = async (dept) => {
-    const ok = window.confirm(`Archive department "${dept.name}"?`)
+    const ok = await confirm({ title: `Archive “${dept.name}”?`, message: 'You can undo this right after.', confirmLabel: 'Archive' })
     if (!ok) return
 
     setArchivingId(dept.id)

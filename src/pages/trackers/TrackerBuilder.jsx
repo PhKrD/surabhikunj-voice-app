@@ -154,7 +154,7 @@ export default function TrackerBuilder() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <button onClick={() => navigate(-1)} className="p-2 rounded-xl text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)]">
           <ChevronLeft className="w-5 h-5" />

@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button'
 import Can from '@/components/Can'
 import { useTerm } from '@/hooks/usePermission'
 import useToastStore from '@/store/toastStore'
+import { confirm } from '@/store/dialogStore'
 
 // ── Plan edit modal ───────────────────────────────────────────────────────────
 function PlanModal({ type, slot, plan, dateStr, orgId, onClose, onSaved }) {
@@ -64,7 +65,7 @@ function PlanModal({ type, slot, plan, dateStr, orgId, onClose, onSaved }) {
   }
 
   const deletePlan = async () => {
-    if (!plan?.id || !confirm('Delete this plan?')) return
+    if (!plan?.id || !(await confirm({ title: 'Delete this plan?', danger: true }))) return
     setSaving(true)
     const { error } = await supabase.from('resource_plans').delete().eq('id', plan.id)
     if (error) toast.error('Delete failed', error.message)
@@ -201,7 +202,7 @@ export default function ResourcesPage() {
   }))
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold text-primary-token">{label}</h1>
         <div className="flex items-center gap-2">

@@ -30,7 +30,7 @@ export default function PendingApproval() {
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden app-bg">
+    <div className="relative min-h-svh flex items-center justify-center p-4 overflow-hidden app-bg">
       {/* Animated gradient orbs */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-32 -left-32 w-[28rem] h-[28rem] rounded-full grad-saffron opacity-30 blur-3xl animate-float-slow" />

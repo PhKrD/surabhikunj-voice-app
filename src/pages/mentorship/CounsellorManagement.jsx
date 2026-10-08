@@ -15,6 +15,7 @@ import {
 } from '@/lib/counsellorApi'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
+import { confirm } from '@/store/dialogStore'
 
 // ---------------------------------------------------------------------
 // Member search picker — reused for both "Make Counsellor" and
@@ -115,7 +116,7 @@ function ManageCounsellisModal({ counsellor, typeId, onClose, onChanged }) {
   const handleAssign = async (member) => {
     setShowPicker(false)
     if (member.current_mentor_id && member.current_mentor_id !== counsellor.mentor_id) {
-      const ok = window.confirm(`${member.display_name} is currently assigned to ${member.current_mentor_name}. Transfer to ${counsellor.mentor_name}?`)
+      const ok = await confirm({ title: `Transfer ${member.display_name}?`, message: `${member.display_name} is currently assigned to ${member.current_mentor_name}. Transfer to ${counsellor.mentor_name}?`, confirmLabel: 'Transfer' })
       if (!ok) return
     }
     try {
@@ -129,7 +130,7 @@ function ManageCounsellisModal({ counsellor, typeId, onClose, onChanged }) {
   }
 
   const handleEnd = async (rel) => {
-    if (!window.confirm(`Remove ${rel.mentee_name} from ${counsellor.mentor_name}'s counsellis?`)) return
+    if (!(await confirm({ title: `Remove ${rel.mentee_name}?`, message: `${rel.mentee_name} will no longer be assigned to ${counsellor.mentor_name}.`, confirmLabel: 'Remove', danger: true }))) return
     setBusyId(rel.id)
     try {
       await endMentorship(rel.id)

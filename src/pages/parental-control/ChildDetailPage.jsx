@@ -133,7 +133,7 @@ export default function ChildDetailPage() {
   const onlineCount = activeDevices.filter((d) => isDeviceOnline(d)).length
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div>
       {/* Header */}
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white px-6 pt-14 pb-8 rounded-b-[2rem]">
         <div className="max-w-3xl mx-auto">

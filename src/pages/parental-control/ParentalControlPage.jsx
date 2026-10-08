@@ -9,6 +9,7 @@ import { useDeviceModeStore } from '@/store/deviceModeStore'
 import DeviceModeSetupPage from './DeviceModeSetupPage'
 import MemberLinkPicker from '@/components/parental-control/MemberLinkPicker'
 import ChildrenOverview from './ChildrenOverview'
+import { confirm } from '@/store/dialogStore'
 
 /**
  * The parent console's single entry point: the family overview, plus the
@@ -68,7 +69,7 @@ export default function ParentalControlPage() {
   if (deviceMode === 'unset') return <DeviceModeSetupPage />
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div>
       {/* Header */}
       <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white px-6 pt-14 pb-8 rounded-b-[2rem]">
         <div className="max-w-4xl mx-auto">
@@ -146,8 +147,8 @@ export default function ParentalControlPage() {
 
         {deviceMode === 'parent' && (
           <button
-            onClick={() => {
-              if (window.confirm('Reconfigure this device? You will be asked "I am a Parent / I am a Child" again next time you open Parental Control.')) {
+            onClick={async () => {
+              if (await confirm({ title: 'Reconfigure this device?', message: 'You will be asked “I am a Parent / I am a Child” again next time you open Parental Control.', confirmLabel: 'Reconfigure' })) {
                 useDeviceModeStore.getState().reset()
               }
             }}

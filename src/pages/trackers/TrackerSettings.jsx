@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { calculateEntryScore } from '@/lib/trackerScoring'
 import { FALLBACK_TEMPLATE } from '@/lib/trackerWhatsapp'
 import { fetchTrackerConfig } from '@/lib/trackerApi'
+import { confirm } from '@/store/dialogStore'
 
 const inputBase = 'w-full px-3 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 const FIELD_TYPES = ['number', 'time', 'duration_min', 'boolean', 'select', 'text', 'textarea']
@@ -90,7 +91,7 @@ function GroupsPanel({ groups, onChange, toast, trackerId }) {
   }
 
   const deleteGroup = async (g) => {
-    if (!window.confirm(`Delete group "${g.label}"? Fields in it become ungrouped.`)) return
+    if (!(await confirm({ title: `Delete group “${g.label}”?`, message: 'Fields in it become ungrouped.', danger: true }))) return
     try {
       const { error } = await supabase.from('tracker_field_groups').delete().eq('id', g.id)
       if (error) throw error
@@ -402,7 +403,7 @@ function FieldsPanel({ fields, groups, rules, onFieldsChange, onRulesChange, toa
   }
 
   const deleteField = async (field) => {
-    if (!window.confirm(`Delete field "${field.label}"? This does not delete past submitted values.`)) return
+    if (!(await confirm({ title: `Delete field “${field.label}”?`, message: 'Past submitted values are kept.', danger: true }))) return
     try {
       await supabase.from('tracker_scoring_rules').delete().eq('tracker_id', trackerId).eq('field_key', field.key)
       const { error } = await supabase.from('tracker_fields').delete().eq('id', field.id)
@@ -578,7 +579,7 @@ function CalculatedColumnsPanel({ columns, fields, groups, onChange, toast, trac
   }
 
   const deleteColumn = async (col) => {
-    if (!window.confirm(`Delete calculated column "${col.label}"?`)) return
+    if (!(await confirm({ title: `Delete column “${col.label}”?`, danger: true }))) return
     await supabase.from('tracker_calculated_columns').delete().eq('id', col.id)
     onChange(columns.filter((c) => c.id !== col.id))
   }

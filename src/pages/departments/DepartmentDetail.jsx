@@ -9,6 +9,7 @@ import Card, { CardBody } from '@/components/ui/Card'
 import Avatar from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
 import useToastStore from '@/store/toastStore'
+import { confirm } from '@/store/dialogStore'
 
 const DEPT_ICON_MAP = {
   Building2, Users, UtensilsCrossed, BookOpen, Sparkles, Heart, Home,
@@ -112,7 +113,7 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
   }
 
   const removeMember = async (member) => {
-    const ok = window.confirm(`Remove "${memberLabel(member.profile ?? {})}" from this department?`)
+    const ok = await confirm({ title: `Remove ${memberLabel(member.profile ?? {})} from this department?`, confirmLabel: 'Remove', danger: true })
     if (!ok) return
 
     setRemovingId(member.id)

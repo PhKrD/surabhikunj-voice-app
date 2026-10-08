@@ -19,6 +19,7 @@ import Button from '@/components/ui/Button'
 import useToastStore from '@/store/toastStore'
 import { updateChild } from '@/lib/parentalControlApi'
 import { hashPin, isValidPin } from '@/lib/parentPin'
+import { confirm } from '@/store/dialogStore'
 
 export default function ProtectionPinCard({ child, onUpdated }) {
   const toast = useToastStore()
@@ -54,7 +55,7 @@ export default function ProtectionPinCard({ child, onUpdated }) {
   }
 
   const remove = async () => {
-    if (!window.confirm('Remove the protection PIN? The child will be able to open those Settings screens freely again.')) return
+    if (!(await confirm({ title: 'Remove the protection PIN?', message: 'The child will be able to open those Settings screens freely again.', confirmLabel: 'Remove PIN', danger: true }))) return
     setSaving(true)
     try {
       const updated = await updateChild(child.id, { parent_pin_hash: null })

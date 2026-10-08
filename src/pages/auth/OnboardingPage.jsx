@@ -341,14 +341,14 @@ export default function OnboardingPage() {
 
   if (booting) {
     return (
-      <div className="min-h-screen flex items-center justify-center app-bg">
+      <div className="min-h-svh flex items-center justify-center app-bg">
         <Loader2 className="w-7 h-7 text-saffron-500 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden app-bg">
+    <div className="relative min-h-svh flex items-center justify-center p-4 overflow-hidden app-bg">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-32 -left-32 w-[28rem] h-[28rem] rounded-full grad-saffron opacity-25 blur-3xl animate-float-slow" />
         <div className="absolute -bottom-32 right-0 w-[26rem] h-[26rem] rounded-full grad-blue opacity-20 blur-3xl animate-float-slow" style={{ animationDelay: '1.6s' }} />

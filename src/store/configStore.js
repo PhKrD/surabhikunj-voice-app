@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { supabase } from '@/lib/supabase'
 import { getNativeInfo, onAppResume } from '@/lib/native'
 import { logger } from '@/lib/logger'
+import { computeGate } from '@/lib/updateGate'
 
 // Platform remote config (supabase/73_launch_platform.sql →
 // app_platform_config). Decides, for an already-installed app, whether it
@@ -81,20 +82,10 @@ const useConfigStore = create((set, get) => ({
  * the latest version.
  */
 export function selectGate(state) {
-  const p = state.platform
-  const code = state.native.versionCode
-  if (p?.maintenance_enabled && !state.isPlatformAdmin) return { status: 'maintenance', recommended: false }
-  if (code != null && p?.min_native_version_code && code < p.min_native_version_code) {
-    return { status: 'update_required', recommended: false }
-  }
-  const dismissed = parseInt(localStorage.getItem(DISMISS_KEY) ?? '0', 10)
-  const recommended = Boolean(
-    code != null &&
-      p?.recommended_native_version_code &&
-      code < p.recommended_native_version_code &&
-      dismissed < p.recommended_native_version_code,
-  )
-  return { status: 'ok', recommended }
+  return computeGate(state.platform, state.native.versionCode, {
+    isPlatformAdmin: state.isPlatformAdmin,
+    dismissedFor: parseInt(localStorage.getItem(DISMISS_KEY) ?? '0', 10) || 0,
+  })
 }
 
 /**

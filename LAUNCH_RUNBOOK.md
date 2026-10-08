@@ -11,7 +11,9 @@
 ## 2) Deployment Source of Truth
 
 - GitHub repo: `https://github.com/PhKrD/surabhikunj-voice-app`
-- Current deployment URL: `https://surabhikunj-voice-99pncz93n-phkd-s-projects.vercel.app`
+- Web app: `https://surabhikunj-voice-app.vercel.app`
+- Android: signed release APK (`npm run apk`) + OTA bundles (`npm run deploy:ota`).
+  **See DEPLOYMENT.md** for signing, OTA, remote config and migration status.
 
 ## 3) Vercel Deployment Settings
 
@@ -59,6 +61,8 @@ select * from public.notifications;
 
 ## 7) Monitoring Procedure
 
+- Crash reports from phones: `select * from client_errors order by created_at desc limit 50;`
+- Config change history: `select * from config_audit_log order by changed_at desc;`
 - Supabase `Logs` saved views:
   - `auth` + `error`
   - `database` + `error`
@@ -66,7 +70,14 @@ select * from public.notifications;
 
 ## 8) Rollback Plan
 
-If production breaks after deploy:
+If the Android app breaks after an OTA release:
+
+1. Re-publish the previous version: `npm run deploy:ota -- <previous version>`.
+2. Phones switch back on their next launch. (A bundle that crashes before its
+   first screen is rolled back automatically.)
+3. For a serious incident, Settings → App & updates → Maintenance mode.
+
+If the web app breaks after deploy:
 
 1. In Vercel, open previous successful deployment.
 2. Click `Promote to Production` (or redeploy previous stable commit).

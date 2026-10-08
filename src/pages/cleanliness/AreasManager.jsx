@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import useToastStore from '@/store/toastStore'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import { confirm } from '@/store/dialogStore'
 
 const INPUT_CLASS = 'w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 
@@ -100,7 +101,7 @@ export default function AreasManager({ orgId, canManage }) {
   }
 
   const remove = async (area) => {
-    const ok = window.confirm(`Remove cleaning area "${area.name}"?`)
+    const ok = await confirm({ title: `Remove “${area.name}”?`, message: 'This cleaning area will no longer be assigned.', confirmLabel: 'Remove', danger: true })
     if (!ok) return
     setBusyId(area.id)
     try {

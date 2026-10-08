@@ -9,19 +9,56 @@
 ```bash
 npm install
 npm run build     # vite build → dist/
-npm run lint
-node --test $(find src -name "*.test.js" -not -path "*/node_modules/*")
+npm run lint      # must report 0 errors (React Compiler advisories are warnings)
+npm test          # unit tests only (node --test src/**/*.test.js)
+npm run test:smoke  # live Supabase smoke test (needs network + .env)
+npm run apk       # signed RELEASE apk → ~/Desktop (needs android/keystore.properties)
+npm run deploy:ota  # bump version, build, publish OTA bundle
 ```
-`npm test` also runs `smoke_test.mjs`, which needs live network/Supabase
-credentials and will fail offline — run the `node --test` glob above for a
-pure unit-test signal.
+See DEPLOYMENT.md for what needs an APK vs an OTA vs a settings change.
+
+## Launch architecture (October 2026)
+- **Remote control without reinstalling**: `src/store/configStore.js` reads
+  `app_platform_config` (migration 73): min/recommended APK `versionCode`,
+  maintenance mode, APK link, feature flags. `components/system/AppGate.jsx`
+  shows forced-update / maintenance screens; `Banners.jsx` shows update,
+  offline, admin notice (`organization_settings.content`) bars. Fail-open:
+  missing table/offline = app runs normally. Platform admins
+  (`platform_admins`) bypass maintenance.
+- **Native calls must go through `src/lib/native.js` (`hasPlugin()`)**. OTA
+  bundles reach OLD APKs; an unguarded call to a plugin an older APK lacks
+  crashes it. APKs ≤ build 2 have no App plugin (treated as versionCode 2).
+- **OTA** (`src/lib/liveUpdate.js`): manifest `minNativeVersionCode`
+  (package.json `ota.minNativeVersionCode`), apply on next launch,
+  `markBundleHealthy()` after first render (otherwise capgo rolls back).
+- **Signing**: release APKs use the original debug certificate (copied to
+  `~/Documents/VOICE-signing/voice-release.keystore`) so they install over
+  the APKs users already have. Never change the key.
+- **Zustand v5**: a selector that returns a new object/array each call causes
+  an infinite render loop (React #185). Use `useShallow` (see `useGate()`).
+- **Dates**: never `toISOString().split('T')[0]` for "today" — it is the UTC
+  date (wrong before 05:30 IST). Use `src/lib/dates.js`.
+- **Design system**: tokens in `src/index.css` (`--color-*`, `--surface*`,
+  `--shadow-*`, `--radius-*`, `.text-title` …); components in
+  `src/components/ui/` (Button/IconButton/buttonClass, Field: AppInput/
+  AppSelect/AppTextarea, Card, Badge/StatusBadge, Avatar, Dialog +
+  `confirm()` from `store/dialogStore`, States: EmptyState/ErrorState/
+  LoadingState/Skeleton, DynamicIcon). Use `friendlyError()` for any error
+  shown to a user. No `window.confirm`.
+- **Icons by name** (nav, categories): `getIcon()`/`<DynamicIcon>` from the
+  registry in `src/lib/icons.js` — never `import * as Icons from 'lucide-react'`
+  (pulls 625 kB). Add new names to the registry.
+- Errors are reported to `client_errors` (`src/lib/errorReporter.js`); never
+  paint stack traces over the UI.
 
 ## Database migrations
 No automated migration runner exists. Every `supabase/NN_*.sql` file is
 applied manually by pasting into the Supabase SQL Editor, in numeric order.
 This repo does not store a DB password or Supabase access token locally —
 do not attempt to run DDL via the JS client (service-role key only grants
-PostgREST access, not raw SQL execution).
+PostgREST access, not raw SQL execution). Live status (probed October 2026):
+everything through 72 is applied EXCEPT 49 (and the optional 50, which
+overwrites configured Sadhana marks — do not run it casually); 73 is new.
 
 ## Parental Control module (`pc_*` schema)
 See:
@@ -50,10 +87,9 @@ See:
 - `supabase/61_policy_integrity.sql` — policy versioning, duplicate-rule
   prevention, lockout protection (dialer/settings/launcher/agent can never
   be blocked), device self-heal RLS. Additive only; migrations 52–60 stay
-  valid. **Not yet applied to the live database as of this writing** — the
-  app degrades gracefully without it (see `src/lib/policySync.js`
-  `isMigrationApplied()`), but device diagnostics show `'unknown'` sync
-  state until it's run.
+  valid. Applied to the live database (confirmed October 2026). The app
+  still degrades gracefully on a database without it (see
+  `src/lib/policySync.js` `isMigrationApplied()`).
 - Companion app: `../surabhikunj-voice-kids` (child Android agent, Device
   Owner). Its `AGENTS.md` documents the on-device policy engine.
 

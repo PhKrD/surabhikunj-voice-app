@@ -12,6 +12,7 @@ import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
 import { cn, formatTime } from '@/lib/utils'
 import AreasManager from './AreasManager'
+import { confirm } from '@/store/dialogStore'
 
 const MODULE = 'cleanliness'
 
@@ -522,7 +523,7 @@ export default function CleanlinessPage() {
   }
 
   const cancel = async (id, title) => {
-    const ok = window.confirm(`Cancel "${title || 'this cleaning duty'}"? The assignee will be notified.`)
+    const ok = await confirm({ title: `Cancel “${title || 'this cleaning duty'}”?`, message: 'The assignee will be notified.', confirmLabel: 'Cancel duty', cancelLabel: 'Keep', danger: true })
     if (!ok) return
     setBusyId(id)
     try {

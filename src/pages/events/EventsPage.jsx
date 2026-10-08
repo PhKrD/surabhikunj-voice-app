@@ -13,6 +13,7 @@ import useOrgStore from '@/store/orgStore'
 import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
 import { localDateISO } from '@/lib/dates'
+import { confirm } from '@/store/dialogStore'
 
 const eventTypeColors = {
   program: 'bg-blue-50 border-blue-100 text-blue-700',
@@ -231,7 +232,7 @@ export default function EventsPage() {
   }
 
   const archiveEvent = async (event) => {
-    const ok = window.confirm(`Archive event "${event.title}"?`)
+    const ok = await confirm({ title: `Archive “${event.title}”?`, message: 'You can undo this right after.', confirmLabel: 'Archive' })
     if (!ok) return
 
     setArchivingId(event.id)

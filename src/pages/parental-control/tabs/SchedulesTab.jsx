@@ -6,6 +6,7 @@ import useToastStore from '@/store/toastStore'
 import { listSchedules, createSchedule, updateSchedule, deleteSchedule, listInstalledApps } from '@/lib/parentalControlApi'
 import { isProtectedPackage } from '@/lib/protectedPackages'
 import { cn } from '@/lib/utils'
+import { confirm } from '@/store/dialogStore'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const ACTIONS = [
@@ -199,7 +200,7 @@ export default function SchedulesTab({ childId }) {
   }
 
   const remove = async (id) => {
-    if (!confirm('Delete this schedule?')) return
+    if (!(await confirm({ title: 'Delete this schedule?', danger: true }))) return
     try {
       await deleteSchedule(id)
       toast.success('Schedule deleted')

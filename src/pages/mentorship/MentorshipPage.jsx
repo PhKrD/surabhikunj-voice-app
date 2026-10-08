@@ -72,7 +72,7 @@ function MentorshipHome() {
   if (loading) return <div className="p-8 text-center text-muted-token">Loading {pageLabel}…</div>
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-6 max-w-3xl mx-auto">
       <h1 className="text-2xl font-extrabold text-primary-token">{pageLabel}</h1>
 
       <div className="flex flex-wrap gap-3">

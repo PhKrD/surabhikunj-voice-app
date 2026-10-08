@@ -16,6 +16,7 @@ import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
 import { cn, formatTime } from '@/lib/utils'
 import { shareToWhatsApp } from '@/lib/whatsapp'
+import { confirm } from '@/store/dialogStore'
 
 const MODULE = 'service'
 
@@ -605,7 +606,7 @@ export default function ServicesPage() {
   }
 
   const cancel = async (id, title) => {
-    const ok = window.confirm(`Cancel service "${title}"? The assignee will be notified.`)
+    const ok = await confirm({ title: `Cancel “${title}”?`, message: 'The assignee will be notified.', confirmLabel: 'Cancel service', cancelLabel: 'Keep', danger: true })
     if (!ok) return
     setBusyId(id)
     try {

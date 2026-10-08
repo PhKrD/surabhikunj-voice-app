@@ -9,6 +9,7 @@ import { isDeviceOnline } from '@/lib/commandStatus'
 import { derivePolicySyncState, POLICY_SYNC_META, diagnosticChecklist } from '@/lib/policySync'
 import ProtectionPinCard from '@/components/parental-control/ProtectionPinCard'
 import MemberLinkPicker from '@/components/parental-control/MemberLinkPicker'
+import { confirm } from '@/store/dialogStore'
 
 const OWNER_MODE_META = {
   device_owner: { label: 'Advanced mode (Device Owner)', icon: ShieldCheck, variant: 'tulasi' },
@@ -103,7 +104,7 @@ export default function DevicesTab({ childId, onChildUpdated }) {
   }
 
   const handleRemove = async (device) => {
-    const ok = window.confirm(`Remove device "${device.device_name || 'Unnamed'}"? This cannot be undone.`)
+    const ok = await confirm({ title: `Remove “${device.device_name || 'Unnamed device'}”?`, message: 'This cannot be undone. The device will need to be paired again.', confirmLabel: 'Remove device', danger: true })
     if (!ok) return
     try {
       await removeDevice(device.id)

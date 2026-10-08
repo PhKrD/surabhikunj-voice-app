@@ -9,6 +9,7 @@ import Card, { CardBody } from '@/components/ui/Card'
 import Avatar from '@/components/ui/Avatar'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
+import { confirm } from '@/store/dialogStore'
 
 const levelConfig = {
   vmc: { label: 'VMC', icon: Crown, color: 'bg-saffron-500 text-white', order: 0 },
@@ -164,7 +165,7 @@ export default function HierarchyPage() {
   }
 
   const removePosition = async (pos) => {
-    const ok = window.confirm(`Delete position "${pos.title}"?`)
+    const ok = await confirm({ title: `Delete “${pos.title}”?`, message: 'This position will be removed from the hierarchy.', danger: true })
     if (!ok) return
 
     setDeletingId(pos.id)

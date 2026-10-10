@@ -1,34 +1,48 @@
-# Platform Limitations — Parental Control Module
+# Platform Limitations — Parental Control (Android)
 
-Honest capability matrix. A feature is only marked FULL when UI + API +
-enforcement + a passing test exist together. Never trust a checkmark you
-cannot find code for.
+Verified capability matrix, October 2026 audit (code traced end to end and
+the critical paths run on an Android 17 emulator; see
+`PARENTAL_CONTROL_QA.md`). Android only: iOS, Windows and macOS are **not
+supported** and not planned for this release.
 
-| Feature                        | Android | iOS | Windows | macOS | Web (browser) |
-|---------------------------------|:-------:|:---:|:-------:|:-----:|:--------------:|
-| App block / allow                | FULL, no reset required (Accessibility soft-block; Device Owner adds a harder OS-level suspend as an optional bonus — see below) | NONE | NONE | NONE | NONE |
-| App daily time limit (same every day OR per weekday) | FULL, no reset required (same mechanism as app block; needs Usage access) | NONE | NONE | NONE | NONE |
-| "Alert me when this app is used" | FULL, no reset required (Accessibility foreground events → `app_opened` alert, rate-limited 30 min/app) | NONE | NONE | NONE | NONE |
-| Routines / schedules (block_all / allow-list) | SOFT LOCK, no reset required — see "Soft lock vs. hard kiosk" below | NONE | NONE | NONE | NONE |
-| Routines (internet-only block)    | FULL, no reset required (one-time VPN consent — see below) | NONE | NONE | NONE | NONE |
-| Restricted times (weekly hour grid) | SOFT LOCK, no reset required — same mechanism as routines; `lock_device` additionally calls `lockNow()` once on entry | NONE | NONE | NONE | NONE |
-| Daily screen-time limit (per weekday, lock navigation / lock device / alert only) | FULL, no reset required — enforced natively (`PolicyEnforcer.kt`); needs Usage access | NONE | NONE | NONE | NONE |
-| Device lock ("Lock now")          | FULL, no reset required — PERSISTENT: every app except dialer/VOICE is kept off-screen until "Unlock" (Accessibility soft-lock) + one `lockNow()` (Device Admin). The screen-off part is a real deterrent only if the child device has NO lock-screen PIN/pattern set | NONE | NONE | NONE | NONE |
-| Device unlock (remote)            | FULL for releasing OUR lock, no reset required. Dismissing an EXISTING PIN/pattern the child set is ADVANCED MODE ONLY (Device Owner, factory reset) — see below | NONE | NONE | NONE | NONE |
-| Internet pause / resume           | FULL, no reset required (local VPN + one-time consent). Persistent until resumed — a routine ending never silently undoes a manual pause | NONE | NONE | NONE | NONE |
-| Extra time ("Give extra time")    | FULL, no reset required — pauses every limit/routine/restriction/parent lock until it expires | NONE | NONE | NONE | NONE |
-| Parent push notifications for alerts | FULL (DB trigger → `notify()` backbone → push/in-app; migration 70) | n/a | n/a | n/a | n/a |
-| Website allow/block/alert (categories + individual sites) | BEST-EFFORT enforcement (DNS-filtering VPN, no reset required — see below); bypassable by hardwired DoH resolvers outside the mitigated list. 'Alert' resolves normally and raises a rate-limited `website_alert` | NONE | NONE | NONE | NONE |
-| Website visit / search monitoring | BEST-EFFORT (Accessibility Service, requires a manual one-time grant — see below) | NONE | NONE | NONE | NONE |
-| Location tracking                 | FULL    | PARTIAL (native MDM/Screen Time API would be required) | NONE | NONE | NONE |
-| Geofencing                        | FULL    | NONE | NONE | NONE | NONE |
-| App usage reporting               | FULL    | NONE | NONE | NONE | NONE |
-| SOS / panic button                | FULL    | NONE | NONE | NONE | NONE |
-| Bonus time requests               | FULL    | NONE | NONE | NONE | NONE |
-| Factory reset (remote wipe)       | FULL, no reset required (`wipeData()` works under plain Device Admin) | NONE | NONE | NONE | NONE |
-| Remote device diagnostics         | FULL (this release) | NONE | NONE | NONE | NONE |
-| Tamper detection (Accessibility/Device Admin turned off) | DETECTION + ALERT + AUTO-LOCK, no reset required — see below. Cannot PREVENT it, only react. | NONE | NONE | NONE | NONE |
-| Child device can also use org features (Sadhana, cleanliness, etc.) | FULL, when the child is linked to a real VOICE member account — see below | N/A | N/A | N/A | N/A |
+✅ Full — works without a factory reset, enforced on the phone, survives
+offline / reboot / app update · 🟡 Best effort — works, with gaps listed ·
+⚠️ Android limitation — the platform does not allow more without Device
+Owner · ❌ Not supported
+
+| Feature | Status | Notes |
+|---|---|---|
+| Block / allow apps | ✅ | Accessibility; native block screen. Soft lock: see "Soft lock vs. hard kiosk" |
+| App time limits (daily or per weekday, 0 = blocked that day) | ✅ | Needs Usage access; fails open without it |
+| Daily screen-time limit (lock apps / lock phone / alert only) | ✅ | Counted from usage events since local midnight |
+| 15 / 5-minute warnings to the child | ✅ | Once per limit per day |
+| "Alert me when this app is opened" | ✅ | 30-min cool-down per app |
+| Routines: bedtime / study / allow-list / block-all / internet-only | ✅ | Cross-midnight belongs to the night it starts; works offline |
+| Restricted-hours grid | ✅ | Works offline |
+| Lock now (persists until Unlock, even if sent offline) | ✅ | Soft lock + one screen-off with Device admin |
+| Unlock past the child's own PIN/pattern | ⚠️ | Impossible without Device Owner (and even then only with no secure lock screen) |
+| Pause / resume internet | ✅ | Internet apps kept off screen; VPN (if consented) also stops background traffic; VOICE always stays reachable |
+| Extra time (+5…+60, custom; adds to time running) | ✅ | Durable; expires on time offline; "Lock now" overrides it |
+| Ask for more time / ask to unblock from the block screen | ✅ | Queued offline; unblock approval adds the allow rule |
+| Website block / allow / alert, categories | 🟡 | Browser address bar for 8 known browsers; categories are curated lists, not a live classifier |
+| Block unknown sites / unsupported browsers | 🟡 | Strict; blocks harmless uncategorised sites too |
+| Safe Search (Google, Bing, DuckDuckGo, YouTube) | 🟡 | Requires Web protection (VPN) to be on |
+| Filtering inside non-browser apps | 🟡 | Only with Web protection (VPN); bypassable by hard-wired DoH |
+| Browsing / search history | 🟡 | Known browsers only; not in-app browsers |
+| Live location, accuracy, history | ✅ | Balanced power; stores only meaningful movement |
+| Places with arrive / leave alerts | ✅ | Hysteresis + accuracy gate (no edge flapping) |
+| SOS (hold 2 s) | ✅ | Queued offline, original time kept |
+| Usage reports, timeline, alerts, push | ✅ | Repeat pushes rate-limited server-side (migration 74) |
+| Parent action audit log | ✅ | |
+| Protection health score + fix steps + OEM guidance | ✅ | Built from the phone's own recent report only |
+| Tamper detection (Accessibility, Device admin, Usage access, VPN, location) | ✅ detect / ⚠️ prevent | Alert + "back on" alert; critical kinds also lock the screen |
+| Parent-PIN guard on dangerous Settings screens | 🟡 | Deterrent; PIN hash is on the phone |
+| Survives reboot / app update / process death | ✅ | Accessibility bind, BOOT_COMPLETED, MY_PACKAGE_REPLACED, START_STICKY |
+| Survives aggressive OEM battery savers | 🟡 | Needs the battery exemption + OEM steps the app shows |
+| Remote wipe | ✅ | Device admin |
+| Safe mode, second user profile, adb, factory reset | ⚠️ | Bypass any non-Device-Owner supervision; detectable cases alert |
+| Calls / SMS monitoring, message or social scanning, YouTube watch history | ❌ | Out of scope by design |
+| iOS / Windows / macOS | ❌ | Not supported |
 
 ## Where enforcement decisions are made (read this first)
 

@@ -83,7 +83,7 @@ async function runPass({ force }) {
   const now = Date.now()
   if (force || identity.reassigned || now - lastNudgeAt > NUDGE_INTERVAL_MS) {
     lastNudgeAt = now
-    await dpc.enforceNow().catch(() => {})
+    await dpc.enforceNow({ full: force || identity.reassigned }).catch(() => {})
   }
 
   saveEnforcementState({ policyVersion: identity.policyVersion })

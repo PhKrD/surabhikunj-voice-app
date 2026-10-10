@@ -130,11 +130,16 @@ export function resolveLockState({
   usageByPackage = {},
   usageAvailable = true,
   bonusActive = false,
+  parentLock = false,
   now = new Date(),
 } = {}) {
   const usedMin = Math.floor(totalScreenTimeMs(usageByPackage) / 60_000)
   const limitMin = limitForDay(rule, now.getDay())
   const remainingMin = limitMin === null ? null : Math.max(0, limitMin - usedMin)
+
+  // The parent's explicit "Lock now" is their most deliberate instruction:
+  // extra time granted earlier must not cancel it (mirrors PolicyEnforcer.kt).
+  if (parentLock) return { locked: true, reason: 'parent_lock', action: 'lock_device', usedMin, limitMin, remainingMin }
 
   if (bonusActive) return { locked: false, reason: null, action: null, usedMin, limitMin, remainingMin }
 

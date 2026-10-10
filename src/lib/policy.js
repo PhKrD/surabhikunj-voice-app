@@ -91,11 +91,24 @@ export function isTimeInRange(start, end, nowMin) {
   return nowMin >= s && nowMin < e
 }
 
+/**
+ * A window that crosses midnight belongs to the day it STARTS on:
+ * "Bedtime, Mon–Fri, 22:00–06:00" is on at 02:00 Saturday (Friday night)
+ * and off at 02:00 Monday (Sunday night). Mirrors PolicyRules.kt.
+ */
 export function isScheduleActive(schedule, now = new Date()) {
   if (!schedule || schedule.is_enabled === false) return false
   const days = schedule.days_of_week
-  if (!Array.isArray(days) || !days.includes(now.getDay())) return false
-  return isTimeInRange(schedule.start_time, schedule.end_time, minutesOfDay(now))
+  if (!Array.isArray(days)) return false
+  const start = parseHm(schedule.start_time)
+  const end = parseHm(schedule.end_time)
+  if (start === null || end === null || start === end) return false
+  const nowMin = minutesOfDay(now)
+  const today = now.getDay()
+  if (end > start) return days.includes(today) && nowMin >= start && nowMin < end
+  if (nowMin >= start) return days.includes(today)
+  if (nowMin < end) return days.includes((today + 6) % 7)
+  return false
 }
 
 /**

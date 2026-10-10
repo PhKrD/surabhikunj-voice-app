@@ -285,3 +285,30 @@ test('usageMapFromApps folds the native payload into a package→ms map', () => 
   ])
   assert.deepEqual(map, { a: 1250, b: 500 })
 })
+
+// ── cross-midnight routines belong to the night they start ───────────
+
+const weeknightBedtime = {
+  id: 's-bed',
+  name: 'Bedtime',
+  is_enabled: true,
+  days_of_week: [1, 2, 3, 4, 5], // Mon–Fri nights
+  start_time: '22:00',
+  end_time: '06:00',
+  action: 'block_all',
+}
+
+test('bedtime starts and ends on time with no parent action', () => {
+  assert.equal(isScheduleActive(weeknightBedtime, at(21, 59)), false)
+  assert.equal(isScheduleActive(weeknightBedtime, at(22, 0)), true)
+  assert.equal(isScheduleActive(weeknightBedtime, at(5, 59, 1)), true) // Tue early = Mon night
+  assert.equal(isScheduleActive(weeknightBedtime, at(6, 0, 1)), false)
+})
+
+test('REGRESSION: Friday-night bedtime still applies at 2 AM Saturday', () => {
+  assert.equal(isScheduleActive(weeknightBedtime, at(2, 0, 5)), true) // Saturday 02:00
+})
+
+test('REGRESSION: an unselected Sunday night does not lock Monday 2 AM', () => {
+  assert.equal(isScheduleActive(weeknightBedtime, at(2, 0)), false) // Monday 02:00
+})

@@ -129,6 +129,26 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
         // re-fires while the browser is still unwinding the navigation.
         private const val REBLOCK_HOST_COOLDOWN_MS = 4000L
         private const val WEBSITE_BLOCK_ALERT_COOLDOWN_MS = 15 * 60_000L
+
+        // Diagnostics (child debug screen): what the service last saw.
+        @Volatile var lastForegroundPkg: String? = null
+        @Volatile var lastForegroundAt = 0L
+        @Volatile var connectedAt = 0L
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        connectedAt = System.currentTimeMillis()
+        // The accessibility service is re-bound by Android after a reboot or
+        // an app update even when nobody opens VOICE; make sure the policy
+        // engine is running too.
+        if (VoiceKidsPrefs.isConfigured(applicationContext)) {
+            runCatching {
+                androidx.core.content.ContextCompat.startForegroundService(
+                    applicationContext, android.content.Intent(applicationContext, VoiceKidsMonitorService::class.java),
+                )
+            }
+        }
     }
 
     private data class ParsedBar(val raw: String, val host: String, val searchEngine: String?, val searchQuery: String?)
@@ -191,8 +211,12 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
      */
     private fun enforceForegroundApp(pkg: String) {
         if (pkg == applicationContext.packageName) return
-        if (NEVER_BLOCK.contains(pkg)) return
         if (!VoiceKidsPrefs.isConfigured(applicationContext)) return
+        lastForegroundPkg = pkg
+        lastForegroundAt = System.currentTimeMillis()
+        // Device-resolved launcher/dialer/keyboard/permission screens, not a
+        // Pixel-only hard-coded list — see EssentialApps.
+        if (NEVER_BLOCK.contains(pkg) || EssentialApps.isEssential(applicationContext, pkg)) return
 
         val blockAllActive = VoiceKidsPrefs.desiredBlockAllActive(applicationContext)
         val allowList = VoiceKidsPrefs.desiredAllowListPackages(applicationContext)
@@ -217,7 +241,15 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
         }
 
         val now = System.currentTimeMillis()
-        if (pkg == lastBlockedPkg && now - lastBlockedAt < REBLOCK_COOLDOWN_MS) return
+        if (pkg == lastBlockedPkg && now - lastBlockedAt < REBLOCK_COOLDOWN_MS) {
+            // Re-opened straight away: still send it away (otherwise it stays
+            // usable until the next window change), just don't re-show the
+            // screen or re-alert the parent. Late events from an app that is
+            // already on its way out must not knock the block screen away.
+            val stillInFront = runCatching { rootInActiveWindow?.packageName?.toString() == pkg }.getOrDefault(false)
+            if (stillInFront) performGlobalAction(GLOBAL_ACTION_HOME)
+            return
+        }
         lastBlockedPkg = pkg
         lastBlockedAt = now
 
@@ -227,13 +259,33 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
         val reason = when {
             internetBlocked -> "internet_paused"
             blockAllActive || allowList != null -> VoiceKidsPrefs.lockReason(applicationContext).ifEmpty { "schedule" }
+            appLimitReached(pkg) -> "app_limit"
             else -> "app_blocked"
         }
         Log.i(TAG, "Blocking foreground app: $pkg (reason=$reason)")
-        performGlobalAction(GLOBAL_ACTION_HOME)
-        BlockOverlay.show(applicationContext, reason, appLabel(pkg))
+        val label = appLabel(pkg)
+        // Our full-screen explanation goes straight on top; the blocked app
+        // is stopped behind it (so video/audio pause). No "Home" first: that
+        // action is asynchronous and used to land AFTER the block screen,
+        // covering it with the launcher. If Android refuses the activity
+        // start (some OEMs restrict background starts), the app is still in
+        // front a moment later — then fall back to Home + the overlay.
+        val started = runCatching {
+            startActivity(BlockedActivity.intent(applicationContext, reason, pkg, label))
+        }.isSuccess
+        handler.postDelayed({
+            val stillInFront = runCatching { rootInActiveWindow?.packageName?.toString() == pkg }.getOrDefault(false)
+            if (!started || stillInFront) {
+                Log.w(TAG, "Block screen did not come up for $pkg; using Home + overlay")
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                BlockOverlay.show(applicationContext, reason, label)
+            }
+        }, 600)
         maybeAlertBlockedAttempt(pkg, reason)
     }
+
+    private fun appLimitReached(pkg: String): Boolean =
+        runCatching { org.json.JSONObject(VoiceKidsPrefs.appLimitStatus(applicationContext)).has(pkg) }.getOrDefault(false)
 
     /**
      * Every installed package that declares INTERNET, cached — the set an
@@ -277,9 +329,12 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
         VoiceKidsPrefs.setLastAppOpenedAlertAt(applicationContext, "blocked:$pkg", now)
         val label = appLabel(pkg)
         val why = when (reason) {
-            "daily_limit" -> "daily screen-time limit reached"
-            "restricted_time" -> "restricted time"
-            "schedule" -> "a scheduled break is active"
+            "daily_limit" -> "the daily screen-time limit is reached"
+            "app_limit" -> "today's time for this app is used up"
+            "restricted_time" -> "it's a restricted time"
+            "schedule" -> "${VoiceKidsPrefs.lockLabel(applicationContext).ifEmpty { "a routine" }} is on"
+            "parent_lock" -> "the phone is locked"
+            "internet_paused" -> "the internet is paused"
             else -> "the app is blocked"
         }
         ioExecutor.execute {
@@ -295,18 +350,7 @@ class VoiceKidsAccessibilityService : AccessibilityService() {
     }
 
     private fun insertAlert(type: String, severity: String, title: String, body: String, metadata: JSONObject) {
-        val deviceId = VoiceKidsPrefs.deviceId(applicationContext) ?: return
-        val childId = VoiceKidsPrefs.childId(applicationContext) ?: return
-        val row = JSONObject().apply {
-            put("device_id", deviceId)
-            put("child_id", childId)
-            put("alert_type", type)
-            put("severity", severity)
-            put("title", title)
-            put("body", body)
-            put("metadata", metadata)
-        }
-        if (!SupabaseRest.insert(applicationContext, "pc_alerts", row)) Log.w(TAG, "Failed to insert $type alert")
+        if (!Outbox.alert(applicationContext, type, severity, title, body, metadata)) Log.i(TAG, "Queued $type alert (offline)")
     }
 
     private fun checkAddressBar(pkg: String) {

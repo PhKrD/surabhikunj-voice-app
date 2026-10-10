@@ -182,9 +182,22 @@ export const dpc = {
    * next 4s tick. Used right after the WebView processes a command that
    * changes policy (bonus time, sync_rules).
    */
-  async enforceNow() {
+  async enforceNow({ full = false } = {}) {
     if (!isNative()) return webFallback()
-    return NativeDpc.enforceNow()
+    return NativeDpc.enforceNow({ full })
+  },
+
+  /**
+   * Read-only engine diagnostics for the hidden child diagnostics screen.
+   * Older APKs lack the method; resolves null there instead of throwing.
+   */
+  async getDiagnostics() {
+    if (!isNative()) return null
+    try {
+      return await NativeDpc.getDiagnostics()
+    } catch {
+      return null
+    }
   },
 
   /**

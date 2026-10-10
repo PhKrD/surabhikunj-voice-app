@@ -220,6 +220,28 @@ timestamps are unreliable there.
   "Child device can also use org features" and `src/App.jsx`. Unlinked
   children keep the original fully-isolated device-only experience.
 
+## Parental control production hardening (October 2026)
+Read `PARENTAL_CONTROL_ARCHITECTURE.md` (engine, precedence, offline,
+lifecycle), `PARENTAL_CONTROL_SECURITY.md`, `PARENTAL_CONTROL_QA.md`.
+- Native tests: `cd android && ./gradlew :app:testDebugUnitTest` —
+  `PolicyRules.kt` holds the pure time/geofence logic; keep it in sync with
+  `src/lib/policy.js` / `screenTimePolicy.js` (cross-midnight routines belong
+  to the night they START; parent "Lock now" beats extra time).
+- Never hard-code launcher/dialer/keyboard packages: use `EssentialApps.kt`.
+- Device-written rows go through `Outbox.kt` (UUID id, idempotent, queued
+  offline). Don't call `SupabaseRest.insert` directly for alerts/SOS/requests.
+- Native has its OWN Supabase session (`pc-device-session` edge function,
+  deployed). Never push WebView tokens over an independent native session.
+- Approving time = `grantExtraTime()` (desired state). A bare
+  `grant_bonus_time` command is cancelled by the next pass.
+- Migration **74_parental_control_hardening.sql** (RLS child_id checks,
+  schedule read leak, push cool-downs) — dry-run verified, NOT yet applied.
+- Hidden child diagnostics: tap the name on the child home screen 7×.
+- Emulator: Android 17 refuses `am broadcast BOOT_COMPLETED` from adb;
+  enabling Accessibility starts the monitor service by itself now. The
+  display sleeps → engine uses its idle cadence (60 s reads); wake it with
+  `input keyevent KEYCODE_WAKEUP` before timing anything.
+
 ## Lock / pause / extra time are DESIRED STATE, not commands (migration 72)
 `pc_children.parent_lock_active`, `internet_pause_active` and
 `bonus_expires_at` hold the parent's INTENT. `PolicyEnforcer.loadInputs()`

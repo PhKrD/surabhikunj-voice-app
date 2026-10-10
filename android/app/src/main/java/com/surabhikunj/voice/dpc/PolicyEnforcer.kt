@@ -65,12 +65,6 @@ object PolicyEnforcer {
         "com.surabhikunj.voice",
     )
 
-    private val SCHEDULE_SEVERITY = mapOf(
-        "block_all" to 3,
-        "allow_list_only" to 2,
-        "block_internet" to 1,
-    )
-
     /**
      * What is locking the whole device right now, if anything.
      *   key     — stable identity used to detect the TRANSITION into a lock
@@ -121,28 +115,80 @@ object PolicyEnforcer {
     // The age cap heals anything a missed bump could otherwise hide forever.
     private const val INPUT_CACHE_MAX_AGE_MS = 5 * 60_000L
 
-    private fun loadInputs(context: Context, childId: String): PolicyInputs? {
+    // How often the child row (desired lock / pause / extra time + policy
+    // version) is re-read. Local evaluation still runs every tick; only the
+    // network read is spaced out. Screen on: a parent's "Lock now" lands in
+    // seconds. Screen off: nobody is using the phone, so a slower read saves
+    // battery and data — and the screen turning on forces a read at once.
+    private const val CHILD_ROW_INTERVAL_ACTIVE_MS = 8_000L
+    private const val CHILD_ROW_INTERVAL_IDLE_MS = 60_000L
+
+    @Volatile private var lastChildRowAt = 0L
+    @Volatile var lastOnlineAt = 0L
+        private set
+    @Volatile var lastEvaluationAt = 0L
+        private set
+    @Volatile var policySource = "none"
+        private set
+
+    private fun isInteractive(context: Context): Boolean =
+        runCatching { context.getSystemService(android.os.PowerManager::class.java)?.isInteractive ?: true }.getOrDefault(true)
+
+    /**
+     * Returns the policy to enforce this pass. Never returns "no policy"
+     * just because the network failed: the last policy fetched successfully
+     * is kept in memory AND on disk (survives reboot / process death), so a
+     * phone with no signal keeps enforcing — and keeps running time-based
+     * transitions like bedtime starting or extra time running out. Before
+     * this, a failed fetch skipped the whole pass, so an offline phone never
+     * entered bedtime and a phone that went offline DURING bedtime stayed
+     * locked past its end.
+     */
+    private fun loadInputs(context: Context, childId: String, force: Boolean): PolicyInputs? {
+        val now = System.currentTimeMillis()
+        val cached = cachedInputs?.takeIf { it.childId == childId }
+            ?: restoreInputs(context, childId)?.also { cachedInputs = it }
+        val interval = if (isInteractive(context)) CHILD_ROW_INTERVAL_ACTIVE_MS else CHILD_ROW_INTERVAL_IDLE_MS
+        if (!force && cached != null && now - lastChildRowAt < interval) {
+            return cached
+        }
+        lastChildRowAt = now
+
         // select=* rather than naming columns: parent_pin_hash /
         // protect_settings only exist after migration 71, and PostgREST
         // rejects the whole request for an unknown column, which would
         // take enforcement down entirely on a not-yet-migrated database.
-        val childRow = fetchRows(context, "pc_children", "id=eq.$childId&select=*")?.optJSONObject(0)
-        if (childRow != null) {
-            VoiceKidsPrefs.setParentPinHash(context, childRow.optString("parent_pin_hash", "").takeIf { it.isNotEmpty() && it != "null" })
-            VoiceKidsPrefs.setProtectSettings(context, childRow.optBoolean("protect_settings", true))
-            applyDesiredState(context, childRow)
+        val childRows = fetchRows(context, "pc_children", "id=eq.$childId&select=*")
+        if (childRows == null) {
+            policySource = if (cached != null) "cached" else "none"
+            return cached
         }
-        val policyVersion = childRow?.optLong("policy_version", -1L)?.takeIf { it >= 0 }
-        val cached = cachedInputs
-        val now = System.currentTimeMillis()
-        if (cached != null && cached.childId == childId && policyVersion != null && cached.policyVersion == policyVersion &&
+        val childRow = childRows.optJSONObject(0)
+        if (childRow == null) {
+            // Online, but the child row is invisible: the parent removed this
+            // device (or the child). Confirm against our own device row before
+            // releasing anything — never on a guess.
+            if (isDeviceRevoked(context)) releaseRevokedDevice(context)
+            return null
+        }
+        lastOnlineAt = now
+        VoiceKidsPrefs.setParentPinHash(context, childRow.optString("parent_pin_hash", "").takeIf { it.isNotEmpty() && it != "null" })
+        VoiceKidsPrefs.setProtectSettings(context, childRow.optBoolean("protect_settings", true))
+        applyDesiredState(context, childRow)
+
+        val policyVersion = childRow.optLong("policy_version", -1L).takeIf { it >= 0 }
+        if (!force && cached != null && policyVersion != null && cached.policyVersion == policyVersion &&
             now - cached.fetchedAt < INPUT_CACHE_MAX_AGE_MS) {
+            policySource = "live"
             return cached
         }
 
         val schedules = fetchRows(context, "pc_schedules", "child_id=eq.$childId&select=*")
         val rules = fetchRows(context, "pc_app_rules", "child_id=eq.$childId&select=*")
-        if (schedules == null || rules == null) return null
+        if (schedules == null || rules == null) {
+            policySource = if (cached != null) "cached" else "none"
+            return cached
+        }
         val inputs = PolicyInputs(
             childId = childId,
             policyVersion = policyVersion,
@@ -156,12 +202,95 @@ object PolicyEnforcer {
             fetchedAt = now,
         )
         cachedInputs = inputs
+        persistInputs(context, inputs)
+        policySource = "live"
         return inputs
+    }
+
+    private fun persistInputs(context: Context, inputs: PolicyInputs) {
+        val json = JSONObject()
+            .put("child_id", inputs.childId)
+            .put("policy_version", inputs.policyVersion ?: JSONObject.NULL)
+            .put("schedules", inputs.schedules)
+            .put("rules", inputs.rules)
+            .put("screen_time_rule", inputs.screenTimeRule ?: JSONObject.NULL)
+            .put("restricted", inputs.restricted ?: JSONObject.NULL)
+            .put("website_rules", inputs.websiteRules ?: JSONObject.NULL)
+            .put("category_rules", inputs.categoryRules ?: JSONObject.NULL)
+            .put("filter_settings", inputs.filterSettings ?: JSONObject.NULL)
+            .put("fetched_at", inputs.fetchedAt)
+        VoiceKidsPrefs.setPolicyInputsJson(context, json.toString())
+    }
+
+    private fun restoreInputs(context: Context, childId: String): PolicyInputs? {
+        val raw = VoiceKidsPrefs.policyInputsJson(context) ?: return null
+        return try {
+            val j = JSONObject(raw)
+            if (j.optString("child_id") != childId) return null
+            PolicyInputs(
+                childId = childId,
+                policyVersion = if (j.isNull("policy_version")) null else j.optLong("policy_version"),
+                schedules = j.optJSONArray("schedules") ?: JSONArray(),
+                rules = j.optJSONArray("rules") ?: JSONArray(),
+                screenTimeRule = j.optJSONObject("screen_time_rule"),
+                restricted = j.optJSONObject("restricted"),
+                websiteRules = j.optJSONArray("website_rules"),
+                categoryRules = j.optJSONArray("category_rules"),
+                filterSettings = j.optJSONObject("filter_settings"),
+                // Restored copies are always re-validated at the next online read.
+                fetchedAt = 0L,
+            ).also { policySource = "cached" }
+        } catch (e: Exception) {
+            Log.w(TAG, "Stored policy unreadable, ignoring: ${e.message}")
+            null
+        }
+    }
+
+    private fun isDeviceRevoked(context: Context): Boolean {
+        val deviceId = VoiceKidsPrefs.deviceId(context) ?: return false
+        val rows = fetchRows(context, "pc_devices", "id=eq.$deviceId&select=id,is_active") ?: return false
+        val row = rows.optJSONObject(0) ?: return true
+        return !row.optBoolean("is_active", true)
+    }
+
+    /**
+     * The parent removed this phone. Lift every restriction we applied so the
+     * child is not left locked by a supervision that no longer exists, and
+     * stop enforcing until the phone is paired again.
+     */
+    private fun releaseRevokedDevice(context: Context) {
+        Log.w(TAG, "Device removed by parent — releasing all restrictions")
+        VoiceKidsPrefs.setDesiredBlockedPackages(context, emptySet())
+        VoiceKidsPrefs.setDesiredAllowListPackages(context, null)
+        VoiceKidsPrefs.setDesiredBlockAllActive(context, false)
+        VoiceKidsPrefs.setInternetPauseActive(context, false)
+        VoiceKidsPrefs.setManualInternetPause(context, false)
+        VoiceKidsPrefs.setParentLockActive(context, false)
+        VoiceKidsPrefs.setLockReason(context, "")
+        VoiceKidsPrefs.setAppliedLockKey(context, "")
+        VoiceKidsPrefs.setBlockedDomains(context, emptySet())
+        VoiceKidsPrefs.setPolicyInputsJson(context, null)
+        VoiceKidsPrefs.putString(context, "revoked", "1")
+        if (DpcActions.isDeviceOwner(context)) {
+            val suspended = VoiceKidsPrefs.appliedSuspended(context).toList()
+            if (suspended.isNotEmpty()) DpcActions.setPackagesSuspended(context, suspended, false)
+            DpcActions.setAllowedPackages(context, emptyList())
+        }
+        DpcActions.resumeInternet(context)
+        cachedInputs = null
+    }
+
+    fun isRevoked(context: Context): Boolean = VoiceKidsPrefs.getString(context, "revoked") == "1"
+
+    /** Next pass re-reads the child row (screen on, network back) but keeps the policy cache. */
+    fun invalidateChildRow() {
+        lastChildRowAt = 0L
     }
 
     /** Drops the input cache so the next pass re-reads everything (sync_rules command, reassignment). */
     fun invalidateCache() {
         cachedInputs = null
+        lastChildRowAt = 0L
     }
 
     /**
@@ -241,17 +370,20 @@ object PolicyEnforcer {
 
     /** One enforcement pass at a time — called from VoiceKidsMonitorService's single executor thread already. */
     @Synchronized
-    fun enforce(context: Context) {
+    fun enforce(context: Context, force: Boolean = false) {
         val deviceId = VoiceKidsPrefs.deviceId(context) ?: return
         val childId = VoiceKidsPrefs.childId(context) ?: return
+        if (isRevoked(context)) return
 
-        val inputs = loadInputs(context, childId)
+        val inputs = loadInputs(context, childId, force)
         if (inputs == null) {
-            // A failed fetch must never be treated as "no rules" — that would
-            // unsuspend every blocked app the moment the network hiccups.
-            Log.w(TAG, "enforce: fetch failed, skipping pass")
+            // Nothing fetched yet and nothing stored: there is no policy to
+            // apply. Leave whatever is in force alone — a failed fetch must
+            // never be read as "no rules" and release a block.
+            Log.w(TAG, "enforce: no policy available yet, skipping pass")
             return
         }
+        lastEvaluationAt = System.currentTimeMillis()
         val schedules = inputs.schedules
         val rules = inputs.rules
         val screenTimeRule = inputs.screenTimeRule
@@ -268,17 +400,22 @@ object PolicyEnforcer {
         val activeSchedule = findActiveSchedule(schedules, now, bonusActive)
         val usageAvailable = UsageStatsHelper.hasUsageAccess(context)
         val usageByPackage: Map<String, Long> = if (usageAvailable) {
-            UsageStatsHelper.queryTodayUsage(context).associate { it.packageName to it.totalForegroundMs }
+            UsageStatsHelper.todayUsageCached(context)
         } else emptyMap()
 
         // ── Daily screen time (mirrors screenTimePolicy.js) ─────────────
-        val usedMin = (totalScreenTimeMs(usageByPackage) / 60_000L).toInt()
+        val usedMin = (totalScreenTimeMs(context, usageByPackage) / 60_000L).toInt()
         val limitMin = limitForDay(screenTimeRule, dow)
         VoiceKidsPrefs.setScreenTimeSnapshot(context, if (usageAvailable) usedMin else -1, limitMin)
         val limitReached = limitMin != null && usageAvailable && !bonusActive && usedMin >= limitMin
+        val today = isoDate(System.currentTimeMillis())
+        if (limitMin != null && usageAvailable && !bonusActive &&
+            screenTimeRule?.optString("limit_action") != "alert_only") {
+            ChildNotifier.maybeWarn(context, "daily", "screen time", usedMin, limitMin, today)
+        }
 
         // ── App rules ───────────────────────────────────────────────────
-        val (blockListBase, allowList, alertOnUse) = resolveAppRules(rules, usageByPackage, usageAvailable, bonusActive, dow)
+        val (blockListBase, allowList, alertOnUse) = resolveAppRules(context, rules, usageByPackage, usageAvailable, bonusActive, dow, today)
         VoiceKidsPrefs.setAlertOnUsePackages(context, alertOnUse)
 
         // ── Web filtering settings ──────────────────────────────────────
@@ -310,11 +447,13 @@ object PolicyEnforcer {
         VoiceKidsPrefs.setAlertOnWebsiteBlock(context, alertOnBlock)
 
         // ── Whole-device lock resolution (mirrors resolveLockState) ─────
-        // Priority: bonus time > parent's explicit "Lock now" > active
-        // schedule > restricted-time cell > daily limit. Bonus already
+        // Priority: parent's explicit "Lock now" > extra time > active
+        // routine > restricted-time cell > daily limit. "Lock now" is the
+        // parent's most deliberate, most recent instruction, so extra time
+        // granted earlier must not cancel it (it used to). Extra time already
         // zeroed activeSchedule/limitReached.
         val restrictedActive = !bonusActive && isRestrictedNow(restricted, now)
-        val parentLock = !bonusActive && VoiceKidsPrefs.parentLockActive(context)
+        val parentLock = VoiceKidsPrefs.parentLockActive(context)
         val lock: LockDecision? = when {
             parentLock -> LockDecision("parent_lock", "parent_lock", "lock_device", "Locked by parent")
             activeSchedule != null -> {
@@ -337,14 +476,14 @@ object PolicyEnforcer {
             }
             else -> null
         }
+        VoiceKidsPrefs.setLockUntil(context, lockEndsAt(lock, restricted, now))
 
         // Parent-facing alerts for the two limit events (once per day / per
         // window), independent of whether the lock action is alert_only.
         if (limitReached && (screenTimeRule?.optBoolean("alert_on_limit", true) ?: true)) {
-            val today = isoDate(System.currentTimeMillis())
             if (VoiceKidsPrefs.lastLimitAlertDate(context) != today) {
                 VoiceKidsPrefs.setLastLimitAlertDate(context, today)
-                insertAlert(context, deviceId, childId, "screen_time_exceeded", "warning",
+                Outbox.alert(context, "screen_time_exceeded", "warning",
                     "Daily screen-time limit reached",
                     "$usedMin minutes used of today's $limitMin minute limit.",
                     JSONObject().put("total_minutes", usedMin).put("limit_minutes", limitMin))
@@ -439,7 +578,7 @@ object PolicyEnforcer {
         // VoiceKidsAccessibilityService to enforce (works under Device
         // Admin only, no reset needed). Device Owner additionally gets a
         // real setPackagesSuspended() call as a stronger bonus layer.
-        val desiredSet = blockList.filterNot { isProtectedPackage(it) }.toSet()
+        val desiredSet = blockList.filterNot { isProtectedPackage(it) || EssentialApps.isEssential(context, it) }.toSet()
         VoiceKidsPrefs.setDesiredBlockedPackages(context, desiredSet)
 
         var suspendOk = true
@@ -496,11 +635,25 @@ object PolicyEnforcer {
         }
 
         reportEnforcementState(context, deviceId, policyVersion, mapOf(
+            "policy_source" to policySource,
+            "lock_until" to VoiceKidsPrefs.lockUntil(context).takeIf { it > 0 }?.let { isoTimestamp(it) },
+            "battery_optimization_exempt" to DpcActions.isIgnoringBatteryOptimizations(context),
+            "notifications_allowed" to notificationsAllowed(context),
+            "location_permission" to locationPermission(context),
+            "native_session_independent" to VoiceKidsPrefs.hasIndependentSession(context),
+            "queued_reports" to Outbox.pendingCount(context),
+            "app_version" to appVersion(context),
+            // Lets the parent's device-health view show the right
+            // manufacturer-specific battery/autostart steps.
+            "manufacturer" to android.os.Build.MANUFACTURER,
+            "model" to android.os.Build.MODEL,
+            "android_version" to android.os.Build.VERSION.RELEASE,
             "device_admin" to deviceAdmin,
             "device_owner" to deviceOwner,
             "accessibility_enabled" to AccessibilityStatus.isEnabled(context),
             "overlay_granted" to DpcActions.canDrawOverlays(context),
             "vpn_consent" to vpnConsent,
+            "vpn_filtering_wanted" to useVpn,
             "usage_access" to usageAvailable,
             "active_schedule" to (activeSchedule?.optString("name")),
             "lock_reason" to (lock?.reason?.takeIf { it.isNotEmpty() }),
@@ -515,92 +668,39 @@ object PolicyEnforcer {
         ))
     }
 
-    // ── Schedule resolution (mirrors isScheduleActive/findActiveSchedule) ──
+    // ── Time rules: see PolicyRules.kt (pure, JVM unit-tested) ──────────
 
-    private fun parseHm(value: String?): Int? {
-        if (value == null) return null
-        val m = Regex("^(\\d{1,2}):(\\d{2})(?::(\\d{2}))?$").find(value.trim()) ?: return null
-        val h = m.groupValues[1].toIntOrNull() ?: return null
-        val min = m.groupValues[2].toIntOrNull() ?: return null
-        if (h > 23 || min > 59) return null
-        return h * 60 + min
+    private fun parseHm(value: String?): Int? = PolicyRules.parseHm(value)
+    private fun findActiveSchedule(schedules: JSONArray, now: Calendar, bonusActive: Boolean): JSONObject? =
+        PolicyRules.findActiveSchedule(schedules, now, bonusActive)
+    fun limitForDay(rule: JSONObject?, dow: Int): Int? = PolicyRules.limitForDay(rule, dow)
+    private fun appLimitForDay(rule: JSONObject, dow: Int): Int? = PolicyRules.appLimitForDay(rule, dow)
+    fun isRestrictedNow(restricted: JSONObject?, now: Calendar): Boolean = PolicyRules.isRestrictedNow(restricted, now)
+
+    /**
+     * Foreground ms across all apps except launchers, system UI, keyboards
+     * and VOICE itself. Uses the device's real launcher list, not just
+     * Pixel's, so time spent on a Samsung/Xiaomi home screen isn't counted.
+     */
+    fun totalScreenTimeMs(context: Context, usageByPackage: Map<String, Long>): Long {
+        val notScreenTime = EssentialApps.launchersAndKeyboards(context)
+        return usageByPackage.entries.filter {
+            it.value > 0 && it.key !in SCREEN_TIME_EXCLUDED && it.key !in notScreenTime
+        }.sumOf { it.value }
     }
 
-    private fun isTimeInRange(start: String?, end: String?, nowMin: Int): Boolean {
-        val s = parseHm(start) ?: return false
-        val e = parseHm(end) ?: return false
-        if (s == e) return false
-        return if (e < s) nowMin >= s || nowMin < e else nowMin >= s && nowMin < e
-    }
-
-    private fun isScheduleActive(schedule: JSONObject, now: Calendar): Boolean {
-        if (!schedule.optBoolean("is_enabled", true)) return false
-        val days = schedule.optJSONArray("days_of_week") ?: return false
-        val today = now.get(Calendar.DAY_OF_WEEK) - 1 // Calendar.SUNDAY=1 -> JS getDay()=0
-        var matchesDay = false
-        for (i in 0 until days.length()) if (days.optInt(i, -1) == today) matchesDay = true
-        if (!matchesDay) return false
-        val nowMin = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
-        // optString() with no fallback defaults to "" (never null) for a missing/non-string
-        // key — parseHm() already treats anything that doesn't match HH:MM as invalid.
-        return isTimeInRange(schedule.optString("start_time"), schedule.optString("end_time"), nowMin)
-    }
-
-    private fun findActiveSchedule(schedules: JSONArray, now: Calendar, bonusActive: Boolean): JSONObject? {
-        if (bonusActive) return null
-        var best: JSONObject? = null
-        var bestSeverity = -1
-        for (i in 0 until schedules.length()) {
-            val s = schedules.getJSONObject(i)
-            if (!isScheduleActive(s, now)) continue
-            val severity = SCHEDULE_SEVERITY[s.optString("action")] ?: 0
-            if (severity > bestSeverity || (severity == bestSeverity && best != null &&
-                    s.optString("id") < best.optString("id"))) {
-                best = s
-                bestSeverity = severity
-            }
+    /**
+     * When the current whole-device restriction ends, for the block screen's
+     * "Until 6:00 AM". 0 = open-ended or unknown (a parent's lock, a pause).
+     */
+    private fun lockEndsAt(lock: LockDecision?, restricted: JSONObject?, now: Calendar): Long {
+        if (lock == null) return 0L
+        return when (lock.reason.ifEmpty { lock.key.substringBefore(":") }) {
+            "schedule" -> lock.schedule?.let { PolicyRules.scheduleEndsAt(it, now) } ?: 0L
+            "restricted_time" -> PolicyRules.restrictedEndsAt(restricted, now)
+            "daily_limit" -> PolicyRules.nextLocalMidnight(now)
+            else -> 0L
         }
-        return best
-    }
-
-    // ── Daily limit / restricted time (mirrors screenTimePolicy.js) ─────
-
-    /** Foreground ms across all apps except launcher/system UI/VOICE itself. */
-    fun totalScreenTimeMs(usageByPackage: Map<String, Long>): Long =
-        usageByPackage.entries.filter { it.key !in SCREEN_TIME_EXCLUDED && it.value > 0 }.sumOf { it.value }
-
-    /** Today's limit in minutes honouring daily_limits_by_dow; null = no limit (rule missing/disabled). 0 is a real limit. */
-    fun limitForDay(rule: JSONObject?, dow: Int): Int? {
-        if (rule == null || !rule.optBoolean("is_enabled", true)) return null
-        val byDow = rule.optJSONObject("daily_limits_by_dow")
-        if (byDow != null && byDow.has(dow.toString()) && !byDow.isNull(dow.toString())) {
-            val v = byDow.optDouble(dow.toString(), -1.0)
-            if (v >= 0) return v.toInt()
-        }
-        val base = rule.optDouble("daily_limit_min", -1.0)
-        return if (base >= 0) base.toInt() else null
-    }
-
-    /** Per-app variant for time_limit rules: null = no limit (matches policy.js invalid_limit for <= 0 base). */
-    private fun appLimitForDay(rule: JSONObject, dow: Int): Int? {
-        val byDow = rule.optJSONObject("daily_limits_by_dow")
-        if (byDow != null && byDow.has(dow.toString()) && !byDow.isNull(dow.toString())) {
-            val v = byDow.optDouble(dow.toString(), -1.0)
-            if (v >= 0) return v.toInt()
-        }
-        val base = rule.optDouble("daily_limit_min", -1.0)
-        return if (base > 0) base.toInt() else null
-    }
-
-    /** True when `now` falls in a pc_restricted_times.cells {"<dow>": [hours...]} cell. */
-    fun isRestrictedNow(restricted: JSONObject?, now: Calendar): Boolean {
-        if (restricted == null || !restricted.optBoolean("is_enabled", true)) return false
-        val cells = restricted.optJSONObject("cells") ?: return false
-        val dow = now.get(Calendar.DAY_OF_WEEK) - 1
-        val hours = cells.optJSONArray(dow.toString()) ?: return false
-        val hour = now.get(Calendar.HOUR_OF_DAY)
-        for (i in 0 until hours.length()) if (hours.optInt(i, -1) == hour) return true
-        return false
     }
 
     // ── App-rule resolution (mirrors resolvePolicy) ─────────────────────
@@ -608,15 +708,18 @@ object PolicyEnforcer {
     private data class AppRuleResolution(val blockList: List<String>, val allowList: List<String>, val alertOnUse: Set<String>)
 
     private fun resolveAppRules(
+        context: Context,
         rules: JSONArray,
         usageByPackage: Map<String, Long>,
         usageAvailable: Boolean,
         bonusActive: Boolean,
         dow: Int,
+        today: String,
     ): AppRuleResolution {
         val blockSet = mutableSetOf<String>()
         val allowSet = mutableSetOf<String>()
         val alertSet = mutableSetOf<String>()
+        val limitStatus = JSONObject()
 
         for (i in 0 until rules.length()) {
             val rule = rules.getJSONObject(i)
@@ -631,8 +734,13 @@ object PolicyEnforcer {
                         "time_limit" -> {
                             val limitMin = appLimitForDay(rule, dow)
                             if (limitMin != null && usageAvailable && !bonusActive) {
-                                val usedMin = (usageByPackage[pkg] ?: 0L) / 60_000
-                                if (usedMin >= limitMin) blockSet.add(pkg)
+                                val usedMin = ((usageByPackage[pkg] ?: 0L) / 60_000).toInt()
+                                if (usedMin >= limitMin) {
+                                    blockSet.add(pkg)
+                                    limitStatus.put(pkg, "$usedMin/$limitMin")
+                                } else {
+                                    ChildNotifier.maybeWarn(context, pkg, rule.optString("app_name").ifEmpty { pkg }, usedMin, limitMin, today)
+                                }
                             }
                         }
                     }
@@ -640,6 +748,7 @@ object PolicyEnforcer {
             }
         }
         for (pkg in allowSet) blockSet.remove(pkg)
+        VoiceKidsPrefs.setAppLimitStatus(context, limitStatus.toString())
         return AppRuleResolution(blockSet.toList(), allowSet.toList(), alertSet)
     }
 
@@ -727,21 +836,32 @@ object PolicyEnforcer {
         return (0 until arr.length()).mapNotNull { arr.optString(it, null) }
     }
 
-    private fun insertAlert(
-        context: Context, deviceId: String, childId: String,
-        type: String, severity: String, title: String, body: String, metadata: JSONObject?,
-    ) {
-        val row = JSONObject().apply {
-            put("child_id", childId)
-            put("device_id", deviceId)
-            put("alert_type", type)
-            put("severity", severity)
-            put("title", title)
-            put("body", body)
-            if (metadata != null) put("metadata", metadata)
+    // The report used to be PATCHed on every 4-second pass — ~21,000 writes a
+    // day per phone, mostly identical. Now it is sent when anything in it
+    // changes, and otherwise refreshed every few minutes so the parent can
+    // tell a quiet phone from a dead one.
+    private const val REPORT_REFRESH_MS = 3 * 60_000L
+    @Volatile private var lastReportSignature: String? = null
+    @Volatile private var lastReportAt = 0L
+
+    private fun notificationsAllowed(context: Context): Boolean =
+        runCatching { androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled() }.getOrDefault(true)
+
+    private fun locationPermission(context: Context): String {
+        val pm = android.content.pm.PackageManager.PERMISSION_GRANTED
+        val fine = context.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == pm
+        val coarse = context.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) == pm
+        val background = android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q ||
+            context.checkSelfPermission(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) == pm
+        return when {
+            (fine || coarse) && background -> "always"
+            fine || coarse -> "while_in_use"
+            else -> "denied"
         }
-        SupabaseRest.insert(context, "pc_alerts", row)
     }
+
+    private fun appVersion(context: Context): String =
+        runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "" }.getOrDefault("")
 
     private fun reportEnforcementState(context: Context, deviceId: String, policyVersion: Long?, state: Map<String, Any?>) {
         val json = JSONObject()
@@ -751,6 +871,10 @@ object PolicyEnforcer {
                 else -> json.put(k, v)
             }
         }
+        val signature = "$policyVersion|$json"
+        val now = System.currentTimeMillis()
+        if (signature == lastReportSignature && now - lastReportAt < REPORT_REFRESH_MS) return
+        json.put("reported_at", isoTimestamp(now))
         val body = JSONObject()
             .put("enforcement_state", json)
             .put("last_enforcement_at", isoTimestamp(System.currentTimeMillis()))
@@ -760,7 +884,17 @@ object PolicyEnforcer {
         // syncing indicator (src/lib/policySync.js). Only written when we
         // could read the version; a failed read leaves the last value alone.
         if (policyVersion != null) body.put("applied_policy_version", policyVersion)
-        SupabaseRest.patch(context, "pc_devices", "id=eq.$deviceId", body)
+        // last_seen_at rides along: a successful report IS proof of life.
+        body.put("last_seen_at", isoTimestamp(now))
+        if (SupabaseRest.patch(context, "pc_devices", "id=eq.$deviceId", body)) {
+            lastReportSignature = signature
+            lastReportAt = now
+        }
+    }
+
+    /** Forces the next pass to re-send the report (after a command, on reconnect). */
+    fun markReportStale() {
+        lastReportSignature = null
     }
 
     private fun isoTimestamp(epochMillis: Long): String {

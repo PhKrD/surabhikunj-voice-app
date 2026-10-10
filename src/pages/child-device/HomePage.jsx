@@ -10,7 +10,7 @@
  * The command poller is started here and runs for the app's lifetime.
  */
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { ShieldAlert, Plus, Settings, Send, WifiOff, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useDeviceState } from '../../store/childDeviceState.js'
@@ -24,6 +24,13 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 
 export default function HomePage() {
   const navigate = useNavigate()
+  // Seven taps on the name opens the hidden diagnostics screen (testers).
+  const taps = useRef({ n: 0, at: 0 })
+  const onNameTap = () => {
+    const now = Date.now()
+    taps.current = now - taps.current.at < 1500 ? { n: taps.current.n + 1, at: now } : { n: 1, at: now }
+    if (taps.current.n >= 7) { taps.current = { n: 0, at: 0 }; navigate('/child/diagnostics') }
+  }
   const { childName, bonusActive, internetPaused, setLastCommand, screenTime } = useDeviceState()
   const [usageMinutes, setUsageMinutes] = useState(null)
   const [usageAccessGranted, setUsageAccessGranted] = useState(true)
@@ -71,7 +78,7 @@ export default function HomePage() {
       {/* Header + screen-time ring */}
       <div className="bg-gradient-to-b from-indigo-600 to-indigo-700 text-white px-6 pt-14 pb-10 rounded-b-[2rem]">
         <p className="text-indigo-200 text-sm">{getGreeting()}</p>
-        <h1 className="text-2xl font-bold mt-0.5">{childName || 'Hi there!'}</h1>
+        <h1 className="text-2xl font-bold mt-0.5 select-none" onClick={onNameTap}>{childName || 'Hi there!'}</h1>
 
         <div className="flex items-center justify-center mt-6">
           {usageAccessGranted ? (

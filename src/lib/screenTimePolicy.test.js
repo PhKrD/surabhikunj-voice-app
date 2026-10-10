@@ -147,3 +147,19 @@ test('formatMinutes', () => {
   assert.equal(formatMinutes(45), '45m')
   assert.equal(formatMinutes(125), '2h 05m')
 })
+
+test("resolveLockState: the parent's Lock now beats extra time", () => {
+  const s = resolveLockState({ bonusActive: true, parentLock: true, now: WED })
+  assert.equal(s.locked, true)
+  assert.equal(s.reason, 'parent_lock')
+})
+
+test('resolveLockState: Lock now beats routines, restricted time and limits', () => {
+  const s = resolveLockState({
+    parentLock: true,
+    activeSchedule: { action: 'allow_list_only' },
+    rule: { is_enabled: true, daily_limit_min: 0 },
+    now: WED,
+  })
+  assert.equal(s.reason, 'parent_lock')
+})

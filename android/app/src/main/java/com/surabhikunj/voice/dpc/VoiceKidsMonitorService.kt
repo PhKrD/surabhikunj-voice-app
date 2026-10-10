@@ -72,12 +72,101 @@ class VoiceKidsMonitorService : Service() {
     private val commandHandler = android.os.Handler(Looper.getMainLooper())
     private var commandPollingActive = false
     private val pendingCommandFirstSeen = mutableMapOf<String, Long>()
+    private val tickBusy = java.util.concurrent.atomic.AtomicBoolean(false)
+    @Volatile private var lastCommandPollAt = 0L
 
-    private val commandPollRunnable = object : Runnable {
+    private fun isInteractive(): Boolean =
+        runCatching { getSystemService(android.os.PowerManager::class.java)?.isInteractive ?: true }.getOrDefault(true)
+
+    /**
+     * One adaptive tick replaces the two fixed 4-second loops (command poll
+     * + policy pass), which made ~3 network calls every 4 seconds around
+     * the clock. Local evaluation still runs every few seconds while the
+     * screen is on (bedtime starts on time, a limit trips promptly); the
+     * network reads inside it are spaced out (PolicyEnforcer), and with the
+     * screen off everything slows to a crawl. Screen-on and network-regained
+     * events trigger an immediate fresh read, so nothing feels delayed.
+     */
+    private val tickRunnable = object : Runnable {
         override fun run() {
-            executor.execute { pollAndExecuteCommands() }
-            if (commandPollingActive) commandHandler.postDelayed(this, COMMAND_POLL_INTERVAL_MS)
+            scheduleTick(force = false)
+            if (!commandPollingActive) return
+            // Wake exactly when extra time or the current restriction ends,
+            // not up to a full idle interval later.
+            val regular = if (isInteractive()) TICK_ACTIVE_MS else TICK_IDLE_MS
+            val now = System.currentTimeMillis()
+            val boundary = listOf(VoiceKidsPrefs.bonusExpiresAt(applicationContext), VoiceKidsPrefs.lockUntil(applicationContext))
+                .filter { it > now }.minOrNull()
+            val delay = boundary?.let { minOf(regular, it - now + 500) } ?: regular
+            commandHandler.postDelayed(this, delay.coerceAtLeast(1_000L))
         }
+    }
+
+    private fun scheduleTick(force: Boolean) {
+        if (!tickBusy.compareAndSet(false, true)) return
+        executor.execute {
+            try {
+                val ctx = applicationContext
+                val now = System.currentTimeMillis()
+                val pollEvery = if (isInteractive()) COMMAND_POLL_ACTIVE_MS else COMMAND_POLL_IDLE_MS
+                if (force || now - lastCommandPollAt >= pollEvery) {
+                    lastCommandPollAt = now
+                    pollAndExecuteCommands()
+                }
+                PolicyEnforcer.enforce(ctx, force)
+                TamperGuard.check(ctx)
+                if (force) Outbox.flush(ctx)
+            } catch (e: Exception) {
+                Log.e(TAG, "tick failed: ${e.message}")
+            } finally {
+                tickBusy.set(false)
+            }
+        }
+    }
+
+    // Screen on / unlocked: the child is about to use the phone — read fresh state now.
+    private val screenReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: Intent?) {
+            PolicyEnforcer.invalidateChildRow()
+            scheduleTick(force = false)
+        }
+    }
+
+    private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
+
+    private fun registerWakeTriggers() {
+        runCatching {
+            val filter = android.content.IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+                addAction(Intent.ACTION_TIME_CHANGED)
+                addAction(Intent.ACTION_TIMEZONE_CHANGED)
+                addAction(Intent.ACTION_DATE_CHANGED)
+            }
+            ContextCompat.registerReceiver(this, screenReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        }
+        runCatching {
+            val cm = getSystemService(android.net.ConnectivityManager::class.java)
+            val cb = object : android.net.ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: android.net.Network) {
+                    // Back online: deliver queued alerts/SOS and pick up
+                    // anything the parent changed while we were offline.
+                    PolicyEnforcer.invalidateChildRow()
+                    PolicyEnforcer.markReportStale()
+                    commandHandler.postDelayed({ scheduleTick(force = true) }, 1500)
+                }
+            }
+            cm?.registerDefaultNetworkCallback(cb)
+            networkCallback = cb
+        }
+    }
+
+    private fun unregisterWakeTriggers() {
+        runCatching { unregisterReceiver(screenReceiver) }
+        networkCallback?.let { cb ->
+            runCatching { getSystemService(android.net.ConnectivityManager::class.java)?.unregisterNetworkCallback(cb) }
+        }
+        networkCallback = null
     }
 
     // ── Periodic reporting (independent of GPS fixes) ──────────────────
@@ -94,32 +183,15 @@ class VoiceKidsMonitorService : Service() {
     private val reportingRunnable = object : Runnable {
         override fun run() {
             executor.execute {
-                sendHeartbeat()
-                fetchAndReportLastLocation()
-                reportUsageIfDue()
-                syncInstalledAppsIfDue()
+                runCatching {
+                    sendHeartbeat()
+                    Outbox.flush(applicationContext)
+                    fetchAndReportLastLocation()
+                    reportUsageIfDue()
+                    syncInstalledAppsIfDue()
+                }.onFailure { Log.e(TAG, "reporting tick failed: ${it.message}") }
             }
             if (reportingActive) reportingHandler.postDelayed(this, REPORTING_INTERVAL_MS)
-        }
-    }
-
-    // ── Policy enforcement (schedules + per-app rules) ─────────────────
-    // Runs on the SAME cadence as native command polling, not the slower
-    // reporting tick — a schedule boundary (e.g. bedtime at 22:00) or a
-    // parent deleting a block rule should take effect within seconds, not
-    // minutes, regardless of whether the WebView is alive. See
-    // PolicyEnforcer.kt for why this exists.
-    private val policyRunnable = object : Runnable {
-        override fun run() {
-            executor.execute {
-                PolicyEnforcer.enforce(applicationContext)
-                // Steady-state fallback tamper check (the ContentObserver
-                // below reacts near-instantly to the Accessibility toggle
-                // specifically; this catches anything it might ever miss,
-                // plus Device Admin, on the same cadence).
-                TamperGuard.check(applicationContext)
-            }
-            if (commandPollingActive) commandHandler.postDelayed(this, POLICY_ENFORCE_INTERVAL_MS)
         }
     }
 
@@ -180,6 +252,7 @@ class VoiceKidsMonitorService : Service() {
         createNotificationChannel()
         startForegroundSafely()
         registerTamperObserver()
+        registerWakeTriggers()
         Log.i(TAG, "Monitor service started")
     }
 
@@ -201,21 +274,33 @@ class VoiceKidsMonitorService : Service() {
         val hasLocationPermission =
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val type = if (hasLocationPermission) {
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-                } else {
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                }
-                startForeground(NOTIF_ID, buildNotification(), type)
-            } else {
-                startForeground(NOTIF_ID, buildNotification())
-            }
-        } catch (e: SecurityException) {
-            Log.e(TAG, "startForeground failed unexpectedly, stopping service: ${e.message}")
-            stopSelf()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            startForeground(NOTIF_ID, buildNotification())
+            return
         }
+        // Android refuses some types depending on HOW we were started (e.g.
+        // location from a boot broadcast without background-location access,
+        // or dataSync from BOOT_COMPLETED on Android 15+). Try each type the
+        // manifest declares before giving up; whichever is accepted keeps
+        // enforcement alive.
+        val types = buildList {
+            if (hasLocationPermission) add(ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+            add(ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        }
+        for (type in types) {
+            try {
+                startForeground(NOTIF_ID, buildNotification(), type)
+                VoiceKidsPrefs.putString(this, "fgs_type", if (type == ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION) "location" else "dataSync")
+                return
+            } catch (e: Exception) {
+                Log.w(TAG, "startForeground(type=$type) refused: ${e.message}")
+            }
+        }
+        // Not allowed right now (started from the background). The
+        // accessibility service restarts us as soon as it is bound, and the
+        // app does when opened. Recorded for the parent's device-health view.
+        VoiceKidsPrefs.putLong(this, "fgs_refused_at", System.currentTimeMillis())
+        stopSelf()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -238,6 +323,7 @@ class VoiceKidsMonitorService : Service() {
         stopCommandPolling()
         stopPeriodicReporting()
         unregisterTamperObserver()
+        unregisterWakeTriggers()
         executor.shutdown()
         Log.i(TAG, "Monitor service stopped")
     }
@@ -245,15 +331,13 @@ class VoiceKidsMonitorService : Service() {
     private fun startCommandPolling() {
         if (commandPollingActive) return
         commandPollingActive = true
-        commandHandler.post(commandPollRunnable)
-        commandHandler.postDelayed(policyRunnable, POLICY_ENFORCE_INTERVAL_MS)
-        Log.i(TAG, "Native command polling + policy enforcement started")
+        commandHandler.post(tickRunnable)
+        Log.i(TAG, "Adaptive command polling + policy enforcement started")
     }
 
     private fun stopCommandPolling() {
         commandPollingActive = false
-        commandHandler.removeCallbacks(commandPollRunnable)
-        commandHandler.removeCallbacks(policyRunnable)
+        commandHandler.removeCallbacks(tickRunnable)
     }
 
     private fun startPeriodicReporting() {
@@ -368,9 +452,12 @@ class VoiceKidsMonitorService : Service() {
             }
             "pause_internet" -> {
                 // Persistent until resume_internet — see VoiceKidsPrefs.manualInternetPause.
-                val paused = DpcActions.pauseInternet(context)
-                if (paused) VoiceKidsPrefs.setManualInternetPause(context, true)
-                paused
+                // The pause holds even without VPN consent: the accessibility
+                // service keeps internet apps off screen. So it succeeded if
+                // either layer can carry it, and only fails if neither can.
+                VoiceKidsPrefs.setManualInternetPause(context, true)
+                val tunnel = DpcActions.hasVpnConsent(context) && DpcActions.pauseInternet(context)
+                tunnel || AccessibilityStatus.isEnabled(context)
             }
             "resume_internet" -> {
                 VoiceKidsPrefs.setManualInternetPause(context, false)
@@ -405,20 +492,31 @@ class VoiceKidsMonitorService : Service() {
         // apply immediately instead of waiting for the next 4s tick. After
         // the ack above so the parent sees "executed" without waiting for
         // the (network-bound) enforcement pass.
-        if (success) runCatching { PolicyEnforcer.enforce(context) }
+        VoiceKidsPrefs.putString(context, "last_command", "$commandType:${if (success) "executed" else "failed"}")
+        VoiceKidsPrefs.putLong(context, "last_command_at", System.currentTimeMillis())
+        if (success) {
+            PolicyEnforcer.markReportStale()
+            runCatching { PolicyEnforcer.enforce(context, force = true) }
+        }
 
         if (!success && childId != null) {
-            val alert = JSONObject().apply {
-                put("child_id", childId)
-                put("device_id", deviceId)
-                put("alert_type", "device_offline")
-                put("severity", "warning")
-                put("title", "Command \"$commandType\" failed")
-                put("body", "The action failed on the device. Open VOICE on the child device and finish the setup checklist — Device admin and Accessibility are what carry these actions.")
-                put("metadata", JSONObject().put("command_id", commandId).put("command_type", commandType))
-            }
-            SupabaseRest.insert(context, "pc_alerts", alert)
+            Outbox.alert(
+                context, "device_offline", "warning",
+                "${commandLabel(commandType)} didn't work",
+                "The child's phone couldn't carry this out. Open Device health in VOICE to see which permission is missing.",
+                JSONObject().put("command_id", commandId).put("command_type", commandType),
+            )
         }
+    }
+
+    private fun commandLabel(type: String): String = when (type) {
+        "lock_device" -> "Lock phone"
+        "unlock_device" -> "Unlock phone"
+        "pause_internet" -> "Pause internet"
+        "resume_internet" -> "Resume internet"
+        "grant_bonus_time" -> "Extra time"
+        "revoke_bonus_time" -> "Ending extra time"
+        else -> "A command"
     }
 
     // ── Location ─────────────────────────────────────────────────────────
@@ -523,6 +621,21 @@ class VoiceKidsMonitorService : Service() {
         val deviceId = VoiceKidsPrefs.deviceId(context) ?: return
         val childId = VoiceKidsPrefs.childId(context) ?: return
 
+        // The cached fix is re-read every minute; only store a point when it
+        // is a NEW fix that moved meaningfully, or as a periodic "still here"
+        // (previously the same fix was inserted 60 times an hour).
+        val lastTime = VoiceKidsPrefs.getLong(context, "loc_last_time")
+        if (location.time == lastTime) return
+        val lastLat = VoiceKidsPrefs.getString(context, "loc_last_lat")?.toDoubleOrNull()
+        val lastLon = VoiceKidsPrefs.getString(context, "loc_last_lon")?.toDoubleOrNull()
+        val lastInsertAt = VoiceKidsPrefs.getLong(context, "loc_last_insert_at")
+        if (lastLat != null && lastLon != null) {
+            val moved = haversineMeters(lastLat, lastLon, location.latitude, location.longitude)
+            val threshold = maxOf(25.0, (if (location.hasAccuracy()) location.accuracy.toDouble() else 50.0))
+            if (moved < threshold && System.currentTimeMillis() - lastInsertAt < LOCATION_STILL_HERE_MS) return
+        }
+        VoiceKidsPrefs.putLong(context, "loc_last_time", location.time)
+
         val body = JSONObject().apply {
             put("device_id", deviceId)
             put("child_id", childId)
@@ -535,7 +648,13 @@ class VoiceKidsMonitorService : Service() {
         }
 
         val ok = SupabaseRest.insert(context, "pc_location_events", body)
-        if (!ok) Log.w(TAG, "Failed to report location")
+        if (ok) {
+            VoiceKidsPrefs.putString(context, "loc_last_lat", location.latitude.toString())
+            VoiceKidsPrefs.putString(context, "loc_last_lon", location.longitude.toString())
+            VoiceKidsPrefs.putLong(context, "loc_last_insert_at", System.currentTimeMillis())
+        } else {
+            Log.w(TAG, "Failed to report location")
+        }
     }
 
     // ── Geofencing (checked in software against cached geofences) ─────────
@@ -545,6 +664,9 @@ class VoiceKidsMonitorService : Service() {
         refreshGeofencesIfStale(context)
 
         val geofences = cachedGeofences ?: return
+        if (geofenceState.isEmpty()) loadGeofenceState(context)
+        val accuracy = if (location.hasAccuracy()) location.accuracy.toDouble() else 50.0
+        var changed = false
         for (i in 0 until geofences.length()) {
             val gf = geofences.getJSONObject(i)
             val id = gf.getString("id")
@@ -553,16 +675,42 @@ class VoiceKidsMonitorService : Service() {
             val radius = gf.getDouble("radius_meters")
 
             val distance = haversineMeters(location.latitude, location.longitude, lat, lng)
-            val isInside = distance <= radius
-            val wasInside = geofenceState[id] ?: false
+            // Hysteresis + accuracy gate (PolicyRules.geofenceInside): GPS
+            // wobble around the edge used to fire Arrived / Left / Arrived.
+            val wasInside = geofenceState[id]
+            val isInside = PolicyRules.geofenceInside(distance, radius, accuracy, wasInside) ?: continue
 
+            if (wasInside == null) {
+                // First reading for this place (new place, fresh install,
+                // service restart): learn where we are without announcing an
+                // "arrival" that never happened.
+                geofenceState[id] = isInside
+                changed = true
+                continue
+            }
             if (isInside != wasInside) {
                 geofenceState[id] = isInside
+                changed = true
                 val eventType = if (isInside) "enter" else "exit"
                 val shouldNotify = if (isInside) gf.optBoolean("notify_arrival", true) else gf.optBoolean("notify_departure", true)
                 recordGeofenceEvent(context, gf, eventType, location, shouldNotify)
             }
         }
+        if (changed) saveGeofenceState(context)
+    }
+
+    private fun loadGeofenceState(context: android.content.Context) {
+        val raw = VoiceKidsPrefs.getString(context, "geofence_state") ?: return
+        runCatching {
+            val j = JSONObject(raw)
+            j.keys().forEach { geofenceState[it] = j.getBoolean(it) }
+        }
+    }
+
+    private fun saveGeofenceState(context: android.content.Context) {
+        val j = JSONObject()
+        geofenceState.forEach { (k, v) -> j.put(k, v) }
+        VoiceKidsPrefs.putString(context, "geofence_state", j.toString())
     }
 
     private var cachedGeofences: org.json.JSONArray? = null
@@ -604,20 +752,19 @@ class VoiceKidsMonitorService : Service() {
             put("longitude", location.longitude)
             put("occurred_at", isoTimestamp(location.time))
         }
-        SupabaseRest.insert(context, "pc_geofence_events", eventBody)
+        Outbox.send(context, "pc_geofence_events", eventBody)
 
         if (!notify) return
 
-        val alertBody = JSONObject().apply {
-            put("child_id", childId)
-            put("device_id", deviceId)
-            put("alert_type", if (eventType == "enter") "geofence_enter" else "geofence_exit")
-            put("severity", "info")
-            put("title", if (eventType == "enter") "Arrived at $geofenceName" else "Left $geofenceName")
-            put("body", "")
-            put("metadata", JSONObject().put("geofence_id", geofenceId).put("latitude", location.latitude).put("longitude", location.longitude))
-        }
-        SupabaseRest.insert(context, "pc_alerts", alertBody)
+        val time = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(Date(location.time))
+        Outbox.alert(
+            context,
+            if (eventType == "enter") "geofence_enter" else "geofence_exit",
+            "info",
+            if (eventType == "enter") "Arrived at $geofenceName" else "Left $geofenceName",
+            "At $time",
+            JSONObject().put("geofence_id", geofenceId).put("latitude", location.latitude).put("longitude", location.longitude),
+        )
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
@@ -691,9 +838,9 @@ class VoiceKidsMonitorService : Service() {
             Notification.Builder(this)
         }
         return builder
-            .setContentTitle("VOICE Kids")
-            .setContentText("Parental controls active")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("VOICE supervision is on")
+            .setContentText("Your parent's settings are active on this phone")
+            .setSmallIcon(android.R.drawable.ic_lock_lock)
             .setOngoing(true)
             .build()
     }
@@ -712,18 +859,19 @@ class VoiceKidsMonitorService : Service() {
 
         private const val REPORTING_INTERVAL_MS = 60_000L     // periodic reporting tick (usage/apps/location gated by their own due-intervals)
 
-        private const val COMMAND_POLL_INTERVAL_MS = 4_000L   // native command poll cadence
+        private const val LOCATION_STILL_HERE_MS = 15 * 60 * 1000L   // store an unchanged position at most this often
+
+        // Local policy evaluation cadence (no network) — see tickRunnable.
+        private const val TICK_ACTIVE_MS = 4_000L
+        private const val TICK_IDLE_MS = 30_000L
+        // Command polling (network) cadence.
+        private const val COMMAND_POLL_ACTIVE_MS = 8_000L
+        private const val COMMAND_POLL_IDLE_MS = 60_000L
         private const val NATIVE_CLAIM_DELAY_MS = 5_000L      // let the foreground JS poller (2s) win first
         private const val STUCK_DELIVERED_MS = 30_000L        // retry commands stuck in 'delivered' past this
         private val NATIVE_COMMAND_TYPES = listOf(
             "lock_device", "unlock_device", "pause_internet", "resume_internet",
             "grant_bonus_time", "revoke_bonus_time",
         )
-
-        // Schedules/app-rules must react within seconds of a boundary (bedtime,
-        // a parent revoking bonus time, a rule being deleted) — reuse the same
-        // fast cadence as native command polling rather than the slower
-        // REPORTING_INTERVAL_MS used for usage/location telemetry.
-        private const val POLICY_ENFORCE_INTERVAL_MS = 4_000L
     }
 }

@@ -410,4 +410,62 @@ object VoiceKidsPrefs {
     fun setLastSettingsBlockAlertAt(context: Context, epochMillis: Long) {
         prefs(context).edit().putLong("last_settings_block_alert", epochMillis).apply()
     }
+
+    // ── Generic accessors for the reliability state below ──────────────
+    fun getString(context: Context, key: String): String? = prefs(context).getString(key, null)
+    fun putString(context: Context, key: String, value: String?) {
+        prefs(context).edit().apply { if (value == null) remove(key) else putString(key, value) }.apply()
+    }
+    fun getLong(context: Context, key: String): Long = prefs(context).getLong(key, 0L)
+    fun putLong(context: Context, key: String, value: Long) {
+        prefs(context).edit().putLong(key, value).apply()
+    }
+
+    /**
+     * Last policy inputs fetched successfully, as JSON (PolicyEnforcer).
+     * Lets the device keep enforcing — including time-based transitions
+     * like bedtime starting or extra time running out — while offline.
+     * commit(), not apply(): it must survive an immediate process kill.
+     */
+    fun policyInputsJson(context: Context): String? = prefs(context).getString("policy_inputs_v1", null)
+    fun setPolicyInputsJson(context: Context, json: String?) {
+        prefs(context).edit().apply { if (json == null) remove("policy_inputs_v1") else putString("policy_inputs_v1", json) }.commit()
+    }
+
+    /**
+     * True once the native layer holds its OWN Supabase session, minted for
+     * it by pc-device-session. Before this, native and the WebView shared one
+     * refresh token; whichever refreshed second reused a rotated token and
+     * Supabase revoked the whole session, silently cutting the device off.
+     */
+    fun hasIndependentSession(context: Context): Boolean = prefs(context).getBoolean("independent_session", false)
+    fun setIndependentSession(context: Context, independent: Boolean) {
+        prefs(context).edit().putBoolean("independent_session", independent).apply()
+    }
+
+    /** When the stored refresh token was rejected (0 = session fine). The app re-provisions on next open. */
+    fun sessionInvalidSince(context: Context): Long = prefs(context).getLong("session_invalid_since", 0L)
+    fun setSessionInvalidSince(context: Context, epochMillis: Long) {
+        prefs(context).edit().putLong("session_invalid_since", epochMillis).apply()
+    }
+
+    fun updateIdentity(context: Context, deviceId: String, childId: String, orgId: String) {
+        prefs(context).edit()
+            .putString("device_id", deviceId)
+            .putString("child_id", childId)
+            .putString("org_id", orgId)
+            .apply()
+    }
+
+    /** When the active whole-device restriction ends, if known (0 = unknown, e.g. a parent lock). */
+    fun lockUntil(context: Context): Long = prefs(context).getLong("lock_until", 0L)
+    fun setLockUntil(context: Context, epochMillis: Long) {
+        prefs(context).edit().putLong("lock_until", epochMillis).apply()
+    }
+
+    /** package -> "used/limit" minutes for apps whose daily limit is reached, as a JSON object. */
+    fun appLimitStatus(context: Context): String = prefs(context).getString("app_limit_status", "{}") ?: "{}"
+    fun setAppLimitStatus(context: Context, json: String) {
+        prefs(context).edit().putString("app_limit_status", json).apply()
+    }
 }

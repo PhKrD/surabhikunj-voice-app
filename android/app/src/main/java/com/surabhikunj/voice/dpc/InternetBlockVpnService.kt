@@ -115,7 +115,18 @@ class InternetBlockVpnService : VpnService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val requestedMode = intent?.getStringExtra(EXTRA_MODE) ?: MODE_BLOCK_ALL
+        // A null intent is Android restarting us after the process died
+        // (START_STICKY). Defaulting to block-all here used to cut the
+        // child's internet off entirely when only website filtering had been
+        // running. Rebuild the mode from what the policy currently wants.
+        val requestedMode = intent?.getStringExtra(EXTRA_MODE) ?: when {
+            VoiceKidsPrefs.internetPauseActive(this) -> MODE_BLOCK_ALL
+            VoiceKidsPrefs.websiteFilterActive(this) -> MODE_DNS_FILTER
+            else -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+        }
         if (running && requestedMode != mode) {
             // Mode switch (e.g. a block_internet schedule starts while the
             // DNS filter was running) — tear down and re-establish under
@@ -413,6 +424,12 @@ class InternetBlockVpnService : VpnService() {
     /** Called by the OS when a higher-priority VPN takes over (e.g. user installs their own). */
     override fun onRevoke() {
         stopVpn()
+        // The child (or another VPN app) took the tunnel. The state flags
+        // must say so, or the parent would see "web protection active"; the
+        // next policy pass re-requests it, and TamperGuard reports if the
+        // consent itself is gone.
+        VoiceKidsPrefs.setWebsiteFilterActive(this, false)
+        VoiceKidsPrefs.putLong(this, "vpn_revoked_at", System.currentTimeMillis())
         super.onRevoke()
     }
 }

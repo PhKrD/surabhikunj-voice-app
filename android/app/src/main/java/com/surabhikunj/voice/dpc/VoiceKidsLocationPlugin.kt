@@ -49,8 +49,39 @@ class VoiceKidsLocationPlugin : Plugin() {
             return
         }
 
-        VoiceKidsPrefs.saveSession(context, supabaseUrl, anonKey, deviceId, childId, orgId, accessToken, refreshToken)
-        call.resolve(successResult())
+        val independent = call.getBoolean("independentSession", false) == true
+        val previousDevice = VoiceKidsPrefs.deviceId(context)
+        val previousChild = VoiceKidsPrefs.childId(context)
+        if (independent || !VoiceKidsPrefs.hasIndependentSession(context) || previousDevice != deviceId ||
+            VoiceKidsPrefs.sessionInvalidSince(context) != 0L) {
+            // Fresh pairing, a session minted for native (pc-device-session),
+            // or native's own session died: take these tokens.
+            VoiceKidsPrefs.saveSession(context, supabaseUrl, anonKey, deviceId, childId, orgId, accessToken, refreshToken)
+            VoiceKidsPrefs.setIndependentSession(context, independent)
+            VoiceKidsPrefs.setSessionInvalidSince(context, 0L)
+        } else {
+            // Native already owns its own token family. Taking the WebView's
+            // tokens would put two refreshers on one token chain again — the
+            // bug that silently logged supervised phones out. Identity only.
+            VoiceKidsPrefs.updateIdentity(context, deviceId, childId, orgId)
+        }
+        if (previousDevice != deviceId) VoiceKidsPrefs.putString(context, "revoked", null)
+        if (previousChild != childId) PolicyEnforcer.invalidateCache()
+        val result = successResult()
+        result.put("independentSession", VoiceKidsPrefs.hasIndependentSession(context))
+        call.resolve(result)
+    }
+
+    /** Whether native holds its own session, and whether that session still works. */
+    @PluginMethod
+    fun getSessionState(call: PluginCall) {
+        val result = JSObject()
+        result.put("configured", VoiceKidsPrefs.isConfigured(context))
+        result.put("deviceId", VoiceKidsPrefs.deviceId(context))
+        result.put("independentSession", VoiceKidsPrefs.hasIndependentSession(context))
+        result.put("sessionInvalidSince", VoiceKidsPrefs.sessionInvalidSince(context))
+        result.put("revoked", PolicyEnforcer.isRevoked(context))
+        call.resolve(result)
     }
 
     @PluginMethod

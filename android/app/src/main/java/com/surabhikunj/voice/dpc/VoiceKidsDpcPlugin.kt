@@ -466,10 +466,14 @@ class VoiceKidsDpcPlugin : Plugin() {
     @PluginMethod
     fun enforceNow(call: PluginCall) {
         val appContext = context.applicationContext
+        // full=true (sync_rules, reassignment) re-reads every policy table;
+        // the routine 30-second nudge only re-reads the child row — it used
+        // to refetch all eight tables every time.
+        val full = call.getBoolean("full", false) == true
         enforceExecutor.execute {
             try {
-                PolicyEnforcer.invalidateCache()
-                PolicyEnforcer.enforce(appContext)
+                if (full) PolicyEnforcer.invalidateCache() else PolicyEnforcer.invalidateChildRow()
+                PolicyEnforcer.enforce(appContext, full)
             } catch (e: Exception) {
                 android.util.Log.w("VoiceKidsDpc", "enforceNow failed: ${e.message}")
             }
@@ -501,7 +505,55 @@ class VoiceKidsDpcPlugin : Plugin() {
         result.put("accessibilityEnabled", AccessibilityStatus.isEnabled(context))
         result.put("usageAccess", UsageStatsHelper.hasUsageAccess(context))
         result.put("settingsProtected", VoiceKidsPrefs.protectSettings(context) && SettingsGuard.hasPin(context))
+        result.put("lockUntil", VoiceKidsPrefs.lockUntil(context))
+        result.put("policySource", PolicyEnforcer.policySource)
         call.resolve(result)
+    }
+
+    /**
+     * Everything a tester needs to see why the phone is (or isn't) doing
+     * what the parent set — shown on the child's hidden diagnostics screen.
+     * Read-only; contains no tokens.
+     */
+    @PluginMethod
+    fun getDiagnostics(call: PluginCall) {
+        val c = context
+        val r = JSObject()
+        r.put("accessibilityEnabled", AccessibilityStatus.isEnabled(c))
+        r.put("accessibilityConnectedAt", VoiceKidsAccessibilityService.connectedAt)
+        r.put("usageAccess", UsageStatsHelper.hasUsageAccess(c))
+        r.put("deviceAdmin", DpcActions.isDeviceAdmin(c))
+        r.put("deviceOwner", DpcActions.isDeviceOwner(c))
+        r.put("vpnConsent", DpcActions.hasVpnConsent(c))
+        r.put("vpnFilterRunning", VoiceKidsPrefs.websiteFilterActive(c))
+        r.put("vpnRevokedAt", VoiceKidsPrefs.getLong(c, "vpn_revoked_at"))
+        r.put("overlay", DpcActions.canDrawOverlays(c))
+        r.put("batteryExempt", DpcActions.isIgnoringBatteryOptimizations(c))
+        r.put("notifications", androidx.core.app.NotificationManagerCompat.from(c).areNotificationsEnabled())
+        r.put("foregroundServiceType", VoiceKidsPrefs.getString(c, "fgs_type") ?: "")
+        r.put("foregroundServiceRefusedAt", VoiceKidsPrefs.getLong(c, "fgs_refused_at"))
+        r.put("lastEvaluationAt", PolicyEnforcer.lastEvaluationAt)
+        r.put("lastOnlineAt", PolicyEnforcer.lastOnlineAt)
+        r.put("policySource", PolicyEnforcer.policySource)
+        r.put("foregroundApp", VoiceKidsAccessibilityService.lastForegroundPkg ?: "")
+        r.put("foregroundAppAt", VoiceKidsAccessibilityService.lastForegroundAt)
+        r.put("lockReason", VoiceKidsPrefs.lockReason(c))
+        r.put("lockLabel", VoiceKidsPrefs.lockLabel(c))
+        r.put("lockUntil", VoiceKidsPrefs.lockUntil(c))
+        r.put("parentLock", VoiceKidsPrefs.parentLockActive(c))
+        r.put("internetPaused", VoiceKidsPrefs.internetPauseActive(c))
+        r.put("bonusExpiresAt", VoiceKidsPrefs.bonusExpiresAt(c))
+        r.put("blockedPackages", VoiceKidsPrefs.desiredBlockedPackages(c).size)
+        r.put("screenTimeTodayMin", VoiceKidsPrefs.screenTimeTodayMin(c))
+        r.put("screenTimeLimitMin", VoiceKidsPrefs.screenTimeLimitMin(c))
+        r.put("lastCommand", VoiceKidsPrefs.getString(c, "last_command") ?: "")
+        r.put("lastCommandAt", VoiceKidsPrefs.getLong(c, "last_command_at"))
+        r.put("lastLocationAt", VoiceKidsPrefs.getLong(c, "loc_last_insert_at"))
+        r.put("queuedReports", Outbox.pendingCount(c))
+        r.put("independentSession", VoiceKidsPrefs.hasIndependentSession(c))
+        r.put("sessionInvalidSince", VoiceKidsPrefs.sessionInvalidSince(c))
+        r.put("essentialApps", EssentialApps.get(c).size)
+        call.resolve(r)
     }
 
     // ── SOS ─────────────────────────────────────────────────────────────

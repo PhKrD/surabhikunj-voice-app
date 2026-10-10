@@ -15,7 +15,7 @@ import {
   commandTypeLabel,
 } from '@/lib/commandStatus'
 
-const EXTRA_TIME_PRESETS = [15, 30, 60, 120]
+const EXTRA_TIME_PRESETS = [5, 10, 15, 30, 60]
 
 function timeAgo(iso) {
   if (!iso) return ''
@@ -48,6 +48,7 @@ export default function CommandCenter({ devices, childId, child, onChildUpdated,
   const activeDevices = useMemo(() => devices.filter((d) => d.is_active), [devices])
 
   const [sending, setSending] = useState(false)
+  const [customMin, setCustomMin] = useState('')
   const [commands, setCommands] = useState([])
   const [nowTick, setNowTick] = useState(() => Date.now())
   const [showExtraTime, setShowExtraTime] = useState(false)
@@ -251,6 +252,33 @@ export default function CommandCenter({ devices, childId, child, onChildUpdated,
               +{m >= 60 ? `${m / 60}h` : `${m}m`}
             </button>
           ))}
+          <form
+            className="flex items-center gap-1.5"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const n = Math.round(Number(customMin))
+              if (n > 0 && n <= 24 * 60) { giveExtraTime(n); setCustomMin('') }
+            }}
+          >
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={1440}
+              value={customMin}
+              onChange={(e) => setCustomMin(e.target.value)}
+              placeholder="min"
+              aria-label="Custom extra minutes"
+              className="w-20 px-3 py-2 rounded-xl bg-white border border-indigo-200 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={sending || !(Number(customMin) > 0)}
+              className="px-3 py-2 rounded-xl bg-white border border-indigo-200 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+            >
+              Add
+            </button>
+          </form>
           <button
             disabled={sending}
             onClick={endExtraTime}

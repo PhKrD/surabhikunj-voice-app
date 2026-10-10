@@ -48,7 +48,9 @@ object SosReporter {
             put("accuracy_meters", accuracy ?: JSONObject.NULL)
             if (notes.isNotEmpty()) put("notes", notes)
         }
-        val eventOk = SupabaseRest.insert(context, "pc_sos_events", event)
+        // Outbox: delivered now if possible, otherwise retried on reconnect —
+        // an SOS pressed with no signal must still reach the parent later.
+        val eventOk = Outbox.send(context, "pc_sos_events", event)
 
         val alert = JSONObject().apply {
             put("device_id", deviceId)
@@ -62,7 +64,7 @@ object SosReporter {
         // The alert is what actually reaches the parent (push + dashboard),
         // so a successful alert counts as a delivered SOS even if the
         // pc_sos_events row failed.
-        val alertOk = SupabaseRest.insert(context, "pc_alerts", alert)
+        val alertOk = Outbox.send(context, "pc_alerts", alert)
         if (!eventOk || !alertOk) Log.w(TAG, "SOS partial failure: event=$eventOk alert=$alertOk")
         return eventOk || alertOk
     }

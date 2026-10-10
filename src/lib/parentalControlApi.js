@@ -8,6 +8,7 @@
 // =====================================================================
 import { supabase } from '@/lib/supabase'
 import { localDateISO } from './dates.js'
+import { extendedExpiry } from './extraTime.js'
 
 // ---------------------------------------------------------------------
 // Audit log helper (internal)
@@ -299,16 +300,28 @@ export async function getUsageHistory(childId, { days = 7 } = {}) {
  * a device that is offline right now still honours — and still correctly
  * expires — the grant once it reconnects. See setDesiredState().
  */
-export async function grantExtraTime(childId, minutes) {
-  const expiresAt = new Date(Date.now() + minutes * 60_000).toISOString()
+export async function grantExtraTime(childId, minutes, { source = 'parent', requestId = null } = {}) {
+  const mins = Math.round(Number(minutes))
+  if (!Number.isFinite(mins) || mins <= 0 || mins > 24 * 60) throw new Error('Choose between 1 minute and 24 hours.')
+  // "+15 min" while 10 minutes of extra time are still running means 25
+  // minutes left, not 15: extend from whichever is later, now or the
+  // current expiry.
+  const { data: current } = await supabase.from('pc_children').select('bonus_expires_at').eq('id', childId).maybeSingle()
+  const expiresAt = extendedExpiry(current?.bonus_expires_at, mins)
   const result = await setDesiredState(
     childId,
     { bonus_expires_at: expiresAt },
-    { commandType: 'grant_bonus_time', payload: { expires_at: expiresAt, minutes } },
+    { commandType: 'grant_bonus_time', payload: { expires_at: expiresAt, minutes: mins } },
   )
-  await recordAudit({ childId, action: 'grant_extra_time', target: `bonus:${childId}`, metadata: { minutes, expires_at: expiresAt } })
+  await recordAudit({
+    childId,
+    action: 'grant_extra_time',
+    target: `bonus:${childId}`,
+    metadata: { minutes: mins, expires_at: expiresAt, source, request_id: requestId },
+  })
   return { expiresAt, devices: result.devices }
 }
+
 
 /** Revokes any active bonus/extra time for the child. */
 export async function revokeExtraTime(childId) {
@@ -536,12 +549,29 @@ export async function resolveChildRequest(requestId, { approve, bonusMinutes = 3
     .single()
   if (error) throw error
 
-  if (approve && data.request_type === 'bonus_time' && data.device_id && expiresAt) {
-    await sendDeviceCommand({
-      deviceId: data.device_id,
-      commandType: 'grant_bonus_time',
-      payload: { expires_at: expiresAt },
-    })
+  if (approve && data.request_type === 'bonus_time') {
+    // Durable desired state, not a bare command: the device re-reads
+    // pc_children.bonus_expires_at every pass, so a command-only grant was
+    // overwritten (cancelled) by the very next pass.
+    await grantExtraTime(data.child_id, bonusMinutes, { source: 'request', requestId })
+  }
+  // Requests raised from the phone's block screen carry the exact package /
+  // domain, so approval can make the change itself (an allow rule overrides
+  // a block). Free-text requests still need the parent to edit the rules.
+  const meta = data.metadata ?? {}
+  if (approve && data.request_type === 'app_unblock' && meta.package_name) {
+    await setAppRule({ childId: data.child_id, packageName: meta.package_name, appName: meta.app_name ?? meta.package_name, action: 'allow' })
+  }
+  if (approve && data.request_type === 'website_access' && meta.domain) {
+    const domain = String(meta.domain).toLowerCase().trim()
+    const { data: existing } = await supabase
+      .from('pc_website_rules').select('id').eq('child_id', data.child_id).eq('domain', domain).maybeSingle()
+    if (existing?.id) {
+      const { error: ruleErr } = await supabase.from('pc_website_rules').update({ action: 'allow', is_enabled: true }).eq('id', existing.id)
+      if (ruleErr) throw ruleErr
+    } else {
+      await createWebsiteRule({ childId: data.child_id, domain, action: 'allow' })
+    }
   }
 
   await recordAudit({
@@ -1139,15 +1169,25 @@ export async function resolveBonusRequest(requestId, { approve, approvedMin }) {
     patch.approved_min = approvedMin
     patch.expires_at = new Date(Date.now() + approvedMin * 60_000).toISOString()
   }
-  const { data, error } = await supabase.from('pc_bonus_time_requests').update(patch).eq('id', requestId).select().single()
+  // .eq('status','pending'): two parents (or two taps) resolving the same
+  // request can't both grant time.
+  const { data, error } = await supabase
+    .from('pc_bonus_time_requests')
+    .update(patch)
+    .eq('id', requestId)
+    .eq('status', 'pending')
+    .select()
+    .maybeSingle()
   if (error) throw error
+  if (!data) throw new Error('This request was already answered.')
 
   if (approve) {
-    await sendDeviceCommand({
-      deviceId: data.device_id,
-      commandType: 'grant_bonus_time',
-      payload: { expires_at: patch.expires_at },
-    })
+    // Durable desired state — see resolveChildRequest. Sending only a
+    // command here meant the approved time was cancelled seconds later.
+    const granted = await grantExtraTime(data.child_id, approvedMin, { source: 'request', requestId })
+    if (granted?.expiresAt && granted.expiresAt !== patch.expires_at) {
+      await supabase.from('pc_bonus_time_requests').update({ expires_at: granted.expiresAt }).eq('id', requestId)
+    }
   }
 
   await recordAudit({

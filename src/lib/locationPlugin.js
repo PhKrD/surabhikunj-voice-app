@@ -16,6 +16,7 @@
 import { registerPlugin } from '@capacitor/core'
 import { loadDeviceCreds } from './deviceStore.js'
 import { dpc } from './dpcPlugin.js'
+import { supabase } from './supabase.js'
 
 const NativeLocation = registerPlugin('VoiceKidsLocation')
 
@@ -59,8 +60,60 @@ export async function syncSessionAndStartTracking() {
   if (!isNative()) return syncResult
   if (syncResult.success === false) return syncResult
 
+  await ensureIndependentNativeSession().catch(() => {})
   await dpc.grantRuntimePermissions().catch(() => {})
   return NativeLocation.startTracking()
+}
+
+let provisioning = null
+
+/**
+ * Gives the native background layer its OWN Supabase session (via the
+ * pc-device-session edge function) instead of sharing the WebView's.
+ *
+ * Shared, the two sides refreshed one rotating refresh token; the second
+ * refresh reused a spent token, Supabase revoked the session, and the phone
+ * silently stopped hearing from the parent. Runs once per device (and again
+ * if native reports its session died). APKs without getSessionState are
+ * left alone: they would let the WebView overwrite the new tokens, so
+ * provisioning there would only pile up sessions.
+ */
+export async function ensureIndependentNativeSession() {
+  if (!isNative()) return { skipped: 'web' }
+  if (provisioning) return provisioning
+  provisioning = (async () => {
+    let state
+    try {
+      state = await NativeLocation.getSessionState()
+    } catch {
+      return { skipped: 'old_apk' }
+    }
+    if (!state?.configured) return { skipped: 'not_configured' }
+    if (state.independentSession && !state.sessionInvalidSince) return { ok: true, already: true }
+
+    const creds = loadDeviceCreds()
+    if (!creds?.deviceId) return { skipped: 'not_enrolled' }
+    const { data, error } = await supabase.functions.invoke('pc-device-session', {
+      body: { device_id: creds.deviceId },
+    })
+    if (error || !data?.access_token || !data?.refresh_token) return { ok: false, error: error?.message }
+    await NativeLocation.updateSession({
+      supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+      anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+      deviceId: creds.deviceId,
+      childId: creds.childId,
+      orgId: creds.orgId,
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      independentSession: true,
+    })
+    return { ok: true }
+  })()
+  try {
+    return await provisioning
+  } finally {
+    provisioning = null
+  }
 }
 
 export async function stopTracking() {

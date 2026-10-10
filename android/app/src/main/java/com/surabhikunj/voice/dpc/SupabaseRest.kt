@@ -29,6 +29,17 @@ object SupabaseRest {
     }
 
     /**
+     * Insert for rows carrying a client-generated `id` (see Outbox): a 409
+     * conflict means an earlier attempt already landed, so it counts as
+     * delivered — a retry after a lost response can never duplicate a row.
+     */
+    fun insertIdempotent(context: Context, table: String, body: JSONObject): Boolean {
+        val result = request(context, "POST", "/rest/v1/$table", body.toString(),
+            extraHeaders = mapOf("Prefer" to "return=minimal"), allowConflict = true)
+        return result != null
+    }
+
+    /**
      * POST a batch of rows with upsert semantics (insert-or-update on conflict).
      * `conflictColumns` must match a UNIQUE constraint on the table
      * (e.g. "device_id,package_name,usage_date" for pc_app_usage_events).
@@ -114,6 +125,19 @@ object SupabaseRest {
         }
     }
 
+    /**
+     * Refreshes after a 401, at most once across all threads. The monitor
+     * service, accessibility service and VPN each make requests on their own
+     * threads; Supabase rotates refresh tokens, so two simultaneous refreshes
+     * would make the second one reuse a spent token. If another thread
+     * already swapped the token while we waited, just retry with it.
+     */
+    @Synchronized
+    private fun refreshAfter401(context: Context, tokenUsed: String): Boolean {
+        if (VoiceKidsPrefs.accessToken(context) != tokenUsed) return true
+        return refreshAccessToken(context)
+    }
+
     /** Refreshes the access token using the stored refresh token. Returns true on success. */
     fun refreshAccessToken(context: Context): Boolean {
         val supabaseUrl = VoiceKidsPrefs.supabaseUrl(context) ?: return false
@@ -140,9 +164,19 @@ object SupabaseRest {
                 val newAccess = json.getString("access_token")
                 val newRefresh = json.getString("refresh_token")
                 VoiceKidsPrefs.updateTokens(context, newAccess, newRefresh)
+                VoiceKidsPrefs.setSessionInvalidSince(context, 0L)
                 Log.i(TAG, "Access token refreshed")
                 true
             } else {
+                // 400/401 = the refresh token itself was rejected (revoked or
+                // reused): retrying can never succeed. Flag it so the app
+                // re-provisions a session the next time it is opened, and the
+                // parent's device-health view can say why the device went quiet.
+                if (code == 400 || code == 401) {
+                    if (VoiceKidsPrefs.sessionInvalidSince(context) == 0L) {
+                        VoiceKidsPrefs.setSessionInvalidSince(context, System.currentTimeMillis())
+                    }
+                }
                 Log.e(TAG, "Token refresh failed: HTTP $code")
                 false
             }
@@ -161,6 +195,7 @@ object SupabaseRest {
         body: String?,
         extraHeaders: Map<String, String> = emptyMap(),
         isRetry: Boolean = false,
+        allowConflict: Boolean = false,
     ): String? {
         val supabaseUrl = VoiceKidsPrefs.supabaseUrl(context) ?: return null
         val anonKey = VoiceKidsPrefs.anonKey(context) ?: return null
@@ -187,10 +222,11 @@ object SupabaseRest {
                 code in 200..299 -> {
                     conn.inputStream?.bufferedReader()?.use(BufferedReader::readText) ?: ""
                 }
+                code == 409 && allowConflict -> ""
                 code == 401 && !isRetry -> {
                     // Access token expired — refresh once and retry.
-                    if (refreshAccessToken(context)) {
-                        request(context, method, path, body, extraHeaders, isRetry = true)
+                    if (refreshAfter401(context, accessToken)) {
+                        request(context, method, path, body, extraHeaders, isRetry = true, allowConflict = allowConflict)
                     } else null
                 }
                 else -> {

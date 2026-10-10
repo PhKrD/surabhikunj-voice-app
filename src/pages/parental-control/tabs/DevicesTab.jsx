@@ -8,6 +8,7 @@ import { listDevices, generatePairingCode, removeDevice, reassignDevice, listChi
 import { isDeviceOnline } from '@/lib/commandStatus'
 import { derivePolicySyncState, POLICY_SYNC_META, diagnosticChecklist } from '@/lib/policySync'
 import ProtectionPinCard from '@/components/parental-control/ProtectionPinCard'
+import ProtectionHealthCard from '@/components/parental-control/ProtectionHealthCard'
 import MemberLinkPicker from '@/components/parental-control/MemberLinkPicker'
 import { confirm } from '@/store/dialogStore'
 
@@ -136,7 +137,7 @@ export default function DevicesTab({ childId, onChildUpdated }) {
         <CardBody className="py-5 space-y-4">
           <p className="text-sm font-semibold text-primary-token">Add a device</p>
           <p className="text-sm text-secondary-token">
-            Generate a pairing code, then open the VOICE Kids app on the child's device and enter it there.
+            Generate a pairing code. On the child's Android phone, install VOICE, choose "I'm a child" and enter the code. No computer or factory reset needed.
           </p>
           <div className="flex gap-3">
             <input
@@ -288,6 +289,13 @@ export default function DevicesTab({ childId, onChildUpdated }) {
                   <Trash2 className="w-5 h-5" />
                 </button>
               </CardBody>
+              <div className="px-4 pb-4">
+                <ProtectionHealthCard
+                  device={device}
+                  child={child}
+                  vpnRequired={device.enforcement_state?.vpn_filtering_wanted === true}
+                />
+              </div>
             </Card>
           )
         })}

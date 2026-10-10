@@ -54,43 +54,78 @@ object TamperGuard {
     // would spam pc_alerts every enforcement tick forever.
     private const val REMINDER_COOLDOWN_MS = 15 * 60 * 1000L
 
-    /** Call every enforcement tick — cheap, no-ops when both permissions are fine. */
+    // Kinds that cut core supervision: critical alert + protective lock.
+    // The others degrade one feature: warning alert, no lock.
+    private val CRITICAL = setOf("accessibility_disabled", "device_admin_disabled")
+    private const val WARNING_REMINDER_MS = 60 * 60 * 1000L
+
+    /** Call every enforcement tick — cheap, no-ops when every permission is fine. */
     fun check(context: Context) {
-        checkOne(
+        var anyOff = false
+        anyOff = checkOne(
             context,
             kind = "accessibility_disabled",
             currentlyOk = AccessibilityStatus.isEnabled(context),
             wasOk = VoiceKidsPrefs.accessibilityWasEnabled(context),
             setWasOk = { VoiceKidsPrefs.setAccessibilityWasEnabled(context, it) },
-        )
-        checkOne(
+        ) || anyOff
+        anyOff = checkOne(
             context,
             kind = "device_admin_disabled",
             currentlyOk = DpcActions.isDeviceAdmin(context),
             wasOk = VoiceKidsPrefs.deviceAdminWasActive(context),
             setWasOk = { VoiceKidsPrefs.setDeviceAdminWasActive(context, it) },
-        )
+        ) || anyOff
+        anyOff = checkGeneric(context, "usage_access_disabled", UsageStatsHelper.hasUsageAccess(context)) || anyOff
+        // Only a tamper if the parent actually relies on the tunnel.
+        if (VoiceKidsPrefs.useVpnFiltering(context)) {
+            anyOff = checkGeneric(context, "vpn_disabled", DpcActions.hasVpnConsent(context)) || anyOff
+        }
+        val hasLocation = context.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            context.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        anyOff = checkGeneric(context, "location_disabled", hasLocation) || anyOff
+        // Everything back on: clear the child-side warning (it used to stay forever).
+        if (!anyOff) clearNotification(context)
     }
 
-    private fun checkOne(context: Context, kind: String, currentlyOk: Boolean, wasOk: Boolean, setWasOk: (Boolean) -> Unit) {
-        if (currentlyOk) {
-            setWasOk(true)
-            return
+    private fun checkGeneric(context: Context, kind: String, currentlyOk: Boolean): Boolean {
+        val key = "was_ok:$kind"
+        return checkOne(context, kind, currentlyOk, VoiceKidsPrefs.getLong(context, key) != 0L) {
+            VoiceKidsPrefs.putLong(context, key, if (it) 1L else 0L)
         }
-        if (!wasOk) return // setup was never completed — not tampering, just not set up yet
+    }
+
+    /** @return true when this permission is currently off after having been on. */
+    private fun checkOne(context: Context, kind: String, currentlyOk: Boolean, wasOk: Boolean, setWasOk: (Boolean) -> Unit): Boolean {
+        if (currentlyOk) {
+            if (!wasOk) setWasOk(true)
+            if (VoiceKidsPrefs.getLong(context, "tamper_open:$kind") != 0L) {
+                // Restored: tell the parent protection is back, once.
+                VoiceKidsPrefs.putLong(context, "tamper_open:$kind", 0L)
+                VoiceKidsPrefs.setLastTamperAlertAt(context, kind, 0L)
+                Outbox.alert(context, "tamper_detected", "info", restoredTitle(kind),
+                    "It was turned back on.", JSONObject().put("kind", kind).put("restored", true))
+            }
+            return false
+        }
+        if (!wasOk) return false // setup was never completed — not tampering, just not set up yet
         reportTamper(context, kind)
+        return true
     }
 
     /** Public so VoiceKidsDeviceAdminReceiver.onDisabled() can react immediately, not wait for the next poll tick. */
     fun reportTamper(context: Context, kind: String) {
         val now = System.currentTimeMillis()
         val last = VoiceKidsPrefs.lastTamperAlertAt(context, kind)
-        if (last != 0L && now - last < REMINDER_COOLDOWN_MS) return
+        val cooldown = if (kind in CRITICAL) REMINDER_COOLDOWN_MS else WARNING_REMINDER_MS
+        if (last != 0L && now - last < cooldown) return
         VoiceKidsPrefs.setLastTamperAlertAt(context, kind, now)
+        VoiceKidsPrefs.putLong(context, "tamper_open:$kind", now)
 
         Log.w(TAG, "Tamper detected: $kind")
         sendAlert(context, kind)
         showPersistentNotification(context, kind)
+        if (kind !in CRITICAL) return
         // Best-effort deterrent (user's explicit choice: alert + auto-lock).
         // May legitimately fail if Device Admin is what just got disabled.
         try {
@@ -101,45 +136,54 @@ object TamperGuard {
     }
 
     private fun sendAlert(context: Context, kind: String) {
-        val childId = VoiceKidsPrefs.childId(context) ?: return
-        val deviceId = VoiceKidsPrefs.deviceId(context)
         val (title, body) = messageFor(kind)
+        // Outbox: switching supervision off in aeroplane mode no longer
+        // goes unreported — it is delivered when the phone reconnects.
+        Outbox.alert(context, "tamper_detected", if (kind in CRITICAL) "critical" else "warning", title, body,
+            JSONObject().put("kind", kind))
+    }
 
-        val alert = JSONObject().apply {
-            put("child_id", childId)
-            if (deviceId != null) put("device_id", deviceId)
-            put("alert_type", "tamper_detected")
-            put("severity", "critical")
-            put("title", title)
-            put("body", body)
-            put("metadata", JSONObject().put("kind", kind))
-        }
-        val ok = SupabaseRest.insert(context, "pc_alerts", alert)
-        if (!ok) Log.e(TAG, "Failed to report tamper alert for $kind — parent will not be notified server-side")
+    private fun restoredTitle(kind: String): String = when (kind) {
+        "accessibility_disabled" -> "Supervision is back on"
+        "device_admin_disabled" -> "Device admin is back on"
+        "usage_access_disabled" -> "Usage access is back on"
+        "vpn_disabled" -> "Web protection is back on"
+        "location_disabled" -> "Location is back on"
+        else -> "Protection restored"
     }
 
     private fun messageFor(kind: String): Pair<String, String> = when (kind) {
         "accessibility_disabled" -> "Supervision was turned off" to
-            "VOICE's Accessibility permission was turned off on this device — app blocking and monitoring have stopped working until it's re-enabled."
+            "VOICE's Accessibility permission was turned off. App blocking, routines and website filtering have stopped until it's turned back on."
         "device_admin_disabled" -> "Device admin was turned off" to
-            "VOICE's Device Admin permission was turned off on this device — screen lock and some controls have stopped working until it's re-activated."
+            "VOICE's Device admin permission was turned off. Lock now and remote wipe won't work until it's turned back on."
+        "usage_access_disabled" -> "Usage access was turned off" to
+            "Screen-time limits and app limits have stopped, and usage reports are paused, until Usage access is turned back on."
+        "vpn_disabled" -> "Web protection was turned off" to
+            "The VOICE web-protection VPN was switched off or replaced by another VPN. Safe Search and filtering in apps have stopped."
+        "location_disabled" -> "Location permission was removed" to
+            "Location and place alerts have stopped until location access is allowed again."
         else -> "Supervision was turned off" to "A parental-control permission was disabled on this device."
+    }
+
+    private fun clearNotification(context: Context) {
+        runCatching { context.getSystemService(NotificationManager::class.java)?.cancel(NOTIF_ID) }
     }
 
     private fun showPersistentNotification(context: Context, kind: String) {
         ensureChannel(context)
 
-        val settingsAction = if (kind == "accessibility_disabled") {
-            Settings.ACTION_ACCESSIBILITY_SETTINGS
-        } else {
-            Settings.ACTION_SECURITY_SETTINGS
+        val settingsAction = when (kind) {
+            "accessibility_disabled" -> Settings.ACTION_ACCESSIBILITY_SETTINGS
+            "usage_access_disabled" -> Settings.ACTION_USAGE_ACCESS_SETTINGS
+            "location_disabled" -> Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+            else -> Settings.ACTION_SECURITY_SETTINGS
         }
-        val contentIntent = PendingIntent.getActivity(
-            context,
-            0,
-            Intent(settingsAction).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            pendingIntentFlags(),
-        )
+        val intent = Intent(settingsAction).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (settingsAction == Settings.ACTION_APPLICATION_DETAILS_SETTINGS) {
+            intent.data = android.net.Uri.fromParts("package", context.packageName, null)
+        }
+        val contentIntent = PendingIntent.getActivity(context, 0, intent, pendingIntentFlags())
 
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(context, CHANNEL_ID)

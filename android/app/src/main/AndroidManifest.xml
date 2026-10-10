@@ -43,7 +43,7 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -56,8 +56,6 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
             android:exported="true">
 
             <intent-filter>
@@ -80,6 +78,17 @@
             android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
+        <!-- Child-facing "why is this blocked" screen (BlockedActivity.kt).
+             Own task + excluded from recents so it never stacks on VOICE
+             or appears in the app switcher. -->
+        <activity
+            android:name="com.surabhikunj.voice.dpc.BlockedActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="com.surabhikunj.voice.block"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
         <receiver
             android:name="com.surabhikunj.voice.dpc.VoiceKidsDeviceAdminReceiver"
             android:exported="true"
@@ -98,6 +107,9 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 

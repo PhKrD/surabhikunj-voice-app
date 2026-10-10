@@ -3,7 +3,7 @@ import { Plus, X } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import useOrgStore from '@/store/orgStore'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { createChild } from '@/lib/parentalControlApi'
 import { useDeviceModeStore } from '@/store/deviceModeStore'
 import DeviceModeSetupPage from './DeviceModeSetupPage'
@@ -22,7 +22,7 @@ const defaultForm = { displayName: '', dateOfBirth: '', ageGroup: 'child', linke
 
 export default function ParentalControlPage() {
   const { org } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const deviceMode = useDeviceModeStore((s) => s.mode)
 
   const [showForm, setShowForm] = useState(false)

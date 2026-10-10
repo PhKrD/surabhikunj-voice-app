@@ -4,7 +4,7 @@ import { Plus, Trash2, Globe, Ban, CheckCircle, AlertTriangle, Settings as Setti
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import {
   listWebsiteRules, createWebsiteRule, deleteWebsiteRule,
   listCategoryRules, setCategoryRule,
@@ -140,7 +140,7 @@ function SettingsModal({ settings, onClose, onSave }) {
 }
 
 export default function WebsiteRulesTab({ childId }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [subTab, setSubTab] = useState('categories')
   const [rules, setRules] = useState([])
   const [categoryRules, setCategoryRules] = useState({})

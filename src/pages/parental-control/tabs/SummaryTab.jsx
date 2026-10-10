@@ -13,7 +13,7 @@ import {
 import { ResponsiveContainer, BarChart, Bar, XAxis, Tooltip, Cell } from 'recharts'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import {
   getTodayUsage, getScreenTimeRule, getUsageHistory, listAlerts, listWebActivity, getLatestLocation, listDevices,
 } from '@/lib/parentalControlApi'
@@ -45,7 +45,7 @@ function fmtTime(iso) {
 }
 
 export default function SummaryTab({ childId, child, onNavigateTab }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)

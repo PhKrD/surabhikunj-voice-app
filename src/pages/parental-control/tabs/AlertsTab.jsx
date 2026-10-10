@@ -5,7 +5,7 @@ import {
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { listAlerts, markAlertRead, subscribeToAlerts } from '@/lib/parentalControlApi'
 
 const ALERT_ICONS = {
@@ -40,7 +40,7 @@ const ALERT_SUGGESTIONS = {
 }
 
 export default function AlertsTab({ childId }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)

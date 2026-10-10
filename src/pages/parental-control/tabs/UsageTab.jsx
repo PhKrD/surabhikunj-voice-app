@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { RefreshCw, Clock, Smartphone, Save, Hourglass, Lock, Bell, Ban, Info } from 'lucide-react'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, Cell } from 'recharts'
 import Card, { CardBody } from '@/components/ui/Card'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { getTodayUsage, getScreenTimeRule, upsertScreenTimeRule, getUsageHistory } from '@/lib/parentalControlApi'
 import { limitForDay, formatMinutes } from '@/lib/screenTimePolicy'
 import { cn } from '@/lib/utils'
@@ -58,7 +58,7 @@ function MinutesField({ value, onChange, disabled }) {
 }
 
 export default function UsageTab({ childId }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [usage, setUsage] = useState([])
   const [history, setHistory] = useState([])
   const [historyDays, setHistoryDays] = useState(7)

@@ -881,6 +881,23 @@ export async function listAlerts(childId, { limit = 50 } = {}) {
   return data ?? []
 }
 
+/**
+ * Counts for the child page's section badges: unread alerts and requests
+ * still waiting for the parent. HEAD + count only — no rows transferred.
+ */
+export async function getAttentionCounts(childId) {
+  const head = { count: 'exact', head: true }
+  const [alerts, bonus, requests] = await Promise.all([
+    supabase.from('pc_alerts').select('id', head).eq('child_id', childId).eq('is_read', false),
+    supabase.from('pc_bonus_time_requests').select('id', head).eq('child_id', childId).eq('status', 'pending'),
+    supabase.from('pc_child_requests').select('id', head).eq('child_id', childId).eq('status', 'pending'),
+  ])
+  return {
+    unreadAlerts: alerts.count ?? 0,
+    pendingRequests: (bonus.count ?? 0) + (requests.count ?? 0),
+  }
+}
+
 export async function markAlertRead(alertId) {
   const { error } = await supabase.from('pc_alerts').update({ is_read: true }).eq('id', alertId)
   if (error) throw error

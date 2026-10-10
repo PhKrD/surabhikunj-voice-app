@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { WifiOff, Wifi, Lock, LockOpen, Smartphone, RefreshCw, Info, Gift, X, CloudOff } from 'lucide-react'
 import Badge from '@/components/ui/Badge'
 import { cn } from '@/lib/utils'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import {
   listRecentCommands, subscribeToDeviceCommands, grantExtraTime, revokeExtraTime,
   setParentLock, setInternetPause,
@@ -44,7 +44,7 @@ function timeAgo(iso) {
  * target picker.
  */
 export default function CommandCenter({ devices, childId, child, onChildUpdated, onRefreshDevices }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const activeDevices = useMemo(() => devices.filter((d) => d.is_active), [devices])
 
   const [sending, setSending] = useState(false)

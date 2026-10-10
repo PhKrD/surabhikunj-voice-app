@@ -3,13 +3,13 @@ import { Gift, Check, X as XIcon } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { listBonusRequests, resolveBonusRequest } from '@/lib/parentalControlApi'
 
 const STATUS_VARIANT = { pending: 'yellow', approved: 'tulasi', denied: 'red' }
 
 export default function BonusTab({ childId }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [resolvingId, setResolvingId] = useState(null)

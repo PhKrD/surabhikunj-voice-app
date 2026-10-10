@@ -35,6 +35,7 @@ export default function EnrollmentPage() {
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [linked, setLinked] = useState(null)
 
   async function handleEnroll(e) {
     e.preventDefault()
@@ -48,8 +49,8 @@ export default function EnrollmentPage() {
         body: { pairing_code: trimmed },
       })
 
-      if (fnErr) throw new Error(fnErr.message || 'Could not redeem pairing code')
-      if (!data?.ok) throw new Error(data?.error || 'Invalid or expired pairing code')
+      if (fnErr) throw new Error(await pairingErrorMessage(fnErr))
+      if (!data?.ok) throw new Error(data?.error || 'That code didn\u2019t work. Ask your parent for a new one.')
 
       // This screen can be reached while a PARENT is signed in on this same
       // device (the normal way a parent sets up a child's device: log in as
@@ -99,20 +100,31 @@ export default function EnrollmentPage() {
       // below is a manual system prompt, and asking for them right after
       // pairing (while a parent is still holding the phone) is the only
       // moment they reliably get done.
-      navigate(data.is_org_member ? '/family' : '/child/setup', { replace: true })
+      setLinked({ parent: data.parent_name || 'your parent', child: data.child_name || '' })
+      setTimeout(() => navigate(data.is_org_member ? '/family' : '/child/setup', { replace: true }), 1600)
     } catch (err) {
-      setError(err.message)
+      setError(navigator.onLine === false ? 'No internet connection. Connect to Wi-Fi or mobile data and try again.' : err.message)
     } finally {
       setLoading(false)
     }
   }
 
+  if (linked) {
+    return (
+      <div className="min-h-screen bg-[#1A1030] text-white flex flex-col items-center justify-center px-8 text-center gap-5">
+        <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center text-4xl" aria-hidden>✓</div>
+        <h1 className="text-2xl font-bold">You&apos;re now linked with {linked.parent}</h1>
+        <p className="text-[#C7C2E0] text-sm max-w-xs">Next: a few quick permissions so protection can switch on.</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-indigo-950 flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-[#1A1030] flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 flex flex-col gap-6">
         {/* Logo / title */}
         <div className="text-center">
-          <div className="w-16 h-16 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-600/30">
+          <div className="w-16 h-16 bg-[#6845E0] rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#6845E0]/30">
             <span className="text-white text-2xl font-bold">V</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">VOICE</h1>
@@ -133,7 +145,7 @@ export default function EnrollmentPage() {
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             placeholder="e.g. AB12CD"
             maxLength={8}
-            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-center text-2xl font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-center text-2xl font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-[#6845E0]"
             disabled={loading}
             autoComplete="off"
             autoCapitalize="characters"
@@ -146,16 +158,36 @@ export default function EnrollmentPage() {
           <button
             type="submit"
             disabled={loading || code.trim().length < 4}
-            className="w-full bg-indigo-600 active:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold rounded-2xl py-3.5 transition-colors"
+            className="w-full bg-[#6845E0] active:bg-[#5636bd] disabled:bg-[#bcabff] text-white font-semibold rounded-2xl py-3.5 transition-colors"
           >
-            {loading ? 'Pairing…' : 'Pair this device'}
+            {loading ? 'Connecting…' : 'Pair this device'}
           </button>
         </form>
 
         <p className="text-xs text-gray-400 text-center">
-          Ask a parent to open VOICE → Parental Control → Devices → Add a device to get the code.
+          Your parent gets the code in VOICE: Family → child → Protection → Add a device. Codes last 10 minutes and work once.
         </p>
       </div>
     </div>
   )
+}
+
+/**
+ * supabase.functions.invoke() hides the server's message behind "non-2xx
+ * status"; read the response so the child sees WHY the code failed.
+ */
+async function pairingErrorMessage(fnErr) {
+  const res = fnErr?.context
+  const status = res?.status
+  if (status === 410) return 'That code has expired. Codes last 10 minutes \u2014 ask your parent for a new one.'
+  if (status === 404) return 'That code isn\u2019t valid or was already used. Check the letters, or ask your parent for a new code.'
+  if (status === 429) return 'Too many tries. Wait a minute and try again.'
+  if (!status) return 'Couldn\u2019t reach VOICE. Check the internet connection and try again.'
+  try {
+    const body = await res.json()
+    if (body?.error) return body.error
+  } catch {
+    // fall through
+  }
+  return 'Pairing didn\u2019t work. Please try again.'
 }

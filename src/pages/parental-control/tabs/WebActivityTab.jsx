@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Search, Globe, RefreshCw, Info } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { listWebActivity, subscribeToWebActivity } from '@/lib/parentalControlApi'
 
 function dayLabel(iso) {
@@ -16,7 +16,7 @@ function dayLabel(iso) {
 }
 
 export default function WebActivityTab({ childId }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [activity, setActivity] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)

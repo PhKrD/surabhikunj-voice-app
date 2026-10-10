@@ -13,7 +13,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Save, Moon, Ban, Lock, WifiOff, Eraser, Sparkles, Info } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { getRestrictedTimes, upsertRestrictedTimes } from '@/lib/parentalControlApi'
 import { restrictedCellSet, cellsFromSet } from '@/lib/screenTimePolicy'
 import { cn } from '@/lib/utils'
@@ -41,7 +41,7 @@ function hourLabel(h) {
 }
 
 export default function RestrictedTimesTab({ childId }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [cells, setCells] = useState(() => new Set())

@@ -3,7 +3,7 @@ import { Plus, Trash2, Copy, Clock, ShieldCheck, ShieldAlert, ShieldOff, ArrowLe
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { listDevices, generatePairingCode, removeDevice, reassignDevice, listChildren, getChild, updateChild } from '@/lib/parentalControlApi'
 import { isDeviceOnline } from '@/lib/commandStatus'
 import { derivePolicySyncState, POLICY_SYNC_META, diagnosticChecklist } from '@/lib/policySync'
@@ -36,7 +36,7 @@ function protectionMeta(device) {
 }
 
 export default function DevicesTab({ childId, onChildUpdated }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [devices, setDevices] = useState([])
   const [loading, setLoading] = useState(true)
   const [deviceName, setDeviceName] = useState('')
@@ -139,12 +139,12 @@ export default function DevicesTab({ childId, onChildUpdated }) {
           <p className="text-sm text-secondary-token">
             Generate a pairing code. On the child's Android phone, install VOICE, choose "I'm a child" and enter the code. No computer or factory reset needed.
           </p>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <input
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
               placeholder="e.g. Aarav's Phone"
-              className="flex-1 px-4 py-3 rounded-2xl border border-[var(--border-color)] text-sm"
+              className="flex-1 min-w-[10rem] px-4 py-3 rounded-2xl border border-[var(--border-color)] text-sm"
             />
             <Button size="sm" icon={Plus} loading={generating} onClick={handleGenerate}>
               Generate code

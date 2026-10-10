@@ -458,6 +458,10 @@ body {
     }
   }
 
+  /* Horizontal chip rows that scroll by swipe, without a visible bar. */
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
   /* ---- Nicer scrollbars ---- */
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-track { background: transparent; }

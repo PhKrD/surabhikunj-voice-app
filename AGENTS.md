@@ -57,8 +57,8 @@ applied manually by pasting into the Supabase SQL Editor, in numeric order.
 This repo does not store a DB password or Supabase access token locally —
 do not attempt to run DDL via the JS client (service-role key only grants
 PostgREST access, not raw SQL execution). Live status (probed October 2026):
-everything through 72 is applied EXCEPT 49 (and the optional 50, which
-overwrites configured Sadhana marks — do not run it casually); 73 is new.
+everything through 74 is applied except the optional 50 (it overwrites
+configured Sadhana marks — do not run it casually).
 
 ## Parental Control module (`pc_*` schema)
 See:
@@ -235,7 +235,7 @@ lifecycle), `PARENTAL_CONTROL_SECURITY.md`, `PARENTAL_CONTROL_QA.md`.
 - Approving time = `grantExtraTime()` (desired state). A bare
   `grant_bonus_time` command is cancelled by the next pass.
 - Migration **74_parental_control_hardening.sql** (RLS child_id checks,
-  schedule read leak, push cool-downs) — dry-run verified, NOT yet applied.
+  schedule read leak, push cool-downs) — APPLIED to the live DB (Oct 2026).
 - Hidden child diagnostics: tap the name on the child home screen 7×.
 - Emulator: Android 17 refuses `am broadcast BOOT_COMPLETED` from adb;
   enabling Accessibility starts the monitor service by itself now. The

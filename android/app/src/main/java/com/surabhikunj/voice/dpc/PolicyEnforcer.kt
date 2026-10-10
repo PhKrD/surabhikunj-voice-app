@@ -645,6 +645,7 @@ object PolicyEnforcer {
             "app_version" to appVersion(context),
             // Lets the parent's device-health view show the right
             // manufacturer-specific battery/autostart steps.
+            "battery_pct" to batteryPercent(context),
             "manufacturer" to android.os.Build.MANUFACTURER,
             "model" to android.os.Build.MODEL,
             "android_version" to android.os.Build.VERSION.RELEASE,
@@ -859,6 +860,13 @@ object PolicyEnforcer {
             else -> "denied"
         }
     }
+
+    /** Battery level rounded to 5 % so it doesn't make every report "changed". */
+    private fun batteryPercent(context: Context): Int? = runCatching {
+        val pct = context.getSystemService(android.os.BatteryManager::class.java)
+            ?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: return null
+        if (pct in 0..100) (pct / 5) * 5 else null
+    }.getOrNull()
 
     private fun appVersion(context: Context): String =
         runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "" }.getOrDefault("")

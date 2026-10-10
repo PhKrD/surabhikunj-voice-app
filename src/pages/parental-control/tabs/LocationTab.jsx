@@ -3,7 +3,7 @@ import { Plus, Trash2, X, MapPin, Navigation } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import useOrgStore from '@/store/orgStore'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import {
   getLatestLocation,
   listRecentLocations,
@@ -44,7 +44,7 @@ function MapEmbed({ latitude, longitude, zoomDelta = 0.01, height = 220 }) {
 
 export default function LocationTab({ childId }) {
   const { org } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
 
   const [latest, setLatest] = useState(null)
   const [history, setHistory] = useState([])

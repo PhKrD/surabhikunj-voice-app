@@ -3,7 +3,7 @@ import { RefreshCw, CheckCircle, XCircle, Clock, Send, Info } from 'lucide-react
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { listChildRequests, resolveChildRequest } from '@/lib/parentalControlApi'
 
 // Only bonus_time carries a structured payload (minutes) the child app
@@ -21,7 +21,7 @@ const REQUEST_ICONS = {
 }
 
 export default function RequestsTab({ childId }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)

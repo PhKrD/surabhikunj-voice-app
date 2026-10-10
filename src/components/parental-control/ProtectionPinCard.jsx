@@ -16,13 +16,13 @@ import { useState } from 'react'
 import { KeyRound, ShieldCheck, ShieldAlert, Check } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { updateChild } from '@/lib/parentalControlApi'
 import { hashPin, isValidPin } from '@/lib/parentPin'
 import { confirm } from '@/store/dialogStore'
 
 export default function ProtectionPinCard({ child, onUpdated }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [pin, setPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
   const [editing, setEditing] = useState(false)

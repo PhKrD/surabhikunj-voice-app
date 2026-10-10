@@ -139,8 +139,22 @@ Deno.serve(async (req: Request) => {
     body: 'A new device just finished pairing.',
   })
 
+  // "You're now linked with <parent>" on the child's screen. Best-effort:
+  // a lookup failure must never fail a pairing that already succeeded.
+  let parentName = ''
+  try {
+    const { data: childRow } = await admin.from('pc_children').select('parent_id').eq('id', device.child_id).maybeSingle()
+    if (childRow?.parent_id) {
+      const { data: parent } = await admin.from('profiles').select('display_name, spiritual_name').eq('id', childRow.parent_id).maybeSingle()
+      parentName = parent?.spiritual_name || parent?.display_name || ''
+    }
+  } catch {
+    parentName = ''
+  }
+
   return json({
     ok: true,
+    parent_name: parentName,
     access_token: session.session.access_token,
     refresh_token: session.session.refresh_token,
     device_id: device.id,

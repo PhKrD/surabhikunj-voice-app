@@ -12,7 +12,7 @@ import { Search, Smartphone as SmartphoneIcon, Clock, Ban, CheckCircle2, Bell, B
 import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { listAppRules, setAppRule, listInstalledApps, getAppUsageToday } from '@/lib/parentalControlApi'
 import { isProtectedPackage, PROTECTED_PACKAGE_EXPLANATION } from '@/lib/protectedPackages'
 import { appLimitForDay, formatMinutes } from '@/lib/screenTimePolicy'
@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const PRESETS = [15, 30, 45, 60, 90, 120]
+const NO_LIMIT_MIN = 1440
 
 const STATUS_META = {
   allow: { label: 'Allowed', variant: 'tulasi', icon: CheckCircle2 },
@@ -41,7 +42,12 @@ function isNoise(app) {
 function TimeLimitModal({ app, rule, onClose, onSave }) {
   const [base, setBase] = useState(rule?.daily_limit_min ?? 60)
   const [perDay, setPerDay] = useState(Boolean(rule?.daily_limits_by_dow && Object.keys(rule.daily_limits_by_dow).length))
-  const [byDow, setByDow] = useState(() => Object.fromEntries(DAYS.map((_, i) => [String(i), rule?.daily_limits_by_dow?.[String(i)] ?? rule?.daily_limit_min ?? 60])))
+  // A blank day = no limit that day, stored as a full day (1440 min) so
+  // both engines read it as "never reached" without a schema change.
+  const [byDow, setByDow] = useState(() => Object.fromEntries(DAYS.map((_, i) => {
+    const v = rule?.daily_limits_by_dow?.[String(i)] ?? rule?.daily_limit_min ?? 60
+    return [String(i), Number(v) >= NO_LIMIT_MIN ? '' : v]
+  })))
   const [saving, setSaving] = useState(false)
 
   const submit = async () => {
@@ -49,7 +55,9 @@ function TimeLimitModal({ app, rule, onClose, onSave }) {
     try {
       await onSave({
         dailyLimitMin: Math.max(1, Number(base) || 60),
-        dailyLimitsByDow: perDay ? Object.fromEntries(Object.entries(byDow).map(([d, v]) => [d, Math.max(0, Number(v) || 0)])) : null,
+        dailyLimitsByDow: perDay
+          ? Object.fromEntries(Object.entries(byDow).map(([d, v]) => [d, String(v).trim() === '' ? NO_LIMIT_MIN : Math.min(NO_LIMIT_MIN, Math.max(0, Number(v) || 0))]))
+          : null,
       })
       onClose()
     } finally {
@@ -70,8 +78,8 @@ function TimeLimitModal({ app, rule, onClose, onSave }) {
           </div>
 
           <div className="flex items-center gap-2 bg-[var(--surface-muted)] rounded-xl p-1 w-fit">
-            <button onClick={() => setPerDay(false)} className={cn('px-3 py-1.5 rounded-lg text-xs font-medium', !perDay ? 'bg-indigo-600 text-white' : 'text-secondary-token')}>Same every day</button>
-            <button onClick={() => setPerDay(true)} className={cn('px-3 py-1.5 rounded-lg text-xs font-medium', perDay ? 'bg-indigo-600 text-white' : 'text-secondary-token')}>Per weekday</button>
+            <button onClick={() => setPerDay(false)} className={cn('px-3 py-1.5 rounded-lg text-xs font-medium', !perDay ? 'bg-[var(--color-primary-600)] text-white' : 'text-secondary-token')}>Same every day</button>
+            <button onClick={() => setPerDay(true)} className={cn('px-3 py-1.5 rounded-lg text-xs font-medium', perDay ? 'bg-[var(--color-primary-600)] text-white' : 'text-secondary-token')}>Per weekday</button>
           </div>
 
           {!perDay ? (
@@ -82,7 +90,7 @@ function TimeLimitModal({ app, rule, onClose, onSave }) {
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {PRESETS.map((p) => (
-                  <button key={p} onClick={() => setBase(p)} className={cn('px-2.5 py-1 text-xs rounded-lg border', Number(base) === p ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-[var(--border-color)] text-secondary-token')}>{formatMinutes(p)}</button>
+                  <button key={p} onClick={() => setBase(p)} className={cn('px-2.5 py-1 text-xs rounded-lg border', Number(base) === p ? 'border-[var(--color-primary-500)] bg-[var(--color-primary-50)] text-[var(--color-primary-700)]' : 'border-[var(--border-color)] text-secondary-token')}>{formatMinutes(p)}</button>
                 ))}
               </div>
             </div>
@@ -91,13 +99,13 @@ function TimeLimitModal({ app, rule, onClose, onSave }) {
               {DAYS.map((d, i) => (
                 <label key={d} className="flex items-center justify-between gap-2 text-sm">
                   <span className="text-primary-token w-9">{d}</span>
-                  <input type="number" min={0} max={1440} value={byDow[String(i)]} onChange={(e) => setByDow((prev) => ({ ...prev, [String(i)]: e.target.value }))} className="w-20 px-2 py-1.5 rounded-lg border border-[var(--border-color)] text-sm text-right" />
+                  <input type="number" inputMode="numeric" min={0} max={1440} placeholder="No limit" aria-label={`${d} limit in minutes`} value={byDow[String(i)]} onChange={(e) => setByDow((prev) => ({ ...prev, [String(i)]: e.target.value }))} className="w-24 h-10 px-2 rounded-lg border border-[var(--border-color)] bg-[var(--surface)] text-sm text-right" />
                 </label>
               ))}
             </div>
           )}
 
-          <p className="text-xs text-muted-token flex items-start gap-1.5"><Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" /> The app is blocked for the rest of the day once the limit is used up. 0 minutes = blocked all day.</p>
+          <p className="text-xs text-muted-token flex items-start gap-1.5"><Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" /> Blocked for the rest of the day once the limit is used up. 0 = blocked all day. Leave a day blank for no limit that day. Limits reset at midnight on the child’s phone.</p>
 
           <div className="flex justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
@@ -110,7 +118,7 @@ function TimeLimitModal({ app, rule, onClose, onSave }) {
 }
 
 export default function RulesTab({ childId }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [rules, setRules] = useState([])
   const [installedApps, setInstalledApps] = useState([])
   const [appUsage, setAppUsage] = useState([])
@@ -177,7 +185,8 @@ export default function RulesTab({ childId }) {
         const rule = ruleByPkg[a.package_name]
         const status = rule?.action ?? 'allow'
         const usedMs = usageByPkg[a.package_name] ?? 0
-        const limitMin = rule?.action === 'time_limit' ? appLimitForDay(rule, todayDow) : null
+        const rawLimit = rule?.action === 'time_limit' ? appLimitForDay(rule, todayDow) : null
+        const limitMin = rawLimit !== null && rawLimit >= NO_LIMIT_MIN ? null : rawLimit
         return { ...a, rule, status, usedMs, limitMin, alert: Boolean(rule?.alert_on_use) }
       })
       .filter((a) => {

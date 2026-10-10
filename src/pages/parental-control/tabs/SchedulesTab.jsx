@@ -1,24 +1,41 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Plus, Trash2, Clock, ShieldAlert, Moon, Sun, Smartphone, Pencil, Search, X, Info } from 'lucide-react'
+import { Plus, Trash2, Clock, ShieldAlert, Moon, Sun, Smartphone, Pencil, Search, X, Info, BookOpen, GraduationCap, Users, Sparkles, Library } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { listSchedules, createSchedule, updateSchedule, deleteSchedule, listInstalledApps } from '@/lib/parentalControlApi'
 import { isProtectedPackage } from '@/lib/protectedPackages'
+import { isScheduleActive } from '@/lib/policy'
 import { cn } from '@/lib/utils'
 import { confirm } from '@/store/dialogStore'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** "Every day" / "Weekdays" / "Weekends" / "Mon, Wed" — sorted Mon-first. */
+function daysLabel(days = []) {
+  const set = new Set(days)
+  if (set.size === 7) return 'Every day'
+  if (set.size === 5 && [1, 2, 3, 4, 5].every((d) => set.has(d))) return 'Weekdays'
+  if (set.size === 2 && set.has(0) && set.has(6)) return 'Weekends'
+  return [1, 2, 3, 4, 5, 6, 0].filter((d) => set.has(d)).map((d) => DAYS[d]).join(', ')
+}
 const ACTIONS = [
   { value: 'block_all', label: 'Block everything', icon: ShieldAlert, desc: 'Lock the device — only calls, VOICE and any apps you pick below stay available' },
   { value: 'allow_list_only', label: 'Only selected apps', icon: Sun, desc: 'Homework mode: only the apps you pick below can be used' },
   { value: 'block_internet', label: 'Internet off', icon: Smartphone, desc: 'Blocks every app that needs the internet. Offline apps still work' },
 ]
 
+// Quick-start routines. Everything stays editable before saving; times
+// that end earlier than they start run overnight (Bedtime 22:00–06:00
+// belongs to the night it starts).
 const TEMPLATES = [
-  { name: 'Bedtime', daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: '21:00', endTime: '07:00', action: 'block_all', icon: Moon },
-  { name: 'School', daysOfWeek: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '15:00', action: 'block_all', icon: Sun },
-  { name: 'Homework', daysOfWeek: [1, 2, 3, 4, 5], startTime: '17:00', endTime: '19:00', action: 'allow_list_only', icon: Clock },
+  { name: 'Bedtime', daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: '22:00', endTime: '06:00', action: 'block_all', icon: Moon, hint: 'Every night' },
+  { name: 'Study', daysOfWeek: [1, 2, 3, 4, 5], startTime: '17:00', endTime: '19:00', action: 'allow_list_only', icon: BookOpen, hint: 'Weekdays · chosen apps only' },
+  { name: 'School', daysOfWeek: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '14:00', action: 'block_all', icon: GraduationCap, hint: 'Weekdays' },
+  { name: 'Reading', daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: '20:00', endTime: '20:30', action: 'allow_list_only', icon: Library, hint: 'Every day · chosen apps only' },
+  { name: 'Family time', daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: '19:30', endTime: '20:30', action: 'block_all', icon: Users, hint: 'Every day' },
+  { name: 'Sadhana', daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: '05:00', endTime: '06:30', action: 'block_all', icon: Sparkles, hint: 'Morning practice' },
+  { name: '', daysOfWeek: [1, 2, 3, 4, 5], startTime: '16:00', endTime: '17:00', action: 'block_all', icon: Plus, hint: 'Start from scratch', label: 'Custom' },
 ]
 
 /** Multi-select of installed apps for a routine's always-allowed list. */
@@ -110,18 +127,21 @@ const emptyForm = {
 }
 
 export default function SchedulesTab({ childId }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [schedules, setSchedules] = useState([])
   const [installedApps, setInstalledApps] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  // Clock read on load (not during render) for the "On now" badges.
+  const [now, setNow] = useState(null)
 
   const load = useCallback(async () => {
     try {
       const [rows, apps] = await Promise.all([listSchedules(childId), listInstalledApps(childId).catch(() => [])])
       setSchedules(rows)
+      setNow(new Date())
       // dedupe across devices
       const seen = {}
       for (const a of apps) if (!seen[a.package_name]) seen[a.package_name] = a
@@ -240,34 +260,37 @@ export default function SchedulesTab({ childId }) {
         </Button>
       </div>
 
-      {schedules.length === 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-token mb-2">Quick start</p>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
           {TEMPLATES.map((t) => {
             const Icon = t.icon
             return (
               <button
-                key={t.name}
+                key={t.label ?? t.name}
+                type="button"
                 onClick={() => openForm(null, t)}
-                className="flex items-center gap-3 p-3 rounded-2xl border border-dashed border-[var(--border-color)] text-left hover:border-indigo-400 hover:bg-indigo-50/40"
+                className="shrink-0 w-40 flex flex-col items-start gap-2 p-3 rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] text-left hover:border-[var(--color-primary-400)] transition-colors"
               >
-                <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                  <Icon className="w-4 h-4 text-indigo-600" />
+                <div className="w-9 h-9 rounded-xl bg-[var(--color-primary-50)] flex items-center justify-center">
+                  <Icon className="w-4 h-4 text-[var(--color-primary-600)]" />
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-primary-token">{t.name}</p>
-                  <p className="text-[11px] text-muted-token">{formatTime(t.startTime)} – {formatTime(t.endTime)}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-primary-token">{t.label ?? t.name}</p>
+                  <p className="text-[11px] text-muted-token">{t.label ? t.hint : `${formatTime(t.startTime)} – ${formatTime(t.endTime)}`}</p>
+                  {!t.label && <p className="text-[11px] text-muted-token truncate">{t.hint}</p>}
                 </div>
               </button>
             )
           })}
         </div>
-      )}
+      </div>
 
       {schedules.length === 0 ? (
         <div className="text-center py-6 px-6">
           <Clock className="w-8 h-8 text-muted-token mx-auto mb-3" />
           <p className="text-sm font-medium text-secondary-token">No routines yet</p>
-          <p className="text-xs text-muted-token mt-1">Start from a template above, or paint hours directly in the Restricted times tab.</p>
+          <p className="text-xs text-muted-token mt-1">Pick a quick start above. Routines run on the child’s phone even when it’s offline.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -281,13 +304,21 @@ export default function SchedulesTab({ childId }) {
                 <CardBody className="py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center">
-                        <Icon className="w-4 h-4 text-indigo-600" />
+                      <div className="w-9 h-9 rounded-xl bg-[var(--color-primary-50)] flex items-center justify-center">
+                        <Icon className="w-4 h-4 text-[var(--color-primary-600)]" />
                       </div>
                       <div>
-                        <p className="font-medium text-primary-token">{sched.name}</p>
+                        <p className="font-medium text-primary-token flex items-center gap-2 flex-wrap">
+                          {sched.name}
+                          {enabled && now && isScheduleActive(sched, now) && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[var(--color-success-soft)] text-[var(--color-success)]">On now</span>
+                          )}
+                          {sched.end_time?.slice(0, 5) < sched.start_time?.slice(0, 5) && (
+                            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[var(--surface-muted)] text-secondary-token">Overnight</span>
+                          )}
+                        </p>
                         <p className="text-xs text-secondary-token mt-0.5">
-                          {DAYS.filter((_, i) => sched.days_of_week.includes(i)).join(', ')} · {formatTime(sched.start_time)} – {formatTime(sched.end_time)}
+                          {daysLabel(sched.days_of_week)} · {formatTime(sched.start_time)} – {formatTime(sched.end_time)}
                         </p>
                         <p className="text-xs text-muted-token mt-0.5">
                           {actionDef?.label}
@@ -298,7 +329,7 @@ export default function SchedulesTab({ childId }) {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => toggleEnabled(sched)}
-                        className={`w-10 h-5 rounded-full transition-colors relative mr-1 ${enabled ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                        className={`w-10 h-5 rounded-full transition-colors relative mr-1 ${enabled ? 'bg-[var(--color-primary-600)]' : 'bg-gray-300'}`}
                         title={enabled ? 'On' : 'Off'}
                       >
                         <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${enabled ? 'translate-x-5' : ''}`} />

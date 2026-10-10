@@ -7,9 +7,10 @@ import Card, { CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { listChildren, getTodayUsage, listAlerts, listDevices, getScreenTimeRule } from '@/lib/parentalControlApi'
 import { isDeviceOnline } from '@/lib/commandStatus'
+import { protectionHealth, PROTECTION_STATUS_META } from '@/lib/protectionHealth'
 import { limitForDay } from '@/lib/screenTimePolicy'
 
 function formatDuration(ms) {
@@ -20,29 +21,23 @@ function formatDuration(ms) {
 }
 
 /**
- * Real, honest protection status derived from what the device itself last
- * reported (enforcement_state — Device Admin + Accessibility + Usage access
- * is the full, no-reset setup; Device Owner is an optional extra). Falls
- * back to device_owner_mode for devices that have never reported. Never a
- * fabricated "Protected" flag. See PLATFORM_LIMITATIONS.md.
+ * Protection status from the most recently seen phone's OWN recent report
+ * (src/lib/protectionHealth.js). A missing or stale report is "Not
+ * confirmed", never a green "Protected".
  */
-function protectionMeta(devices) {
-  const active = devices.filter((d) => d.is_active)
-  if (active.length === 0) return null
-  const missing = new Set()
-  for (const d of active) {
-    const s = d.enforcement_state
-    if (!s) {
-      if (d.device_owner_mode !== 'device_owner') missing.add('setup')
-      continue
-    }
-    if (s.device_admin === false) missing.add('Device admin')
-    if (s.accessibility_enabled === false) missing.add('Accessibility')
-    if (s.usage_access === false) missing.add('Usage access')
+function protectionMeta(devices, child) {
+  const device = devices
+    .filter((d) => d.is_active)
+    .sort((a, b) => new Date(b.last_seen_at ?? 0) - new Date(a.last_seen_at ?? 0))[0]
+  if (!device) return null
+  const health = protectionHealth(device, child, { vpnRequired: device.enforcement_state?.vpn_filtering_wanted === true })
+  const meta = PROTECTION_STATUS_META[health.status]
+  return {
+    label: health.score != null ? `${meta.label} · ${health.score}%` : meta.label,
+    variant: meta.tone === 'danger' ? 'red' : meta.tone,
+    icon: health.status === 'strong' ? ShieldCheck : ShieldAlert,
+    strong: health.status === 'strong',
   }
-  if (missing.size === 0) return { label: 'Protected', variant: 'tulasi', icon: ShieldCheck }
-  if (missing.has('setup') && missing.size === 1) return { label: 'Setup needed', variant: 'saffron', icon: ShieldAlert }
-  return { label: `Missing ${[...missing].filter((m) => m !== 'setup').join(', ')}`, variant: 'yellow', icon: ShieldAlert }
 }
 
 /**
@@ -92,7 +87,7 @@ function labelForLock(reason) {
  */
 export default function ChildrenOverview({ onAddChild, reloadKey = 0 }) {
   const navigate = useNavigate()
-  const toast = useToastStore()
+  const toast = useToast()
   const [children, setChildren] = useState([])
   const [loading, setLoading] = useState(true)
   const [childData, setChildData] = useState({})
@@ -143,7 +138,7 @@ export default function ChildrenOverview({ onAddChild, reloadKey = 0 }) {
   const totalAlerts = Object.values(childData).reduce((sum, d) => sum + d.unreadAlerts, 0)
   const needsAttention = children.filter((c) => {
     const d = childData[c.id]
-    return d && protectionMeta(d.devices)?.variant !== 'tulasi'
+    return d && protectionMeta(d.devices, c)?.strong !== true
   })
 
   return (
@@ -184,7 +179,7 @@ export default function ChildrenOverview({ onAddChild, reloadKey = 0 }) {
         <div className="grid gap-4 sm:grid-cols-2">
           {children.map((child) => {
             const d = childData[child.id] ?? { devices: [], alerts: [], totalMs: 0, unreadAlerts: 0, onlineDevices: 0, limitMin: null }
-            const protection = protectionMeta(d.devices)
+            const protection = protectionMeta(d.devices, child)
             const ProtIcon = protection?.icon ?? ShieldCheck
             const usedMin = Math.round(d.totalMs / 60000)
             const pct = d.limitMin ? Math.min(100, (usedMin / d.limitMin) * 100) : null

@@ -79,3 +79,15 @@ const useToastStore = create((set) => ({
 }))
 
 export default useToastStore
+
+/**
+ * Stable toast actions for components. `useToastStore()` with no selector
+ * returns the whole store, which changes with every toast shown — so a
+ * `useCallback(..., [toast])` loader re-ran (refetching data) every time any
+ * toast appeared. The actions themselves never change.
+ */
+const selectActions = (s) => s.actions
+useToastStore.setState((s) => ({ actions: { success: s.success, error: s.error, info: s.info, addToast: s.addToast } }))
+export function useToast() {
+  return useToastStore(selectActions)
+}

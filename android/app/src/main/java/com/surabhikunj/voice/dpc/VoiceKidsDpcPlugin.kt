@@ -507,6 +507,7 @@ class VoiceKidsDpcPlugin : Plugin() {
         result.put("settingsProtected", VoiceKidsPrefs.protectSettings(context) && SettingsGuard.hasPin(context))
         result.put("lockUntil", VoiceKidsPrefs.lockUntil(context))
         result.put("policySource", PolicyEnforcer.policySource)
+        result.put("manufacturer", android.os.Build.MANUFACTURER)
         call.resolve(result)
     }
 

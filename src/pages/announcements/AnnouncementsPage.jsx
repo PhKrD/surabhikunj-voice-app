@@ -98,7 +98,7 @@ export default function AnnouncementsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Megaphone className="w-5 h-5 text-saffron-500" />
-          <h2 className="text-lg font-bold text-primary-token">Announcements</h2>
+          <h2 className="text-title text-primary-token">Announcements</h2>
         </div>
         {canPost && !showForm && (
           <Button size="sm" icon={Plus} onClick={() => setShowForm(true)}>New</Button>

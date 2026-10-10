@@ -92,7 +92,7 @@ export default function BroadcastPage() {
           <Megaphone className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-primary-token">Broadcasts</h1>
+          <h1 className="text-title text-primary-token">Broadcasts</h1>
           <p className="text-xs text-muted-token">Send announcements and reminders to devotees</p>
         </div>
       </div>

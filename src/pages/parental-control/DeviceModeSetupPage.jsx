@@ -27,8 +27,8 @@ export default function DeviceModeSetupPage() {
   return (
     <div className="max-w-lg mx-auto space-y-6 py-6">
       <div className="text-center space-y-2">
-        <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto">
-          <ShieldCheck className="w-7 h-7 text-indigo-600" />
+        <div className="w-14 h-14 rounded-2xl bg-[var(--color-primary-50)] flex items-center justify-center mx-auto">
+          <ShieldCheck className="w-7 h-7 text-[var(--color-primary-600)]" />
         </div>
         <h2 className="text-lg font-bold text-primary-token">How are you using Parental Control?</h2>
         <p className="text-sm text-secondary-token">

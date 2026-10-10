@@ -682,7 +682,7 @@ export default function ServicesPage() {
           <div className="w-9 h-9 rounded-2xl grad-saffron flex items-center justify-center flex-shrink-0">
             <HeartHandshake className="w-5 h-5 text-white" />
           </div>
-          <h2 className="text-lg font-bold text-primary-token">IM Services</h2>
+          <h2 className="text-title text-primary-token">IM Services</h2>
         </div>
         {canManage && activeTab === 'manage' && (
           <Button size="sm" icon={showForm ? X : Plus} onClick={() => setShowForm((v) => !v)}>

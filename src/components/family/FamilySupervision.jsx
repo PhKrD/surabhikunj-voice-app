@@ -54,14 +54,14 @@ function LockOverlay({ reason, label, screenTime }) {
   return (
     <div className="fixed inset-0 z-[9999] bg-gray-900 flex flex-col items-center justify-center px-8 gap-8 text-white">
       <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center">
-        <Icon size={48} className="text-indigo-400" />
+        <Icon size={48} className="text-[var(--color-primary-400)]" />
       </div>
       <div className="text-center">
         <h1 className="text-3xl font-bold">{copy.title}</h1>
         <p className="text-gray-400 mt-3">{copy.body}</p>
-        {reason === 'schedule' && label && <p className="text-indigo-300 text-sm mt-2">Schedule: {label}</p>}
+        {reason === 'schedule' && label && <p className="text-[var(--color-primary-300)] text-sm mt-2">Schedule: {label}</p>}
         {reason === 'daily_limit' && screenTime?.limitMin != null && (
-          <p className="text-indigo-300 text-sm mt-2">
+          <p className="text-[var(--color-primary-300)] text-sm mt-2">
             {formatMinutes(screenTime.usedMin ?? screenTime.limitMin)} used of today&apos;s {formatMinutes(screenTime.limitMin)}
           </p>
         )}
@@ -69,7 +69,7 @@ function LockOverlay({ reason, label, screenTime }) {
       {reason !== 'parent_lock' && (
         <button
           onClick={() => navigate('/family/bonus')}
-          className="w-full max-w-xs bg-indigo-500 hover:bg-indigo-600 text-white font-semibold rounded-2xl py-4 flex items-center justify-center gap-2"
+          className="w-full max-w-xs bg-[var(--color-primary-500)] hover:bg-[var(--color-primary-600)] text-white font-semibold rounded-2xl py-4 flex items-center justify-center gap-2"
         >
           <Plus size={20} /> Ask for more time
         </button>

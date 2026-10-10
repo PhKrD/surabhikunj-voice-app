@@ -277,7 +277,7 @@ export default function EventsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-primary-token">Events & Festivals</h2>
+        <h2 className="text-title text-primary-token">Events & Festivals</h2>
         {canManage && (
           <Button
             size="sm"

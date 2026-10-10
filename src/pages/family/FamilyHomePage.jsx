@@ -49,16 +49,16 @@ export default function FamilyHomePage() {
   const greeting = getGreeting()
 
   return (
-    <div className="min-h-screen bg-indigo-50 flex flex-col">
+    <div className="min-h-screen bg-[var(--color-primary-50)] flex flex-col">
       {/* Header */}
-      <div className="bg-indigo-600 text-white px-6 pt-12 pb-8">
+      <div className="bg-[var(--color-primary-600)] text-white px-6 pt-12 pb-8">
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-1.5 text-sm text-indigo-200 mb-4"
+          className="flex items-center gap-1.5 text-sm text-[var(--color-primary-200)] mb-4"
         >
           <ArrowLeft size={16} /> Back to VOICE
         </button>
-        <p className="text-indigo-200 text-sm">{greeting}</p>
+        <p className="text-[var(--color-primary-200)] text-sm">{greeting}</p>
         <h1 className="text-2xl font-bold mt-1">{childName || 'Hi there!'}</h1>
       </div>
 
@@ -68,20 +68,20 @@ export default function FamilyHomePage() {
         <SetupChecklistCard />
 
         {/* Screen time card */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
+        <div className="bg-[var(--surface)] rounded-2xl p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-2">
-            <Clock size={20} className="text-indigo-500" />
-            <span className="font-semibold text-gray-700">Screen time today</span>
+            <Clock size={20} className="text-[var(--color-primary-500)]" />
+            <span className="font-semibold text-secondary-token">Screen time today</span>
           </div>
 
           {usageAccessGranted ? (
-            <p className="text-3xl font-bold text-indigo-600">
+            <p className="text-3xl font-bold text-[var(--color-primary-600)]">
               {usageMinutes === null ? '—' : formatMinutes(usageMinutes)}
             </p>
           ) : (
             <button
               onClick={openUsageAccessSettings}
-              className="flex items-center gap-2 text-sm text-indigo-600 font-medium mt-1"
+              className="flex items-center gap-2 text-sm text-[var(--color-primary-600)] font-medium mt-1"
             >
               <Settings size={16} />
               Tap to enable screen time tracking
@@ -98,7 +98,7 @@ export default function FamilyHomePage() {
         {/* Request more time */}
         <button
           onClick={() => navigate('/family/bonus')}
-          className="w-full bg-white border-2 border-indigo-200 hover:border-indigo-400 text-indigo-700 font-semibold rounded-2xl py-4 flex items-center justify-center gap-2 transition-colors shadow-sm"
+          className="w-full bg-[var(--surface)] border-2 border-[var(--color-primary-200)] hover:border-[var(--color-primary-400)] text-[var(--color-primary-700)] font-semibold rounded-2xl py-4 flex items-center justify-center gap-2 transition-colors shadow-sm"
         >
           <Plus size={20} />
           Request more screen time
@@ -107,7 +107,7 @@ export default function FamilyHomePage() {
         {/* General request */}
         <button
           onClick={() => navigate('/family/request')}
-          className="w-full bg-white border-2 border-slate-200 hover:border-slate-400 text-slate-700 font-semibold rounded-2xl py-4 flex items-center justify-center gap-2 transition-colors shadow-sm"
+          className="w-full bg-[var(--surface)] border-2 border-[var(--border-color)] hover:border-slate-400 text-secondary-token font-semibold rounded-2xl py-4 flex items-center justify-center gap-2 transition-colors shadow-sm"
         >
           <Send size={20} />
           Ask for something else
@@ -125,7 +125,7 @@ export default function FamilyHomePage() {
           SOS — I need help
         </button>
 
-        <p className="text-xs text-gray-400 text-center">
+        <p className="text-xs text-muted-token text-center">
           Press SOS only in an emergency. Your parents will be notified immediately.
         </p>
       </div>

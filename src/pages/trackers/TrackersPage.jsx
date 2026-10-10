@@ -259,14 +259,14 @@ function FieldInput({ field, value, onChange }) {
           'inline-flex items-center gap-3 px-5 py-3 rounded-2xl text-sm font-semibold border transition-all active:scale-[0.97]',
           value
             ? 'bg-tulasi-600 text-white border-transparent shadow-sm'
-            : 'surface text-muted-token border-[var(--border-color)] hover:border-slate-300'
+            : 'surface text-muted-token border-[var(--border-color)] hover:border-[var(--border-color)]'
         )}
       >
         <span className={cn(
           'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
           value ? 'bg-white/30 border-white' : 'border-[var(--border-color)]'
         )}>
-          {value && <span className="w-2 h-2 rounded-full bg-white block" />}
+          {value && <span className="w-2 h-2 rounded-full bg-[var(--surface)] block" />}
         </span>
         {value ? 'Yes — Done' : 'No — Not done'}
       </button>
@@ -335,12 +335,12 @@ function colorToGradient(hex) {
   const presets = {
     '#f97316': 'from-orange-400 via-saffron-500 to-orange-600',
     '#22c55e': 'from-emerald-400 via-tulasi-500 to-green-600',
-    '#3b82f6': 'from-blue-400 via-blue-500 to-indigo-600',
+    '#3b82f6': 'from-blue-400 via-blue-500 to-[var(--color-primary-600)]',
     '#d946ef': 'from-fuchsia-400 via-lotus-500 to-purple-600',
     '#f43f5e': 'from-rose-400 via-red-500 to-rose-600',
     '#f59e0b': 'from-amber-400 via-yellow-500 to-orange-500',
     '#06b6d4': 'from-cyan-400 via-sky-500 to-blue-500',
-    '#8b5cf6': 'from-violet-400 via-purple-500 to-indigo-600',
+    '#8b5cf6': 'from-[var(--color-primary-400)] via-purple-500 to-[var(--color-primary-600)]',
   }
   return presets[hex?.toLowerCase()] ?? 'from-orange-400 via-saffron-500 to-orange-600'
 }
@@ -350,17 +350,17 @@ function TrackerCard({ t, onOpen, onSettings }) {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={onOpen}
-      className="group relative rounded-2xl overflow-hidden cursor-pointer press surface border elev-1 hover:elev-2 transition-shadow"
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
+      className="group relative rounded-2xl overflow-hidden cursor-pointer press surface border elev-1 hover:elev-2 transition-shadow focus-visible:outline-2 focus-visible:outline-[var(--color-primary-500)]"
     >
-      {/* Accent top edge in the tracker's own color — identity without a full-bleed banner */}
-      <div className={cn('h-1.5 bg-gradient-to-r', grad)} />
-
       <div className="relative p-5">
         {/* Top row */}
         <div className="flex items-start justify-between mb-4">
-          <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br', grad)}>
-            <BookOpen className="w-6 h-6 text-white" />
+          <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-gradient-to-br', grad)}>
+            <BookOpen className="w-5 h-5 text-white" />
           </div>
           <div className="flex items-center gap-2">
             {t.has_scoring && (
@@ -372,9 +372,11 @@ function TrackerCard({ t, onOpen, onSettings }) {
             <Can permission="trackers.manage">
               <button
                 onClick={(e) => { e.stopPropagation(); onSettings() }}
-                className="w-7 h-7 rounded-xl surface-muted hover:bg-[var(--surface)] flex items-center justify-center transition"
+                onKeyDown={(e) => e.stopPropagation()}
+                aria-label={`${t.name} settings`}
+                className="w-9 h-9 rounded-xl surface-muted hover:bg-[var(--surface)] flex items-center justify-center transition"
               >
-                <Settings className="w-3.5 h-3.5 text-secondary-token" />
+                <Settings className="w-4 h-4 text-secondary-token" />
               </button>
             </Can>
           </div>
@@ -382,7 +384,7 @@ function TrackerCard({ t, onOpen, onSettings }) {
 
         {/* Name + description */}
         <div className="mb-4">
-          <h3 className="text-lg font-extrabold text-primary-token leading-tight mb-1">{t.name}</h3>
+          <h3 className="text-heading text-primary-token mb-1">{t.name}</h3>
           {t.description && (
             <p className="text-sm text-secondary-token line-clamp-2 leading-relaxed">{t.description}</p>
           )}
@@ -390,7 +392,7 @@ function TrackerCard({ t, onOpen, onSettings }) {
 
         {/* CTA */}
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-muted-token uppercase tracking-widest">Fill today</span>
+          <span className="text-sm font-semibold text-[var(--color-primary-600)]">Fill today</span>
           <div className="w-8 h-8 rounded-xl surface-muted group-hover:bg-[var(--color-primary-50)] dark:group-hover:bg-[var(--color-primary-900)] flex items-center justify-center transition group-hover:translate-x-0.5">
             <ChevronRight className="w-4 h-4 text-secondary-token" />
           </div>
@@ -426,33 +428,22 @@ function TrackerList() {
 
   return (
     <div className="space-y-0">
-      {/* ── Hero banner ── */}
-      <div
-        className="relative overflow-hidden rounded-2xl mb-8 mx-1 text-white"
-        style={{ background: 'linear-gradient(135deg, var(--color-primary-700), var(--color-primary-500))' }}
-      >
-        <div className="relative px-6 py-7 flex items-end justify-between gap-4 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="w-4 h-4 text-white/80" />
-              <span className="text-xs font-bold text-white/70 uppercase tracking-widest">Daily Practice</span>
-            </div>
-            <h1 className="text-2xl font-extrabold text-white leading-tight mb-1">{label}</h1>
-            <p className="text-sm text-white/70 max-w-xs">
-              Track your spiritual practices and see your growth over time.
-            </p>
+      {/* ── Page header (compact: the content is the trackers, not a banner) ── */}
+      <div className="flex items-center justify-between gap-3 mb-5 px-1">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-[var(--color-primary-50)] flex items-center justify-center shrink-0">
+            <Sparkles className="w-5 h-5 text-[var(--color-primary-600)]" />
           </div>
-          <Can permission="trackers.manage">
-            <Button
-              size="sm"
-              icon={Plus}
-              onClick={() => navigate('new')}
-              className="bg-white/15 hover:bg-white/25 text-white border-white/25 border shadow-none flex-shrink-0"
-            >
-              New
-            </Button>
-          </Can>
+          <div className="min-w-0">
+            <h1 className="text-title text-primary-token truncate">{label}</h1>
+            <p className="text-sm text-muted-token truncate">Your daily practice, day by day</p>
+          </div>
         </div>
+        <Can permission="trackers.manage">
+          <Button size="sm" icon={Plus} onClick={() => navigate('new')} className="shrink-0">
+            New
+          </Button>
+        </Can>
       </div>
 
       {/* ── Empty state ── */}

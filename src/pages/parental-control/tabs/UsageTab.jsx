@@ -34,7 +34,7 @@ const LIMIT_ACTIONS = [
 ]
 
 const BAR_COLORS = [
-  'bg-indigo-500', 'bg-saffron-500', 'bg-tulasi-500',
+  'bg-[var(--color-primary-500)]', 'bg-saffron-500', 'bg-tulasi-500',
   'bg-lotus-500', 'bg-blue-500', 'bg-emerald-500',
 ]
 
@@ -50,7 +50,7 @@ function MinutesField({ value, onChange, disabled }) {
         disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-20 px-2.5 py-1.5 rounded-lg border border-[var(--border-color)] text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-50"
+        className="w-20 px-2.5 py-1.5 rounded-lg border border-[var(--border-color)] text-sm text-right focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-300)] disabled:opacity-50"
       />
       <span className="text-xs text-muted-token w-14">{formatMinutes(value)}</span>
     </div>
@@ -219,7 +219,7 @@ export default function UsageTab({ childId }) {
                 <button
                   key={n}
                   onClick={() => setHistoryDays(n)}
-                  className={cn('px-2.5 py-1 rounded-md text-xs font-medium', historyDays === n ? 'bg-white shadow text-indigo-600' : 'text-secondary-token')}
+                  className={cn('px-2.5 py-1 rounded-md text-xs font-medium', historyDays === n ? 'bg-[var(--surface)] shadow text-[var(--color-primary-600)]' : 'text-secondary-token')}
                 >
                   {n}d
                 </button>
@@ -258,23 +258,23 @@ export default function UsageTab({ childId }) {
             </div>
             <button
               onClick={() => setEnabled((v) => !v)}
-              className={`w-11 h-6 rounded-full transition-colors relative ${enabled ? 'bg-indigo-600' : 'bg-gray-300'}`}
+              className={`w-11 h-6 rounded-full transition-colors relative ${enabled ? 'bg-[var(--color-primary-600)]' : 'bg-[var(--surface-sunken)]'}`}
               title={enabled ? 'Limits on' : 'Limits off'}
             >
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${enabled ? 'translate-x-5' : ''}`} />
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-[var(--surface)] transition-transform ${enabled ? 'translate-x-5' : ''}`} />
             </button>
           </div>
 
           <div className="flex items-center gap-2 bg-[var(--surface-muted)] rounded-xl p-1 w-fit">
             <button
               onClick={() => setSameEveryDay(true)}
-              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium', sameEveryDay ? 'bg-indigo-600 text-white' : 'text-secondary-token')}
+              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium', sameEveryDay ? 'bg-[var(--color-primary-600)] text-white' : 'text-secondary-token')}
             >
               Same every day
             </button>
             <button
               onClick={() => setSameEveryDay(false)}
-              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium', !sameEveryDay ? 'bg-indigo-600 text-white' : 'text-secondary-token')}
+              className={cn('px-3 py-1.5 rounded-lg text-xs font-medium', !sameEveryDay ? 'bg-[var(--color-primary-600)] text-white' : 'text-secondary-token')}
             >
               Per weekday
             </button>
@@ -290,7 +290,7 @@ export default function UsageTab({ childId }) {
                     type="button"
                     disabled={!enabled}
                     onClick={() => setBaseLimit(p)}
-                    className={cn('px-2.5 py-1 text-xs rounded-lg border', Number(baseLimit) === p ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-[var(--border-color)] text-secondary-token hover:bg-[var(--surface-muted)]')}
+                    className={cn('px-2.5 py-1 text-xs rounded-lg border', Number(baseLimit) === p ? 'border-[var(--color-primary-500)] bg-[var(--color-primary-50)] text-[var(--color-primary-700)]' : 'border-[var(--border-color)] text-secondary-token hover:bg-[var(--surface-muted)]')}
                   >
                     {formatMinutes(p)}
                   </button>
@@ -301,7 +301,7 @@ export default function UsageTab({ childId }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
               {DAYS.map((day, i) => (
                 <div key={day} className="flex items-center justify-between gap-3">
-                  <span className={cn('text-sm w-10', i === todayDow ? 'font-semibold text-indigo-600' : 'text-primary-token')}>{day}</span>
+                  <span className={cn('text-sm w-10', i === todayDow ? 'font-semibold text-[var(--color-primary-600)]' : 'text-primary-token')}>{day}</span>
                   <MinutesField
                     value={byDow[String(i)] ?? baseLimit}
                     onChange={(v) => setByDow((prev) => ({ ...prev, [String(i)]: v }))}
@@ -325,7 +325,7 @@ export default function UsageTab({ childId }) {
                     onClick={() => setLimitAction(act.value)}
                     className={cn(
                       'flex items-center gap-3 p-2.5 rounded-lg border text-left text-sm transition-colors disabled:opacity-50',
-                      limitAction === act.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-[var(--border-color)] hover:border-slate-300 text-primary-token',
+                      limitAction === act.value ? 'border-[var(--color-primary-500)] bg-[var(--color-primary-50)] text-[var(--color-primary-700)]' : 'border-[var(--border-color)] hover:border-[var(--border-color)] text-primary-token',
                     )}
                   >
                     <Icon className="w-4 h-4 flex-shrink-0" />
@@ -344,9 +344,9 @@ export default function UsageTab({ childId }) {
             <button
               type="button"
               onClick={() => setAlertOnLimit((v) => !v)}
-              className={`w-11 h-6 rounded-full transition-colors relative ${alertOnLimit ? 'bg-indigo-600' : 'bg-gray-300'}`}
+              className={`w-11 h-6 rounded-full transition-colors relative ${alertOnLimit ? 'bg-[var(--color-primary-600)]' : 'bg-[var(--surface-sunken)]'}`}
             >
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${alertOnLimit ? 'translate-x-5' : ''}`} />
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-[var(--surface)] transition-transform ${alertOnLimit ? 'translate-x-5' : ''}`} />
             </button>
           </label>
 

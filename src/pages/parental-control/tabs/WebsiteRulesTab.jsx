@@ -109,9 +109,9 @@ function SettingsModal({ settings, onClose, onSave }) {
               </div>
               <button
                 onClick={() => toggle(row.key)}
-                className={`flex-shrink-0 w-11 h-6 rounded-full transition-colors relative ${form[row.key] ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                className={`flex-shrink-0 w-11 h-6 rounded-full transition-colors relative ${form[row.key] ? 'bg-[var(--color-primary-600)]' : 'bg-[var(--surface-sunken)]'}`}
               >
-                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${form[row.key] ? 'translate-x-5' : ''}`} />
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-[var(--surface)] transition-transform ${form[row.key] ? 'translate-x-5' : ''}`} />
               </button>
             </div>
           ))}
@@ -124,9 +124,9 @@ function SettingsModal({ settings, onClose, onSave }) {
             </div>
             <button
               onClick={() => toggle('alert_on_block')}
-              className={`flex-shrink-0 w-11 h-6 rounded-full transition-colors relative ${form.alert_on_block ? 'bg-indigo-600' : 'bg-gray-300'}`}
+              className={`flex-shrink-0 w-11 h-6 rounded-full transition-colors relative ${form.alert_on_block ? 'bg-[var(--color-primary-600)]' : 'bg-[var(--surface-sunken)]'}`}
             >
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${form.alert_on_block ? 'translate-x-5' : ''}`} />
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-[var(--surface)] transition-transform ${form.alert_on_block ? 'translate-x-5' : ''}`} />
             </button>
           </div>
 
@@ -265,20 +265,20 @@ export default function WebsiteRulesTab({ childId }) {
         <div className="flex items-center gap-2 bg-[var(--surface-muted)] rounded-xl p-1">
           <button
             onClick={() => setSubTab('categories')}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${subTab === 'categories' ? 'bg-indigo-600 text-white' : 'text-secondary-token'}`}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${subTab === 'categories' ? 'bg-[var(--color-primary-600)] text-white' : 'text-secondary-token'}`}
           >
             Categories
           </button>
           <button
             onClick={() => setSubTab('websites')}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${subTab === 'websites' ? 'bg-indigo-600 text-white' : 'text-secondary-token'}`}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${subTab === 'websites' ? 'bg-[var(--color-primary-600)] text-white' : 'text-secondary-token'}`}
           >
             Websites
           </button>
         </div>
         <button
           onClick={() => setShowSettings(true)}
-          className="p-2 rounded-lg text-muted-token hover:text-indigo-600 hover:bg-indigo-50"
+          className="p-2 rounded-lg text-muted-token hover:text-[var(--color-primary-600)] hover:bg-[var(--color-primary-50)]"
           title="Settings"
         >
           <SettingsIcon className="w-5 h-5" />
@@ -292,9 +292,9 @@ export default function WebsiteRulesTab({ childId }) {
               <span className="text-sm font-medium text-primary-token">Apply filters</span>
               <button
                 onClick={handleToggleApplyFilters}
-                className={`w-11 h-6 rounded-full transition-colors relative ${settings.apply_filters ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                className={`w-11 h-6 rounded-full transition-colors relative ${settings.apply_filters ? 'bg-[var(--color-primary-600)]' : 'bg-[var(--surface-sunken)]'}`}
               >
-                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${settings.apply_filters ? 'translate-x-5' : ''}`} />
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-[var(--surface)] transition-transform ${settings.apply_filters ? 'translate-x-5' : ''}`} />
               </button>
             </div>
             <p className="text-xs text-muted-token pb-2">Select a web category below to set filtering rules.</p>

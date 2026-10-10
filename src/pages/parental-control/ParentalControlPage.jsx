@@ -71,11 +71,11 @@ export default function ParentalControlPage() {
   return (
     <div>
       {/* Header */}
-      <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white px-6 pt-14 pb-8 rounded-b-[2rem]">
+      <div className="bg-[var(--color-primary-600)] text-white px-6 pt-14 pb-8 rounded-b-[2rem]">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-indigo-200 text-sm">Parental Control</p>
+              <p className="text-[var(--color-primary-200)] text-sm">Parental Control</p>
               <h1 className="text-2xl font-bold mt-0.5">Family</h1>
             </div>
             <Button

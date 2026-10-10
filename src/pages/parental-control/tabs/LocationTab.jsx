@@ -146,15 +146,15 @@ export default function LocationTab({ childId }) {
             <div className="space-y-3">
               <MapEmbed latitude={latest.latitude} longitude={latest.longitude} />
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-5 h-5 text-indigo-500" />
+                <div className="w-10 h-10 rounded-xl bg-[var(--color-primary-50)] flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-5 h-5 text-[var(--color-primary-500)]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <a
                     href={`https://www.google.com/maps?q=${latest.latitude},${latest.longitude}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sm font-medium text-indigo-600 hover:underline"
+                    className="text-sm font-medium text-[var(--color-primary-600)] hover:underline"
                   >
                     {latest.latitude.toFixed(5)}, {latest.longitude.toFixed(5)}
                   </a>
@@ -166,7 +166,7 @@ export default function LocationTab({ childId }) {
                 {geofences.length > 0 && (() => {
                   const inside = geofences.filter((gf) => haversineMeters(latest.latitude, latest.longitude, gf.latitude, gf.longitude) <= gf.radius_meters)
                   return (
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${inside.length ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${inside.length ? 'bg-emerald-50 text-emerald-700' : 'bg-[var(--surface-muted)] text-secondary-token'}`}>
                       {inside.length ? `At ${inside.map((g) => g.name).join(', ')}` : 'Not at a saved place'}
                     </span>
                   )
@@ -244,7 +244,7 @@ export default function LocationTab({ childId }) {
             <button
               type="button"
               onClick={useMyLocation}
-              className="flex items-center gap-1.5 text-xs font-medium text-indigo-600"
+              className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-primary-600)]"
             >
               <Navigation className="w-3.5 h-3.5" /> Use my current location
             </button>

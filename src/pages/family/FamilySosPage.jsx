@@ -71,7 +71,7 @@ export default function FamilySosPage() {
             </p>
             <button
               onClick={() => navigate('/family', { replace: true })}
-              className="mt-4 bg-white text-red-600 font-bold rounded-2xl px-8 py-4"
+              className="mt-4 bg-[var(--surface)] text-red-600 font-bold rounded-2xl px-8 py-4"
             >
               Go back home
             </button>
@@ -83,7 +83,7 @@ export default function FamilySosPage() {
             <p className="text-red-200 text-sm text-center">{errorMsg}</p>
             <button
               onClick={() => { setPhase('armed'); setProgress(0) }}
-              className="mt-4 bg-white text-red-600 font-bold rounded-2xl px-8 py-4"
+              className="mt-4 bg-[var(--surface)] text-red-600 font-bold rounded-2xl px-8 py-4"
             >
               Try again
             </button>
@@ -118,7 +118,7 @@ export default function FamilySosPage() {
                 onPointerUp={endHold}
                 onPointerLeave={endHold}
                 disabled={phase === 'sending'}
-                className="w-40 h-40 rounded-full bg-white text-red-600 font-black text-xl shadow-2xl active:scale-95 transition-transform select-none"
+                className="w-40 h-40 rounded-full bg-[var(--surface)] text-red-600 font-black text-xl shadow-2xl active:scale-95 transition-transform select-none"
               >
                 {phase === 'sending' ? '…' : 'HOLD'}
               </button>

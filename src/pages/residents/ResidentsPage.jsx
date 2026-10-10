@@ -88,7 +88,7 @@ export default function ResidentsPage() {
     <div className="max-w-5xl mx-auto space-y-5">
       <div className="flex items-center gap-2">
         <Users className="w-5 h-5 text-saffron-500" />
-        <h2 className="text-lg font-bold text-primary-token">Residents</h2>
+        <h2 className="text-title text-primary-token">Residents</h2>
         <Badge variant="default" className="ml-1">{filtered.length}</Badge>
       </div>
 

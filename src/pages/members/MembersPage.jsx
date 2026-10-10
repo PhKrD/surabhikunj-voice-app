@@ -214,10 +214,10 @@ export default function MembersPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-extrabold text-primary-token flex items-center gap-2">
-            <UserCog className="w-5 h-5 text-saffron-500" /> Assign Members
-          </h2>
-          <p className="text-sm text-secondary-token mt-0.5">Approve devotees and assign their role.</p>
+          <h1 className="text-title text-primary-token flex items-center gap-2">
+            <UserCog className="w-5 h-5 text-[var(--color-primary-600)]" /> Members
+          </h1>
+          <p className="text-sm text-muted-token mt-0.5">Approve devotees and assign their role.</p>
         </div>
         <div className="flex items-center gap-2">
           {pendingCount > 0 && (
@@ -287,19 +287,20 @@ export default function MembersPage() {
 
       {/* Assign by email */}
       <Card>
-        <CardBody className="py-4">
-          <form onSubmit={handleFindByEmail} className="flex flex-col sm:flex-row gap-2">
+        <CardBody className="py-4 space-y-2">
+          <p className="text-sm font-semibold text-primary-token">Add someone who already has an account</p>
+          <form onSubmit={handleFindByEmail} className="flex gap-2">
             <div className="relative flex-1 group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token group-focus-within:text-saffron-500 transition-colors" />
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token group-focus-within:text-[var(--color-primary-600)] transition-colors" />
               <input
                 type="email"
-                placeholder="Find devotee by email address…"
+                placeholder="Their email address"
                 value={emailQuery}
                 onChange={(e) => setEmailQuery(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 rounded-2xl border border-[var(--border-color)] bg-slate-50/60 text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-400/60 focus:border-saffron-300 focus:bg-[var(--surface)] transition-all"
+                className="w-full pl-11 pr-4 py-3 rounded-2xl border border-[var(--border-color)] bg-[var(--surface-muted)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-300)] focus:border-[var(--color-primary-400)] focus:bg-[var(--surface)] transition-all"
               />
             </div>
-            <Button type="submit" icon={Search} className="sm:w-auto w-full">Find</Button>
+            <Button type="submit" icon={Search} className="shrink-0">Find</Button>
           </form>
         </CardBody>
       </Card>
@@ -309,10 +310,10 @@ export default function MembersPage() {
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token" />
         <input
           type="text"
-          placeholder="Search all members by name or email…"
+          placeholder="Search members by name or email"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-400/60 focus:border-saffron-300 transition-all"
+          className="w-full pl-11 pr-4 py-3 rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-300)] focus:border-[var(--color-primary-400)] transition-all"
         />
       </div>
 
@@ -371,11 +372,12 @@ export default function MembersPage() {
                             onClick={() => setDraft(m.id, { is_approved: !d.is_approved })}
                             disabled={self}
                             className={cn(
-                              'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-60',
+                              'inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-60',
                               d.is_approved
-                                ? 'grad-tulasi text-white shadow-[0_6px_16px_-6px_rgba(34,197,94,0.5)]'
-                                : 'bg-[var(--surface-muted)] text-secondary-token hover:bg-slate-200'
+                                ? 'bg-[var(--color-success-soft)] text-[var(--color-success)] border-transparent'
+                                : 'bg-[var(--surface)] text-secondary-token border-[var(--border-color)] hover:bg-[var(--surface-muted)]'
                             )}
+                            aria-pressed={d.is_approved}
                           >
                             {d.is_approved ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
                             {d.is_approved ? 'Approved' : 'Not approved'}
@@ -387,9 +389,9 @@ export default function MembersPage() {
                             loading={savingId === m.id}
                             disabled={!dirty || self}
                             onClick={() => saveMember(m)}
-                            className={cn(!dirty && 'opacity-50')}
+                            variant={dirty ? 'primary' : 'secondary'}
                           >
-                            Save
+                            {dirty ? 'Save changes' : 'Saved'}
                           </Button>
                         </div>
                         {self && <p className="text-[11px] text-muted-token mt-2">You can't change your own role or approval.</p>}

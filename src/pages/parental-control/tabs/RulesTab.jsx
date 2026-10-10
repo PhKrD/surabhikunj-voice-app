@@ -260,7 +260,7 @@ export default function RulesTab({ childId }) {
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token" />
         </div>
-        <button onClick={() => { setRefreshing(true); load() }} className="p-2.5 rounded-xl border border-[var(--border-color)] text-muted-token hover:text-indigo-600" title="Refresh">
+        <button onClick={() => { setRefreshing(true); load() }} className="p-2.5 rounded-xl border border-[var(--border-color)] text-muted-token hover:text-[var(--color-primary-600)]" title="Refresh">
           <RefreshCw className={cn('w-4 h-4', refreshing && 'animate-spin')} />
         </button>
       </div>
@@ -275,7 +275,7 @@ export default function RulesTab({ childId }) {
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
-            className={cn('flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border', filter === f.key ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-[var(--surface)] text-secondary-token border-[var(--border-color)]')}
+            className={cn('flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border', filter === f.key ? 'bg-[var(--color-primary-500)] text-white border-[var(--color-primary-500)]' : 'bg-[var(--surface)] text-secondary-token border-[var(--border-color)]')}
           >
             {f.label}
           </button>
@@ -327,7 +327,7 @@ export default function RulesTab({ childId }) {
                     <button
                       onClick={() => applyRule(app, { alertOnUse: !app.alert, action: app.rule?.action ?? (app.alert ? null : 'allow') })}
                       disabled={busy}
-                      className={cn('p-2 rounded-lg', app.alert ? 'text-indigo-600 bg-indigo-50' : 'text-muted-token hover:bg-[var(--surface-muted)]')}
+                      className={cn('p-2 rounded-lg', app.alert ? 'text-[var(--color-primary-600)] bg-[var(--color-primary-50)]' : 'text-muted-token hover:bg-[var(--surface-muted)]')}
                       title={app.alert ? 'Alerting you when this app is used' : 'Alert me when this app is used'}
                     >
                       {app.alert ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
@@ -361,7 +361,7 @@ export default function RulesTab({ childId }) {
                   </div>
 
                   {app.limitMin !== null && (
-                    <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2">
+                    <div className="w-full bg-[var(--surface-sunken)] rounded-full h-1.5 mt-2">
                       <div
                         className={cn('h-1.5 rounded-full transition-all', overLimit ? 'bg-red-500' : 'bg-amber-500')}
                         style={{ width: `${app.limitMin > 0 ? Math.min(100, (usedMin / app.limitMin) * 100) : 100}%` }}

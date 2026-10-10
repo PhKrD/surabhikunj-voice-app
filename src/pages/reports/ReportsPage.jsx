@@ -7,11 +7,13 @@ import useAuthStore from '@/store/authStore'
 import useOrgStore from '@/store/orgStore'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import Can from '@/components/Can'
-import { cn } from '@/lib/utils'
 
 // ── Inline SVG bar chart ──────────────────────────────────────────────────────
-function MiniBarChart({ data, color = '#f97316', height = 80 }) {
+function MiniBarChart({ data, color = 'var(--color-primary-500)', height = 80, emptyText = 'Nothing recorded in this period yet.' }) {
   if (!data?.length) return null
+  if (!data.some((d) => (d.value ?? 0) > 0)) {
+    return <p className="text-sm text-muted-token py-4 text-center rounded-xl bg-[var(--surface-muted)]">{emptyText}</p>
+  }
   const max = Math.max(...data.map((d) => d.value ?? 0), 1)
   return (
     <div className="flex items-end gap-0.5" style={{ height }}>
@@ -21,14 +23,14 @@ function MiniBarChart({ data, color = '#f97316', height = 80 }) {
           <div key={i} className="flex-1 flex flex-col items-center justify-end group relative" style={{ height: '100%' }}>
             <div
               className="w-full rounded-t-sm transition-all"
-              style={{ height: `${Math.max(pct, 2)}%`, backgroundColor: d.value ? color : '#e2e8f0' }}
+              style={{ height: `${Math.max(pct, 2)}%`, backgroundColor: d.value ? color : 'var(--surface-sunken)' }}
             />
             {d.label && (
               <span className="absolute -bottom-4 text-[9px] text-muted-token w-full text-center truncate">
                 {d.label}
               </span>
             )}
-            <div className="absolute bottom-full mb-1 hidden group-hover:flex bg-slate-800 text-white text-xs px-1.5 py-0.5 rounded whitespace-nowrap z-10">
+            <div className="absolute bottom-full mb-1 hidden group-hover:flex bg-[var(--text-primary)] text-[var(--surface)] text-xs px-1.5 py-0.5 rounded whitespace-nowrap z-10">
               {d.tooltip ?? d.value}
             </div>
           </div>
@@ -39,10 +41,10 @@ function MiniBarChart({ data, color = '#f97316', height = 80 }) {
 }
 
 // ── Stat pill ─────────────────────────────────────────────────────────────────
-function StatPill({ label, value, sub, color = 'text-saffron-600' }) {
+function StatPill({ label, value, sub }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className={cn('text-2xl font-extrabold', color)}>{value}</span>
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <span className="text-2xl font-bold text-primary-token tabular-nums">{value}</span>
       <span className="text-xs font-medium text-secondary-token">{label}</span>
       {sub && <span className="text-xs text-muted-token">{sub}</span>}
     </div>
@@ -116,13 +118,13 @@ function TrackerTrendSection({ profile, orgId }) {
       </CardHeader>
       <CardBody>
         <div className="flex gap-6 mb-4">
-          <StatPill label="Entries (30d)" value={submitted} color="text-saffron-600" />
-          {tracker?.has_scoring && <StatPill label="Avg Score" value={avgScore} color="text-lotus-600" />}
-          <StatPill label="Streak" value={`${calcStreak(entries)}d`} sub="consecutive" color="text-tulasi-600" />
+          <StatPill label="Entries (30d)" value={submitted} />
+          {tracker?.has_scoring && <StatPill label="Avg Score" value={avgScore} />}
+          <StatPill label="Streak" value={`${calcStreak(entries)}d`} sub="consecutive" />
         </div>
         {loading
           ? <div className="h-20 bg-[var(--surface-muted)] rounded-xl animate-pulse" />
-          : <div className="pb-5"><MiniBarChart data={chartData} color={tracker?.color ?? '#f97316'} height={80} /></div>
+          : <div className="pb-5"><MiniBarChart data={chartData} color={tracker?.color ?? 'var(--color-primary-500)'} height={80} emptyText="No entries in the last 30 days." /></div>
         }
       </CardBody>
     </Card>
@@ -191,12 +193,12 @@ function TaskCompletionSection({ profile }) {
       </CardHeader>
       <CardBody>
         <div className="flex gap-6 mb-4">
-          <StatPill label="Avg Completion" value={`${avg}%`} color="text-saffron-600" />
-          <StatPill label="Days with Tasks" value={data.filter((d) => d.value > 0).length} color="text-blue-600" />
+          <StatPill label="Avg Completion" value={`${avg}%`} />
+          <StatPill label="Days with Tasks" value={data.filter((d) => d.value > 0).length} />
         </div>
         {loading
           ? <div className="h-20 bg-[var(--surface-muted)] rounded-xl animate-pulse" />
-          : <div className="pb-5"><MiniBarChart data={data} color="#6366f1" height={80} /></div>
+          : <div className="pb-5"><MiniBarChart data={data} height={80} emptyText="No tasks logged in the last 14 days." /></div>
         }
       </CardBody>
     </Card>
@@ -247,10 +249,10 @@ function OrgStatsSection({ orgId }) {
       </CardHeader>
       <CardBody>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-          <StatPill label="Active Members" value={stats.members} color="text-primary-token" />
-          <StatPill label="Tracker Submissions" value={stats.submitters} sub={`${pct}% of members`} color="text-lotus-600" />
-          <StatPill label="Task Logs" value={stats.totalLogs} color="text-saffron-600" />
-          <StatPill label="Completion Rate" value={`${taskPct}%`} sub={`${stats.done} done`} color="text-tulasi-600" />
+          <StatPill label="Active Members" value={stats.members} />
+          <StatPill label="Tracker Submissions" value={stats.submitters} sub={`${pct}% of members`} />
+          <StatPill label="Task Logs" value={stats.totalLogs} />
+          <StatPill label="Completion Rate" value={`${taskPct}%`} sub={`${stats.done} done`} />
         </div>
         {/* Progress bars */}
         <div className="mt-5 space-y-3">
@@ -290,10 +292,15 @@ export default function ReportsPage() {
 
   return (
     <Can permission="reports.view" fallback={<Navigate to="/" replace />}>
-      <div className="p-6 space-y-6 max-w-3xl mx-auto">
+      <div className="space-y-5 max-w-3xl mx-auto">
         <div className="flex items-center gap-3">
-          <BarChart3 className="w-6 h-6 text-saffron-500" />
-          <h1 className="text-2xl font-extrabold text-primary-token">Reports</h1>
+          <div className="w-10 h-10 rounded-xl bg-[var(--color-primary-50)] flex items-center justify-center">
+            <BarChart3 className="w-5 h-5 text-[var(--color-primary-600)]" />
+          </div>
+          <div>
+            <h1 className="text-title text-primary-token">Reports</h1>
+            <p className="text-sm text-muted-token">Your practice and your community at a glance</p>
+          </div>
         </div>
 
         <TrackerTrendSection profile={profile} orgId={org?.id} />

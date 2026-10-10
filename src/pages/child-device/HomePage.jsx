@@ -76,8 +76,8 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Header + screen-time ring */}
-      <div className="bg-gradient-to-b from-indigo-600 to-indigo-700 text-white px-6 pt-14 pb-10 rounded-b-[2rem]">
-        <p className="text-indigo-200 text-sm">{getGreeting()}</p>
+      <div className="bg-[var(--color-primary-600)] text-white px-6 pt-14 pb-10 rounded-b-[2rem]">
+        <p className="text-[var(--color-primary-200)] text-sm">{getGreeting()}</p>
         <h1 className="text-2xl font-bold mt-0.5 select-none" onClick={onNameTap}>{childName || 'Hi there!'}</h1>
 
         <div className="flex items-center justify-center mt-6">
@@ -99,7 +99,7 @@ export default function HomePage() {
                 )}
               </svg>
               <p className="text-4xl font-bold tabular-nums">{usageKnown ? formatMinutes(used) : '—'}</p>
-              <p className="text-xs text-indigo-200 mt-1">
+              <p className="text-xs text-[var(--color-primary-200)] mt-1">
                 {limit == null ? 'used today' : over ? "today's limit reached" : `of ${formatMinutes(limit)}`}
               </p>
             </div>
@@ -115,7 +115,7 @@ export default function HomePage() {
         </div>
 
         {usageAccessGranted && limit != null && !over && (
-          <p className="text-center text-sm text-indigo-100 mt-1">{formatMinutes(remaining)} left today</p>
+          <p className="text-center text-sm text-[var(--color-primary-100)] mt-1">{formatMinutes(remaining)} left today</p>
         )}
       </div>
 
@@ -134,8 +134,8 @@ export default function HomePage() {
           onClick={() => navigate('/child/bonus')}
           className="w-full bg-white rounded-3xl px-5 py-4 flex items-center gap-3 shadow-sm active:bg-slate-100 transition-colors"
         >
-          <span className="w-10 h-10 rounded-2xl bg-indigo-100 flex items-center justify-center shrink-0">
-            <Plus size={20} className="text-indigo-600" />
+          <span className="w-10 h-10 rounded-2xl bg-[var(--color-primary-100)] flex items-center justify-center shrink-0">
+            <Plus size={20} className="text-[var(--color-primary-600)]" />
           </span>
           <span className="text-left">
             <span className="block font-semibold text-slate-800">Ask for more screen time</span>

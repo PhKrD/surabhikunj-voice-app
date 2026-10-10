@@ -95,7 +95,7 @@ export default function TasksPage() {
     <div className="space-y-5 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-primary-token">{label}</h1>
+        <h1 className="text-title text-primary-token">{label}</h1>
         <Can permission="tasks.assign">
           <Button size="sm" icon={Plus}>Assign</Button>
         </Can>

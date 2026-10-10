@@ -73,7 +73,7 @@ function MentorshipHome() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-extrabold text-primary-token">{pageLabel}</h1>
+      <h1 className="text-title text-primary-token">{pageLabel}</h1>
 
       <div className="flex flex-wrap gap-3">
         {hasPermission('mentorship.view_own') && (

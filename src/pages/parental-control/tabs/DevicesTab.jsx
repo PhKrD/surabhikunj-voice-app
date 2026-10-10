@@ -152,13 +152,13 @@ export default function DevicesTab({ childId, onChildUpdated }) {
           </div>
 
           {pairing && (
-            <div className="mt-3 rounded-3xl bg-indigo-50 border border-indigo-100 p-5 text-center">
-              <p className="text-4xl font-bold tracking-widest text-indigo-700 font-mono">
+            <div className="mt-3 rounded-3xl bg-[var(--color-primary-50)] border border-[var(--color-primary-100)] p-5 text-center">
+              <p className="text-4xl font-bold tracking-widest text-[var(--color-primary-700)] font-mono">
                 {pairing.pairing_code}
               </p>
               <button
                 onClick={copyCode}
-                className="inline-flex items-center gap-1.5 text-sm text-indigo-600 font-medium mt-3"
+                className="inline-flex items-center gap-1.5 text-sm text-[var(--color-primary-600)] font-medium mt-3"
               >
                 <Copy className="w-4 h-4" /> Copy code
               </button>
@@ -211,7 +211,7 @@ export default function DevicesTab({ childId, onChildUpdated }) {
                   </div>
                   <button
                     onClick={() => setExpandedId(isExpanded ? null : device.id)}
-                    className="flex items-center gap-1.5 text-sm text-indigo-600 font-medium mt-3"
+                    className="flex items-center gap-1.5 text-sm text-[var(--color-primary-600)] font-medium mt-3"
                   >
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     Diagnostics

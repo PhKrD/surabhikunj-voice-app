@@ -221,7 +221,7 @@ export default function ChildrenOverview({ onAddChild, reloadKey = 0 }) {
                     </div>
                     <div className="h-2.5 w-full rounded-full bg-[var(--surface-muted)] overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${over ? 'bg-red-500' : 'bg-indigo-500'}`}
+                        className={`h-full rounded-full transition-all duration-500 ${over ? 'bg-red-500' : 'bg-[var(--color-primary-500)]'}`}
                         style={{ width: `${pct ?? Math.min(100, usedMin / 3)}%` }}
                       />
                     </div>

@@ -149,11 +149,11 @@ export default function AlertsTab({ childId }) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-primary-token truncate">{alert.title}</p>
-                      {!alert.is_read && <span className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />}
+                      {!alert.is_read && <span className="w-2 h-2 rounded-full bg-[var(--color-primary-500)] flex-shrink-0" />}
                     </div>
                     {alert.body && <p className="text-sm text-secondary-token mt-0.5">{alert.body}</p>}
                     {suggestion && !alert.is_read && (
-                      <p className="text-xs text-indigo-600 mt-1.5 bg-indigo-50 px-2 py-1 rounded-md inline-block">
+                      <p className="text-xs text-[var(--color-primary-600)] mt-1.5 bg-[var(--color-primary-50)] px-2 py-1 rounded-md inline-block">
                         💡 {suggestion}
                       </p>
                     )}

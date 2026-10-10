@@ -184,7 +184,7 @@ function ManageCounsellisModal({ counsellor, typeId, onClose, onChanged }) {
                         <p className="text-sm font-semibold text-primary-token truncate">{r.mentee_name}</p>
                         <p className="text-[11px] text-muted-token">Since {format(new Date(r.started_at), 'd MMM yyyy')}</p>
                       </div>
-                      <button onClick={() => openHistory(r)} className="p-1.5 rounded-lg text-muted-token hover:bg-slate-200" title="History">
+                      <button onClick={() => openHistory(r)} className="p-1.5 rounded-lg text-muted-token hover:bg-[var(--surface-sunken)]" title="History">
                         <History className="w-3.5 h-3.5" />
                       </button>
                       <Button size="xs" variant="danger" loading={busyId === r.id} onClick={() => handleEnd(r)}>Remove</Button>
@@ -310,7 +310,7 @@ export default function CounsellorManagement() {
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-extrabold text-primary-token flex items-center gap-2">
+          <h2 className="text-title text-primary-token flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-saffron-500" /> Counsellor Management
           </h2>
           <p className="text-sm text-secondary-token mt-0.5">Assign counsellors and manage their counsellis.</p>

@@ -32,7 +32,7 @@ function EditableCell({ field, value, onChange }) {
         aria-pressed={on}
         className={cn(
           'w-full h-7 rounded-lg flex items-center justify-center transition',
-          on ? 'bg-tulasi-500 text-white' : 'bg-[var(--surface-muted)] text-muted-token hover:bg-slate-200'
+          on ? 'bg-tulasi-500 text-white' : 'bg-[var(--surface-muted)] text-muted-token hover:bg-[var(--surface-sunken)]'
         )}
       >
         {on ? <Check className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
@@ -384,7 +384,7 @@ export default function TrackerSpreadsheet({
               </thead>
               <tbody>
                 {model.rows.map((row, idx) => (
-                  <tr key={row.iso} className={idx % 2 === 0 ? 'bg-[var(--surface)]' : 'bg-slate-50/60'}>
+                  <tr key={row.iso} className={idx % 2 === 0 ? 'bg-[var(--surface)]' : 'bg-[var(--surface-muted)]/60'}>
                     <td className="sticky left-0 z-10 bg-inherit px-2 py-1.5 text-xs font-semibold text-primary-token border-r border-[var(--border-color)]" style={{ width: DATE_W }}>
                       {row.dateLabel}
                     </td>
@@ -410,7 +410,7 @@ export default function TrackerSpreadsheet({
                       }
                       if (col.kind === 'marks') {
                         return (
-                          <td key={col.id} className="px-2 py-1.5 text-center text-xs font-semibold text-secondary-token bg-slate-50/60 border-r border-[var(--border-color)]">
+                          <td key={col.id} className="px-2 py-1.5 text-center text-xs font-semibold text-secondary-token bg-[var(--surface-muted)]/60 border-r border-[var(--border-color)]">
                             {Number(cell.raw ?? 0).toFixed(2)}
                           </td>
                         )

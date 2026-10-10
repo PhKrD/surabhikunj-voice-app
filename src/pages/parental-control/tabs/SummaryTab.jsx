@@ -145,7 +145,7 @@ export default function SummaryTab({ childId, child, onNavigateTab }) {
         )}
         {internetPaused && <Badge variant="yellow"><WifiOff className="w-3.5 h-3.5 mr-1" /> Internet paused</Badge>}
         {!internetPaused && onlineCount > 0 && !lockReason && <Badge variant="default"><Wifi className="w-3.5 h-3.5 mr-1" /> Internet on</Badge>}
-        <button onClick={() => { setRefreshing(true); load() }} className="ml-auto p-2 rounded-lg text-muted-token hover:text-indigo-600" title="Refresh">
+        <button onClick={() => { setRefreshing(true); load() }} className="ml-auto p-2 rounded-lg text-muted-token hover:text-[var(--color-primary-600)]" title="Refresh">
           <RefreshCw className={cn('w-5 h-5', refreshing && 'animate-spin')} />
         </button>
       </div>
@@ -176,7 +176,7 @@ export default function SummaryTab({ childId, child, onNavigateTab }) {
                   {overLimit ? "Today's limit reached" : `${formatMinutes(limitMin - totalMin)} left today`}
                 </p>
               ) : (
-                <button onClick={() => onNavigateTab?.('usage')} className="text-sm text-indigo-600 mt-2 hover:underline">No daily limit set — add one</button>
+                <button onClick={() => onNavigateTab?.('usage')} className="text-sm text-[var(--color-primary-600)] mt-2 hover:underline">No daily limit set — add one</button>
               )}
             </div>
             <div className="w-44 h-24">
@@ -195,7 +195,7 @@ export default function SummaryTab({ childId, child, onNavigateTab }) {
           </div>
           {limitMin !== null && (
             <div className="h-2.5 w-full bg-[var(--surface-muted)] rounded-full overflow-hidden mt-4">
-              <div className={cn('h-full rounded-full', overLimit ? 'bg-red-500' : 'bg-indigo-500')} style={{ width: `${limitMin === 0 ? 100 : pct}%` }} />
+              <div className={cn('h-full rounded-full', overLimit ? 'bg-red-500' : 'bg-[var(--color-primary-500)]')} style={{ width: `${limitMin === 0 ? 100 : pct}%` }} />
             </div>
           )}
         </CardBody>
@@ -204,7 +204,7 @@ export default function SummaryTab({ childId, child, onNavigateTab }) {
       {/* Stat tiles */}
       <div className="grid grid-cols-3 gap-3">
         <button onClick={() => onNavigateTab?.('rules')} className="rounded-3xl border border-[var(--border-color)] bg-[var(--surface)] p-4 text-left">
-          <Smartphone className="w-5 h-5 text-indigo-500 mb-2" />
+          <Smartphone className="w-5 h-5 text-[var(--color-primary-500)] mb-2" />
           <p className="text-2xl font-bold text-primary-token">{usage.length}</p>
           <p className="text-xs text-muted-token">apps used</p>
         </button>
@@ -226,7 +226,7 @@ export default function SummaryTab({ childId, child, onNavigateTab }) {
           <CardBody className="py-5">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-semibold text-primary-token">Top apps today</p>
-              <button onClick={() => onNavigateTab?.('rules')} className="text-sm text-indigo-600 hover:underline">Manage</button>
+              <button onClick={() => onNavigateTab?.('rules')} className="text-sm text-[var(--color-primary-600)] hover:underline">Manage</button>
             </div>
             {usage.length === 0 ? (
               <p className="text-sm text-muted-token py-4">No app usage reported yet today.</p>
@@ -241,7 +241,7 @@ export default function SummaryTab({ childId, child, onNavigateTab }) {
                         <span className="text-xs text-secondary-token whitespace-nowrap ml-2">{formatMinutes(Math.round((app.total_foreground_ms || 0) / 60_000))}</span>
                       </div>
                       <div className="h-2 bg-[var(--surface-muted)] rounded-full overflow-hidden mt-1.5">
-                        <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${w}%` }} />
+                        <div className="h-full bg-[var(--color-primary-400)] rounded-full" style={{ width: `${w}%` }} />
                       </div>
                     </div>
                   )
@@ -256,7 +256,7 @@ export default function SummaryTab({ childId, child, onNavigateTab }) {
           <CardBody className="py-5">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-semibold text-primary-token">Web today</p>
-              <button onClick={() => onNavigateTab?.('websites')} className="text-sm text-indigo-600 hover:underline">Filters</button>
+              <button onClick={() => onNavigateTab?.('websites')} className="text-sm text-[var(--color-primary-600)] hover:underline">Filters</button>
             </div>
             {topDomains.length === 0 && searchesToday.length === 0 ? (
               <p className="text-sm text-muted-token py-4">No browsing seen yet today (needs Accessibility enabled on the device).</p>
@@ -282,8 +282,8 @@ export default function SummaryTab({ childId, child, onNavigateTab }) {
       {/* Location */}
       <Card hover onClick={() => onNavigateTab?.('location')}>
         <CardBody className="py-4 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
-            <MapPin className="w-6 h-6 text-indigo-500" />
+          <div className="w-12 h-12 rounded-2xl bg-[var(--color-primary-50)] flex items-center justify-center flex-shrink-0">
+            <MapPin className="w-6 h-6 text-[var(--color-primary-500)]" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-primary-token">Last known location</p>
@@ -300,7 +300,7 @@ export default function SummaryTab({ childId, child, onNavigateTab }) {
         <CardBody className="py-5">
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-semibold text-primary-token">Today's activity</p>
-            <button onClick={() => onNavigateTab?.('alerts')} className="text-sm text-indigo-600 hover:underline">All alerts</button>
+            <button onClick={() => onNavigateTab?.('alerts')} className="text-sm text-[var(--color-primary-600)] hover:underline">All alerts</button>
           </div>
           {timeline.length === 0 ? (
             <div className="text-center py-8">
@@ -312,8 +312,8 @@ export default function SummaryTab({ childId, child, onNavigateTab }) {
               {timeline.map((item) => {
                 const Icon = item.kind === 'web' ? (item.type === 'search' ? Search : Globe) : (ALERT_ICONS[item.type] ?? Bell)
                 const tone = item.kind === 'alert'
-                  ? item.severity === 'critical' ? 'text-red-600 bg-red-50' : item.severity === 'warning' ? 'text-amber-600 bg-amber-50' : 'text-indigo-600 bg-indigo-50'
-                  : 'text-slate-500 bg-slate-100'
+                  ? item.severity === 'critical' ? 'text-red-600 bg-red-50' : item.severity === 'warning' ? 'text-amber-600 bg-amber-50' : 'text-[var(--color-primary-600)] bg-[var(--color-primary-50)]'
+                  : 'text-muted-token bg-[var(--surface-muted)]'
                 return (
                   <li key={item.id} className="ml-4">
                     <span className={cn('absolute -left-[15px] w-7 h-7 rounded-full flex items-center justify-center ring-4 ring-[var(--surface)]', tone)}>
@@ -333,7 +333,7 @@ export default function SummaryTab({ childId, child, onNavigateTab }) {
 
       <p className="text-xs text-muted-token text-center">
         Tip: use the buttons above the tabs to pause internet, lock the device, or give extra time right now.{' '}
-        <button onClick={() => navigate('/parental-control')} className="text-indigo-600 hover:underline">Family dashboard</button>
+        <button onClick={() => navigate('/parental-control')} className="text-[var(--color-primary-600)] hover:underline">Family dashboard</button>
       </p>
     </div>
   )

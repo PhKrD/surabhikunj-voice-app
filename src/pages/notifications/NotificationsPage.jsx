@@ -130,7 +130,7 @@ export default function NotificationsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-lg font-bold text-primary-token">Notifications</h2>
+        <h2 className="text-title text-primary-token">Notifications</h2>
         <div className="inline-flex items-center gap-1 p-1 rounded-full bg-[var(--surface-muted)] w-full sm:w-auto">
           <button
             onClick={() => setTab('inbox')}

@@ -73,7 +73,7 @@ function AppPicker({ apps, selected, onChange }) {
           {selected.map((pkg) => {
             const app = apps.find((a) => a.package_name === pkg)
             return (
-              <span key={pkg} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs">
+              <span key={pkg} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--color-primary-50)] text-[var(--color-primary-700)] text-xs">
                 {app?.app_name || pkg}
                 <button type="button" onClick={() => toggle(pkg)} className="hover:text-red-600"><X className="w-3 h-3" /></button>
               </span>
@@ -92,10 +92,10 @@ function AppPicker({ apps, selected, onChange }) {
               key={app.package_name}
               type="button"
               onClick={() => toggle(app.package_name)}
-              className={cn('w-full flex items-center gap-2 px-3 py-2 text-left text-sm', on ? 'bg-indigo-50' : 'hover:bg-[var(--surface-muted)]')}
+              className={cn('w-full flex items-center gap-2 px-3 py-2 text-left text-sm', on ? 'bg-[var(--color-primary-50)]' : 'hover:bg-[var(--surface-muted)]')}
             >
-              <span className={cn('w-4 h-4 rounded border flex items-center justify-center flex-shrink-0', on ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300')}>
-                {on && <span className="w-2 h-2 bg-white rounded-sm" />}
+              <span className={cn('w-4 h-4 rounded border flex items-center justify-center flex-shrink-0', on ? 'bg-[var(--color-primary-600)] border-[var(--color-primary-600)]' : 'border-[var(--border-color)]')}>
+                {on && <span className="w-2 h-2 bg-[var(--surface)] rounded-sm" />}
               </span>
               <span className="flex-1 min-w-0">
                 <span className="block truncate text-primary-token">{app.app_name || app.package_name}</span>
@@ -329,12 +329,12 @@ export default function SchedulesTab({ childId }) {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => toggleEnabled(sched)}
-                        className={`w-10 h-5 rounded-full transition-colors relative mr-1 ${enabled ? 'bg-[var(--color-primary-600)]' : 'bg-gray-300'}`}
+                        className={`w-10 h-5 rounded-full transition-colors relative mr-1 ${enabled ? 'bg-[var(--color-primary-600)]' : 'bg-[var(--surface-sunken)]'}`}
                         title={enabled ? 'On' : 'Off'}
                       >
-                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${enabled ? 'translate-x-5' : ''}`} />
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-[var(--surface)] transition-transform ${enabled ? 'translate-x-5' : ''}`} />
                       </button>
-                      <button onClick={() => openForm(sched)} className="p-1.5 rounded-lg text-muted-token hover:text-indigo-600 hover:bg-indigo-50">
+                      <button onClick={() => openForm(sched)} className="p-1.5 rounded-lg text-muted-token hover:text-[var(--color-primary-600)] hover:bg-[var(--color-primary-50)]">
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button onClick={() => remove(sched.id)} className="p-1.5 rounded-lg text-muted-token hover:text-red-600 hover:bg-red-50">
@@ -362,7 +362,7 @@ export default function SchedulesTab({ childId }) {
                   value={form.name}
                   onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="e.g. Bedtime"
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-300)]"
                 />
               </div>
 
@@ -375,7 +375,7 @@ export default function SchedulesTab({ childId }) {
                       type="button"
                       onClick={() => toggleDay(i)}
                       className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
-                        form.daysOfWeek.includes(i) ? 'bg-indigo-500 text-white' : 'bg-[var(--surface-muted)] text-secondary-token hover:bg-slate-200'
+                        form.daysOfWeek.includes(i) ? 'bg-[var(--color-primary-500)] text-white' : 'bg-[var(--surface-muted)] text-secondary-token hover:bg-[var(--surface-sunken)]'
                       }`}
                     >
                       {day}
@@ -391,7 +391,7 @@ export default function SchedulesTab({ childId }) {
                     type="time"
                     value={form.startTime}
                     onChange={(e) => setForm((prev) => ({ ...prev, startTime: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-300)]"
                   />
                 </div>
                 <div>
@@ -400,7 +400,7 @@ export default function SchedulesTab({ childId }) {
                     type="time"
                     value={form.endTime}
                     onChange={(e) => setForm((prev) => ({ ...prev, endTime: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-300)]"
                   />
                 </div>
               </div>
@@ -417,8 +417,8 @@ export default function SchedulesTab({ childId }) {
                         onClick={() => setForm((prev) => ({ ...prev, action: act.value }))}
                         className={`flex items-center gap-2 p-2.5 rounded-lg border text-left text-sm transition-colors ${
                           form.action === act.value
-                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                            : 'border-[var(--border-color)] hover:border-slate-300 text-primary-token'
+                            ? 'border-[var(--color-primary-500)] bg-[var(--color-primary-50)] text-[var(--color-primary-700)]'
+                            : 'border-[var(--border-color)] hover:border-[var(--border-color)] text-primary-token'
                         }`}
                       >
                         <Icon className="w-4 h-4" />

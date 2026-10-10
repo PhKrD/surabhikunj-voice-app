@@ -13,24 +13,24 @@ import Button from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
 
 const INPUT =
-  'w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/60 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-400/60 focus:border-saffron-300 focus:bg-white transition-all'
+  'w-full px-4 py-3.5 rounded-2xl border border-[var(--border-color)] bg-[var(--surface-muted)]/60 text-sm text-primary-token placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-400/60 focus:border-saffron-300 focus:bg-[var(--surface)] transition-all'
 
 // ─── Choice cards ─────────────────────────────────────────────────────────────
 function ChoiceCard({ icon: Icon, title, description, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left p-5 rounded-2xl border border-slate-200 bg-white hover:border-saffron-300 hover:shadow-[0_12px_32px_-16px_rgba(249,115,22,0.35)] transition-all group"
+      className="w-full text-left p-5 rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] hover:border-saffron-300 hover:shadow-[0_12px_32px_-16px_rgba(249,115,22,0.35)] transition-all group"
     >
       <div className="flex items-start gap-4">
         <div className="w-11 h-11 rounded-2xl grad-saffron flex items-center justify-center flex-shrink-0">
           <Icon className="w-5 h-5 text-white" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-bold text-slate-800">{title}</p>
-          <p className="text-sm text-slate-500 mt-0.5">{description}</p>
+          <p className="font-bold text-primary-token">{title}</p>
+          <p className="text-sm text-muted-token mt-0.5">{description}</p>
         </div>
-        <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-saffron-500 group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-3" />
+        <ArrowRight className="w-5 h-5 text-muted-token group-hover:text-saffron-500 group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-3" />
       </div>
     </button>
   )
@@ -81,14 +81,14 @@ function CreateOrgForm({ onBack, onDone }) {
           <Check className="w-7 h-7 text-white" />
         </div>
         <div>
-          <h2 className="text-xl font-extrabold text-slate-800">You're all set</h2>
-          <p className="text-sm text-slate-500 mt-1">
-            You are the owner of <span className="font-semibold text-slate-700">{name.trim()}</span>.
+          <h2 className="text-xl font-extrabold text-primary-token">You're all set</h2>
+          <p className="text-sm text-muted-token mt-1">
+            You are the owner of <span className="font-semibold text-secondary-token">{name.trim()}</span>.
           </p>
         </div>
 
         <div className="p-4 rounded-2xl bg-saffron-50 border border-saffron-100">
-          <p className="text-xs font-medium text-slate-500 mb-1.5">
+          <p className="text-xs font-medium text-muted-token mb-1.5">
             Share this join code with your members
           </p>
           <div className="flex items-center justify-center gap-2">
@@ -103,7 +103,7 @@ function CreateOrgForm({ onBack, onDone }) {
               {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </button>
           </div>
-          <p className="text-[11px] text-slate-400 mt-2">
+          <p className="text-[11px] text-muted-token mt-2">
             You can find this again in Settings → Organization.
           </p>
         </div>
@@ -120,20 +120,20 @@ function CreateOrgForm({ onBack, onDone }) {
       <button
         type="button"
         onClick={onBack}
-        className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+        className="flex items-center gap-1.5 text-sm text-muted-token hover:text-secondary-token transition-colors"
       >
         <ArrowLeft className="w-4 h-4" /> Back
       </button>
 
       <div>
-        <h2 className="text-xl font-extrabold text-slate-800">Create your organization</h2>
-        <p className="text-sm text-slate-500 mt-1">
+        <h2 className="text-xl font-extrabold text-primary-token">Create your organization</h2>
+        <p className="text-sm text-muted-token mt-1">
           You'll become its owner with full control over members, roles and modules.
         </p>
       </div>
 
       <div className="relative group">
-        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-saffron-500 transition-colors" />
+        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token group-focus-within:text-saffron-500 transition-colors" />
         <input
           type="text"
           placeholder="Organization name"
@@ -204,20 +204,20 @@ function JoinOrgForm({ onBack, onDone, onPending }) {
       <button
         type="button"
         onClick={onBack}
-        className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+        className="flex items-center gap-1.5 text-sm text-muted-token hover:text-secondary-token transition-colors"
       >
         <ArrowLeft className="w-4 h-4" /> Back
       </button>
 
       <div>
-        <h2 className="text-xl font-extrabold text-slate-800">Join an organization</h2>
-        <p className="text-sm text-slate-500 mt-1">
+        <h2 className="text-xl font-extrabold text-primary-token">Join an organization</h2>
+        <p className="text-sm text-muted-token mt-1">
           Enter the 7-character join code from your organization's admin.
         </p>
       </div>
 
       <div className="relative group">
-        <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-saffron-500 transition-colors" />
+        <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token group-focus-within:text-saffron-500 transition-colors" />
         <input
           type="text"
           placeholder="ABC2XYZ"
@@ -241,9 +241,9 @@ function JoinOrgForm({ onBack, onDone, onPending }) {
             className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-tulasi-50 border border-tulasi-100"
           >
             <Users className="w-4 h-4 text-tulasi-600 flex-shrink-0" />
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-secondary-token">
               Joining <span className="font-semibold">{peek.org_name}</span>
-              <span className="text-slate-400"> · {peek.member_count} members</span>
+              <span className="text-muted-token"> · {peek.member_count} members</span>
             </p>
           </motion.div>
         )}
@@ -264,10 +264,10 @@ function PendingState({ orgName, onRecheck, checking }) {
         <Clock className="w-7 h-7 text-amber-600" />
       </div>
       <div>
-        <h2 className="text-xl font-extrabold text-slate-800">Waiting for approval</h2>
-        <p className="text-sm text-slate-500 mt-1">
+        <h2 className="text-xl font-extrabold text-primary-token">Waiting for approval</h2>
+        <p className="text-sm text-muted-token mt-1">
           Your request to join{' '}
-          <span className="font-semibold text-slate-700">{orgName}</span> has been sent.
+          <span className="font-semibold text-secondary-token">{orgName}</span> has been sent.
           An admin needs to approve it before you can continue.
         </p>
       </div>
@@ -364,10 +364,10 @@ export default function OnboardingPage() {
           {view === 'choose' && (
             <div className="space-y-5">
               <div>
-                <h1 className="text-2xl font-extrabold text-slate-800">
+                <h1 className="text-2xl font-extrabold text-primary-token">
                   Welcome{profile?.display_name ? `, ${profile.display_name}` : ''}
                 </h1>
-                <p className="text-sm text-slate-500 mt-1">
+                <p className="text-sm text-muted-token mt-1">
                   You're signed in but not part of an organization yet.
                 </p>
               </div>
@@ -405,12 +405,12 @@ export default function OnboardingPage() {
             <PendingState orgName={pendingOrg} onRecheck={recheck} checking={checking} />
           )}
 
-          <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between">
-            <p className="text-xs text-slate-400 truncate">{profile?.email}</p>
+          <div className="mt-6 pt-5 border-t border-[var(--border-color)] flex items-center justify-between">
+            <p className="text-xs text-muted-token truncate">{profile?.email}</p>
             <button
               onClick={async () => { await signOut(); navigate('/login', { replace: true }) }}
               className={cn(
-                'flex items-center gap-1.5 text-xs font-medium text-slate-400',
+                'flex items-center gap-1.5 text-xs font-medium text-muted-token',
                 'hover:text-red-500 transition-colors flex-shrink-0'
               )}
             >

@@ -37,11 +37,11 @@ export default function FamilyBonusPage() {
     return (
       <div className="min-h-screen bg-green-50 flex flex-col items-center justify-center px-8 gap-6">
         <CheckCircle size={64} className="text-green-500" />
-        <h1 className="text-2xl font-bold text-gray-900 text-center">Request sent!</h1>
-        <p className="text-gray-500 text-center">Your parents have been notified. Wait for their approval.</p>
+        <h1 className="text-2xl font-bold text-primary-token text-center">Request sent!</h1>
+        <p className="text-muted-token text-center">Your parents have been notified. Wait for their approval.</p>
         <button
           onClick={() => navigate('/family', { replace: true })}
-          className="mt-4 bg-indigo-600 text-white font-bold rounded-2xl px-8 py-4"
+          className="mt-4 bg-[var(--color-primary-600)] text-white font-bold rounded-2xl px-8 py-4"
         >
           Back to home
         </button>
@@ -50,9 +50,9 @@ export default function FamilyBonusPage() {
   }
 
   return (
-    <div className="min-h-screen bg-indigo-50 flex flex-col">
+    <div className="min-h-screen bg-[var(--color-primary-50)] flex flex-col">
       {/* Header */}
-      <div className="bg-indigo-600 text-white px-6 pt-12 pb-6 flex items-center gap-4">
+      <div className="bg-[var(--color-primary-600)] text-white px-6 pt-12 pb-6 flex items-center gap-4">
         <button onClick={() => navigate('/family')}>
           <ArrowLeft size={22} />
         </button>
@@ -62,7 +62,7 @@ export default function FamilyBonusPage() {
       <form onSubmit={handleSubmit} className="flex-1 flex flex-col gap-6 px-6 py-8">
         {/* Preset buttons */}
         <div>
-          <label className="text-sm font-semibold text-gray-700 mb-3 block">
+          <label className="text-sm font-semibold text-secondary-token mb-3 block">
             How much time do you need?
           </label>
           <div className="grid grid-cols-4 gap-3">
@@ -73,8 +73,8 @@ export default function FamilyBonusPage() {
                 onClick={() => setMinutes(m)}
                 className={`py-3 rounded-xl font-semibold text-sm transition-colors ${
                   minutes === m
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-white text-gray-700 border border-gray-200'
+                    ? 'bg-[var(--color-primary-600)] text-white'
+                    : 'bg-[var(--surface)] text-secondary-token border border-[var(--border-color)]'
                 }`}
               >
                 {m}m
@@ -85,15 +85,15 @@ export default function FamilyBonusPage() {
 
         {/* Reason */}
         <div>
-          <label className="text-sm font-semibold text-gray-700 mb-2 block">
-            Why do you need it? <span className="text-gray-400 font-normal">(optional)</span>
+          <label className="text-sm font-semibold text-secondary-token mb-2 block">
+            Why do you need it? <span className="text-muted-token font-normal">(optional)</span>
           </label>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="e.g. Homework, finishing a level…"
             rows={3}
-            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full border border-[var(--border-color)] rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-500)]"
           />
         </div>
 
@@ -104,7 +104,7 @@ export default function FamilyBonusPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold rounded-2xl py-4 transition-colors"
+          className="w-full bg-[var(--color-primary-600)] hover:bg-[var(--color-primary-700)] disabled:bg-[var(--color-primary-300)] text-white font-bold rounded-2xl py-4 transition-colors"
         >
           {loading ? 'Sending…' : `Ask for ${minutes} more minutes`}
         </button>

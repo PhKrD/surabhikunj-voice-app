@@ -190,7 +190,7 @@ export default function DepartmentsPage() {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-primary-token">Departments ({departments.length})</h2>
+        <h2 className="text-title text-primary-token">Departments ({departments.length})</h2>
         {canManage && (
           <Button
             size="sm"

@@ -291,7 +291,7 @@ export default function ChildDetailPage() {
               >
                 <s.icon className="w-4 h-4" /> {s.label}
                 {n > 0 && (
-                  <span className={cn('min-w-5 h-5 px-1.5 rounded-full text-[11px] leading-5 text-center', active ? 'bg-white text-[var(--color-primary-700)]' : 'bg-[var(--color-danger)] text-white')}>
+                  <span className={cn('min-w-5 h-5 px-1.5 rounded-full text-[11px] leading-5 text-center', active ? 'bg-[var(--surface)] text-[var(--color-primary-700)]' : 'bg-[var(--color-danger)] text-white')}>
                     {n > 99 ? '99+' : n}
                   </span>
                 )}

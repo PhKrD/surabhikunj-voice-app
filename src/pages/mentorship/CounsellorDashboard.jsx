@@ -166,7 +166,7 @@ export default function CounsellorDashboard() {
     <div className="max-w-3xl mx-auto space-y-5">
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-extrabold text-primary-token">Counsellor Dashboard</h1>
+          <h1 className="text-title text-primary-token">Counsellor Dashboard</h1>
           <p className="text-sm text-secondary-token">Welcome, {profile?.display_name ?? profile?.spiritual_name}</p>
         </div>
       </div>

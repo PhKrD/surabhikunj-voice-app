@@ -173,7 +173,7 @@ export default function CommandCenter({ devices, childId, child, onChildUpdated,
               key={d.id}
               className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border bg-[var(--surface)] text-secondary-token border-[var(--border-color)]"
             >
-              <span className={cn('w-1.5 h-1.5 rounded-full', online ? 'bg-tulasi-400' : 'bg-slate-300')} />
+              <span className={cn('w-1.5 h-1.5 rounded-full', online ? 'bg-tulasi-400' : 'bg-[var(--surface-sunken)]')} />
               {d.device_name || 'Unnamed'}
               <span className="font-normal text-muted-token">{online ? 'online' : 'offline'}</span>
             </span>
@@ -221,8 +221,8 @@ export default function CommandCenter({ devices, childId, child, onChildUpdated,
             bonusActive
               ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
               : showExtraTime
-                ? 'bg-indigo-500 text-white border-indigo-500'
-                : 'bg-[var(--surface)] border-[var(--border-color)] text-secondary-token hover:border-indigo-200 hover:text-indigo-600',
+                ? 'bg-[var(--color-primary-500)] text-white border-[var(--color-primary-500)]'
+                : 'bg-[var(--surface)] border-[var(--border-color)] text-secondary-token hover:border-[var(--color-primary-200)] hover:text-[var(--color-primary-600)]',
           )}
           title="Pause every limit, routine and restriction for a while"
         >
@@ -240,14 +240,14 @@ export default function CommandCenter({ devices, childId, child, onChildUpdated,
       </div>
 
       {showExtraTime && (
-        <div className="rounded-3xl border border-indigo-200 bg-indigo-50/60 p-4 flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-indigo-800 mr-1">Extra time:</span>
+        <div className="rounded-3xl border border-[var(--color-primary-200)] bg-[var(--color-primary-50)]/60 p-4 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-[var(--color-primary-800)] mr-1">Extra time:</span>
           {EXTRA_TIME_PRESETS.map((m) => (
             <button
               key={m}
               disabled={sending}
               onClick={() => giveExtraTime(m)}
-              className="px-4 py-2 rounded-xl bg-white border border-indigo-200 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+              className="px-4 py-2 rounded-xl bg-[var(--surface)] border border-[var(--color-primary-200)] text-sm font-medium text-[var(--color-primary-700)] hover:bg-[var(--color-primary-100)] disabled:opacity-50"
             >
               +{m >= 60 ? `${m / 60}h` : `${m}m`}
             </button>
@@ -269,12 +269,12 @@ export default function CommandCenter({ devices, childId, child, onChildUpdated,
               onChange={(e) => setCustomMin(e.target.value)}
               placeholder="min"
               aria-label="Custom extra minutes"
-              className="w-20 px-3 py-2 rounded-xl bg-white border border-indigo-200 text-sm"
+              className="w-20 px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--color-primary-200)] text-sm"
             />
             <button
               type="submit"
               disabled={sending || !(Number(customMin) > 0)}
-              className="px-3 py-2 rounded-xl bg-white border border-indigo-200 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+              className="px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--color-primary-200)] text-sm font-medium text-[var(--color-primary-700)] hover:bg-[var(--color-primary-100)] disabled:opacity-50"
             >
               Add
             </button>

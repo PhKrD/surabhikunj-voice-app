@@ -204,7 +204,7 @@ export default function ResourcesPage() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-primary-token">{label}</h1>
+        <h1 className="text-title text-primary-token">{label}</h1>
         <div className="flex items-center gap-2">
           <button onClick={() => setDate((d) => subDays(d, 1))} className="p-2 rounded-xl text-secondary-token hover:bg-[var(--surface-muted)]">
             <ChevronLeft className="w-5 h-5" />

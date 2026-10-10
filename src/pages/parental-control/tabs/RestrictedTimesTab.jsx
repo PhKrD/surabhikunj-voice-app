@@ -151,17 +151,17 @@ export default function RestrictedTimesTab({ childId }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-primary-token flex items-center gap-2"><Moon className="w-4 h-4 text-indigo-500" /> Restricted times</h3>
+          <h3 className="text-sm font-semibold text-primary-token flex items-center gap-2"><Moon className="w-4 h-4 text-[var(--color-primary-500)]" /> Restricted times</h3>
           <p className="text-xs text-muted-token mt-0.5">
             Tap or drag over the hours when the device should be restricted. {totalHours} hour{totalHours === 1 ? '' : 's'}/week selected.
           </p>
         </div>
         <button
           onClick={() => { setEnabled((v) => !v); setDirty(true) }}
-          className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${enabled ? 'bg-indigo-600' : 'bg-gray-300'}`}
+          className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${enabled ? 'bg-[var(--color-primary-600)]' : 'bg-[var(--surface-sunken)]'}`}
           title={enabled ? 'Restricted times on' : 'Restricted times off'}
         >
-          <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${enabled ? 'translate-x-5' : ''}`} />
+          <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-[var(--surface)] transition-transform ${enabled ? 'translate-x-5' : ''}`} />
         </button>
       </div>
 
@@ -175,7 +175,7 @@ export default function RestrictedTimesTab({ childId }) {
                 <button
                   key={h}
                   onClick={() => toggleWholeHour(h)}
-                  className="text-[9px] text-muted-token hover:text-indigo-600 text-center py-1 leading-none"
+                  className="text-[9px] text-muted-token hover:text-[var(--color-primary-600)] text-center py-1 leading-none"
                   title={`Toggle ${hourLabel(h)} on every day`}
                 >
                   {h % 3 === 0 ? hourLabel(h) : ''}
@@ -186,7 +186,7 @@ export default function RestrictedTimesTab({ childId }) {
               <div key={day} className="grid items-center" style={{ gridTemplateColumns: '44px repeat(24, minmax(0, 1fr))' }}>
                 <button
                   onClick={() => toggleWholeDay(d)}
-                  className={cn('text-xs font-medium text-left pr-2 py-1', d === now.getDay() ? 'text-indigo-600' : 'text-secondary-token', 'hover:text-indigo-600')}
+                  className={cn('text-xs font-medium text-left pr-2 py-1', d === now.getDay() ? 'text-[var(--color-primary-600)]' : 'text-secondary-token', 'hover:text-[var(--color-primary-600)]')}
                   title={`Toggle all of ${day}`}
                 >
                   {day}
@@ -205,7 +205,7 @@ export default function RestrictedTimesTab({ childId }) {
                       onTouchStart={() => startPaint(d, h)}
                       className={cn(
                         'h-7 m-[1px] rounded-[3px] cursor-pointer transition-colors border',
-                        on ? 'bg-indigo-500 border-indigo-600' : 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100',
+                        on ? 'bg-[var(--color-primary-500)] border-[var(--color-primary-600)]' : 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100',
                         key === nowKey && 'ring-2 ring-saffron-400 ring-offset-1',
                       )}
                     />
@@ -215,7 +215,7 @@ export default function RestrictedTimesTab({ childId }) {
             ))}
             <div className="flex items-center gap-4 mt-3 text-xs text-muted-token">
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-50 border border-emerald-200" /> Allowed</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-indigo-500" /> Restricted</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-[var(--color-primary-500)]" /> Restricted</span>
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm ring-2 ring-saffron-400" /> Now</span>
             </div>
           </div>
@@ -229,7 +229,7 @@ export default function RestrictedTimesTab({ childId }) {
             onClick={() => applyPreset(p)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-color)] text-xs text-secondary-token hover:bg-[var(--surface-muted)]"
           >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> {p.label}
+            <Sparkles className="w-3.5 h-3.5 text-[var(--color-primary-500)]" /> {p.label}
           </button>
         ))}
         <button
@@ -253,7 +253,7 @@ export default function RestrictedTimesTab({ childId }) {
                   onClick={() => { setAction(act.value); setDirty(true) }}
                   className={cn(
                     'flex items-center gap-3 p-2.5 rounded-lg border text-left text-sm transition-colors',
-                    action === act.value ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-[var(--border-color)] hover:border-slate-300 text-primary-token',
+                    action === act.value ? 'border-[var(--color-primary-500)] bg-[var(--color-primary-50)] text-[var(--color-primary-700)]' : 'border-[var(--border-color)] hover:border-[var(--border-color)] text-primary-token',
                   )}
                 >
                   <Icon className="w-4 h-4 flex-shrink-0" />

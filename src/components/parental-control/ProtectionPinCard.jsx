@@ -93,8 +93,8 @@ export default function ProtectionPinCard({ child, onUpdated }) {
             </p>
           </div>
           {hasPin && !editing && (
-            <button onClick={toggleProtect} className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${protectOn ? 'bg-indigo-600' : 'bg-gray-300'}`} title="Guard settings screens">
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${protectOn ? 'translate-x-5' : ''}`} />
+            <button onClick={toggleProtect} className={`shrink-0 w-11 h-6 rounded-full transition-colors relative ${protectOn ? 'bg-[var(--color-primary-600)]' : 'bg-[var(--surface-sunken)]'}`} title="Guard settings screens">
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-[var(--surface)] transition-transform ${protectOn ? 'translate-x-5' : ''}`} />
             </button>
           )}
         </div>

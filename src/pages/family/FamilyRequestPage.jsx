@@ -56,19 +56,19 @@ export default function FamilyRequestPage() {
   const Icon = typeConfig.icon
 
   return (
-    <div className="min-h-screen bg-indigo-50 flex flex-col">
-      <div className="bg-indigo-600 text-white px-6 pt-12 pb-6">
-        <button onClick={() => navigate('/family')} className="flex items-center gap-1.5 text-sm text-indigo-200 mb-4">
+    <div className="min-h-screen bg-[var(--color-primary-50)] flex flex-col">
+      <div className="bg-[var(--color-primary-600)] text-white px-6 pt-12 pb-6">
+        <button onClick={() => navigate('/family')} className="flex items-center gap-1.5 text-sm text-[var(--color-primary-200)] mb-4">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
         <h1 className="text-2xl font-bold">Request</h1>
-        <p className="text-indigo-200 text-sm mt-1">Ask for extra time or access</p>
+        <p className="text-[var(--color-primary-200)] text-sm mt-1">Ask for extra time or access</p>
       </div>
 
       <div className="flex-1 px-6 py-6 space-y-6">
-        <div className="bg-white rounded-2xl p-5 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <Icon className="w-4 h-4 text-indigo-500" />
+        <div className="bg-[var(--surface)] rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-secondary-token">
+            <Icon className="w-4 h-4 text-[var(--color-primary-500)]" />
             Request type
           </div>
           <div className="grid grid-cols-1 gap-2">
@@ -81,8 +81,8 @@ export default function FamilyRequestPage() {
                   onClick={() => setType(t.value)}
                   className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
                     type === t.value
-                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                      : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                      ? 'border-[var(--color-primary-500)] bg-[var(--color-primary-50)] text-[var(--color-primary-700)]'
+                      : 'border-[var(--border-color)] hover:border-[var(--border-color)] text-secondary-token'
                   }`}
                 >
                   <TIcon className="w-5 h-5" />
@@ -94,33 +94,33 @@ export default function FamilyRequestPage() {
 
           {type === 'bonus_time' && (
             <div>
-              <label className="block text-xs text-slate-500 mb-1.5">Minutes needed</label>
+              <label className="block text-xs text-muted-token mb-1.5">Minutes needed</label>
               <input
                 type="number"
                 min={1}
                 max={120}
                 value={minutes}
                 onChange={(e) => setMinutes(parseInt(e.target.value, 10) || 30)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm"
+                className="w-full px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-xs text-slate-500 mb-1.5">Reason</label>
+            <label className="block text-xs text-muted-token mb-1.5">Reason</label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={typeConfig.placeholder}
               rows={3}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-none"
+              className="w-full px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm resize-none"
             />
           </div>
 
           <button
             onClick={handleSubmit}
             disabled={sending || !reason.trim()}
-            className="w-full bg-indigo-600 text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 hover:bg-indigo-700 disabled:opacity-60"
+            className="w-full bg-[var(--color-primary-600)] text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 hover:bg-[var(--color-primary-700)] disabled:opacity-60"
           >
             <Send className="w-4 h-4" /> {sending ? 'Sending...' : 'Send request'}
           </button>
@@ -128,14 +128,14 @@ export default function FamilyRequestPage() {
 
         {requests.length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-slate-700">Your requests</h3>
+            <h3 className="text-sm font-semibold text-secondary-token">Your requests</h3>
             {requests.map((req) => (
-              <div key={req.id} className="bg-white rounded-xl p-4 shadow-sm">
+              <div key={req.id} className="bg-[var(--surface)] rounded-xl p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-medium text-slate-800 capitalize">{req.request_type.replace('_', ' ')}</p>
-                    <p className="text-sm text-slate-500 mt-0.5">{req.reason}</p>
-                    <p className="text-xs text-slate-400 mt-1">{new Date(req.created_at).toLocaleString()}</p>
+                    <p className="font-medium text-primary-token capitalize">{req.request_type.replace('_', ' ')}</p>
+                    <p className="text-sm text-muted-token mt-0.5">{req.reason}</p>
+                    <p className="text-xs text-muted-token mt-1">{new Date(req.created_at).toLocaleString()}</p>
                   </div>
                   {req.status === 'approved' && <CheckCircle className="w-5 h-5 text-green-500" />}
                   {req.status === 'denied' && <XCircle className="w-5 h-5 text-red-500" />}

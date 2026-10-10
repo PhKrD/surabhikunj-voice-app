@@ -602,7 +602,7 @@ export default function CleanlinessPage() {
         <div className="w-9 h-9 rounded-2xl grad-tulasi flex items-center justify-center flex-shrink-0">
           <Sparkles className="w-5 h-5 text-white" />
         </div>
-        <h2 className="text-lg font-bold text-primary-token">Cleanliness</h2>
+        <h2 className="text-title text-primary-token">Cleanliness</h2>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">

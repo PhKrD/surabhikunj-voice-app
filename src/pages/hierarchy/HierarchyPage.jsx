@@ -206,7 +206,7 @@ export default function HierarchyPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <GitBranch className="w-5 h-5 text-saffron-500" />
-          <h2 className="text-lg font-bold text-primary-token">Organizational Structure</h2>
+          <h2 className="text-title text-primary-token">Organizational Structure</h2>
         </div>
         {canManage && (
           <Button

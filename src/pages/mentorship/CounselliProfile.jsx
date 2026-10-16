@@ -12,7 +12,7 @@ import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { cn } from '@/lib/utils'
 import { fetchTrackerConfig } from '@/lib/trackerApi'
 import {
@@ -93,7 +93,7 @@ function AssignmentTaskList({ userId, moduleKey, label }) {
 
 function NotesTab({ mentee, orgId, canManage }) {
   const { profile } = useAuthStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const [notes, setNotes] = useState([])
   const [followups, setFollowups] = useState([])
   const [body, setBody] = useState('')
@@ -263,7 +263,7 @@ export default function CounselliProfile() {
   const { menteeId } = useParams()
   const navigate = useNavigate()
   const { org, hasPermission } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const [mentee, setMentee] = useState(null)
   const [tab, setTab] = useState('sadhana')
   const [loading, setLoading] = useState(true)

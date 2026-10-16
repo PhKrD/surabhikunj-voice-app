@@ -45,6 +45,17 @@ export function getInitials(name) {
   return letters || '?'
 }
 
+// Parental-control pairing creates a hidden auth user per child device
+// (pc-generate-pairing-code). It is never a person, so it must never show
+// up in member pickers even if it ended up with a membership row.
+const DEVICE_ACCOUNT_DOMAIN = '@voice.kids.internal'
+export function isDeviceAccount(member) {
+  return Boolean(member?.email?.toLowerCase().endsWith(DEVICE_ACCOUNT_DOMAIN))
+}
+export function withoutDeviceAccounts(rows) {
+  return (rows ?? []).filter((r) => !isDeviceAccount(r))
+}
+
 export function scoreColor(score) {
   if (score >= 80) return 'text-tulasi-600'
   if (score >= 60) return 'text-saffron-500'

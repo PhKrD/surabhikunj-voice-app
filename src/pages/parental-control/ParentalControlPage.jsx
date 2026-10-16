@@ -132,7 +132,7 @@ export default function ParentalControlPage() {
                 value={form.linkedProfileId}
                 onChange={(id) => setForm((f) => ({ ...f, linkedProfileId: id }))}
               />
-              {formError && <p className="text-sm text-red-600">{formError}</p>}
+              {formError && <p className="text-sm text-[var(--color-danger)]">{formError}</p>}
               <div className="flex justify-end gap-3 pt-2">
                 <Button variant="secondary" size="sm" onClick={() => { resetForm(); setShowForm(false) }}>
                   Cancel

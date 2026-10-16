@@ -11,7 +11,7 @@ import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import useOrgStore from '@/store/orgStore'
 import { cn } from '@/lib/utils'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { localDateISO } from '@/lib/dates'
 import { confirm } from '@/store/dialogStore'
 
@@ -35,7 +35,7 @@ export default function EventsPage() {
   const { org, hasPermission } = useOrgStore()
   const location = useLocation()
   const navigate = useNavigate()
-  const toast = useToastStore()
+  const toast = useToast()
   const orgId = org?.id ?? profile?.org_id
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)

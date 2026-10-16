@@ -1,136 +1,278 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
-  Users, Search, UserPlus, X, ArrowRightLeft, History, ShieldCheck, Loader2,
+  Users, Search, UserPlus, History, ShieldCheck, Loader2, ChevronRight, UserMinus,
 } from 'lucide-react'
-import Card, { CardBody } from '@/components/ui/Card'
+import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
-import useToastStore from '@/store/toastStore'
+import { Dialog } from '@/components/ui/Dialog'
+import { AppInput } from '@/components/ui/Field'
+import { EmptyState, ErrorState, Skeleton, SkeletonList } from '@/components/ui/States'
+import { useToast } from '@/store/toastStore'
 import useOrgStore from '@/store/orgStore'
 import {
   adminMentorshipOverview, mentorRelationships, adminMenteeSearch,
   assignMentee, endMentorship, menteeAssignmentHistory,
-  ensureCounsellorRole, addMemberRole,
+  ensureCounsellorRole, addMemberRole, getCounsellorType,
 } from '@/lib/counsellorApi'
-import { supabase } from '@/lib/supabase'
+import { friendlyError } from '@/lib/friendlyError'
+import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { confirm } from '@/store/dialogStore'
+
+const SEARCH_DEBOUNCE_MS = 250
+
+function fmtDate(value) {
+  return value ? format(new Date(value), 'd MMM yyyy') : '—'
+}
 
 // ---------------------------------------------------------------------
 // Member search picker — reused for both "Make Counsellor" and
 // "Assign Counselli".
+//
+// The search depends ONLY on the query. Exclusions are applied at render
+// time: the old version put an `excludeIds = []` default (a new array every
+// render) into the search callback's deps, so the effect re-ran the search
+// on every render, every search re-rendered, and the list flickered
+// between "Searching…" and results forever.
 // ---------------------------------------------------------------------
-function MemberPicker({ title, excludeIds = [], onPick, onClose }) {
+function MemberPicker({ open, title, description, excludeIds, statusFor, onPick, onClose }) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState([])
+  const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [pickingId, setPickingId] = useState(null)
+  const [retryKey, setRetryKey] = useState(0)
+  const requestSeq = useRef(0)
 
-  const search = useCallback(async (q) => {
+  useEffect(() => {
+    if (!open) return undefined
+    const seq = ++requestSeq.current
     setLoading(true)
-    try {
-      const rows = await adminMenteeSearch(q)
-      setResults(rows.filter((r) => !excludeIds.includes(r.id)))
-    } finally {
-      setLoading(false)
-    }
-  }, [excludeIds])
+    const timer = setTimeout(async () => {
+      try {
+        const rows = await adminMenteeSearch(query)
+        // A slower, older request must not overwrite a newer one.
+        if (seq !== requestSeq.current) return
+        setResults(rows)
+        setError(null)
+      } catch (e) {
+        if (seq === requestSeq.current) setError(e)
+      } finally {
+        if (seq === requestSeq.current) setLoading(false)
+      }
+    }, query ? SEARCH_DEBOUNCE_MS : 0)
+    return () => clearTimeout(timer)
+  }, [open, query, retryKey])
 
-  useEffect(() => { search('') }, [search])
+  // Reset when closed so the next open starts clean.
+  useEffect(() => {
+    if (open) return
+    setQuery('')
+    setResults(null)
+    setError(null)
+    setPickingId(null)
+  }, [open])
+
+  const excluded = useMemo(() => new Set(excludeIds ?? []), [excludeIds])
+  const visible = useMemo(() => (results ?? []).filter((r) => !excluded.has(r.id)), [results, excluded])
+
+  const pick = async (member) => {
+    if (pickingId) return
+    setPickingId(member.id)
+    try {
+      await onPick(member)
+    } finally {
+      setPickingId(null)
+    }
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
-      <div className="bg-[var(--surface)] rounded-3xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-color)]">
-          <h3 className="font-bold text-primary-token">{title}</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-muted-token hover:bg-[var(--surface-muted)]"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="px-5 py-3 border-b border-[var(--border-color)]">
-          <div className="relative">
-            <Search className="w-4 h-4 text-muted-token absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              autoFocus
-              value={query}
-              onChange={(e) => { setQuery(e.target.value); search(e.target.value) }}
-              placeholder="Search by name, phone or email…"
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300"
-            />
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {loading && <div className="p-6 text-center text-sm text-muted-token"><Loader2 className="w-4 h-4 animate-spin inline mr-2" />Searching…</div>}
-          {!loading && results.length === 0 && (
-            <div className="p-6 text-center text-sm text-muted-token">No members found.</div>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={title}
+      description={description}
+      className="sm:max-w-lg h-[80svh] sm:h-[70vh]"
+      bodyClassName="flex-1 pt-3"
+    >
+      <div className="sticky -top-3 z-10 -mx-5 px-5 -mt-3 pt-3 pb-3 bg-[var(--surface-elevated)]">
+        <div className="relative">
+          <AppInput
+            autoFocus
+            icon={Search}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or email"
+            aria-label="Search members"
+            className="!pr-10"
+          />
+          {loading && results && (
+            <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-token" aria-label="Searching" />
           )}
-          {results.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => onPick(r)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-saffron-50 text-left transition"
-            >
-              <Avatar name={r.display_name} url={r.avatar_url} size="sm" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-primary-token truncate">{r.display_name}</p>
-                {r.email && <p className="text-xs text-muted-token truncate">{r.email}</p>}
-              </div>
-              {r.current_mentor_id && (
-                <Badge variant="default" className="text-[10px] whitespace-nowrap">has counsellor</Badge>
-              )}
-            </button>
-          ))}
         </div>
       </div>
-    </div>
+
+      {error && !results ? (
+        <ErrorState compact error={error} onRetry={() => setRetryKey((k) => k + 1)} />
+      ) : !results ? (
+        <div className="space-y-2" role="status" aria-label="Loading members">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="flex items-center gap-3 px-2 py-2">
+              <Skeleton className="w-9 h-9 rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="w-1/2" />
+                <Skeleton className="w-2/3 h-3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : visible.length === 0 ? (
+        <EmptyState
+          compact
+          icon={Users}
+          title={query ? 'No one matches that' : 'No members to show'}
+          description={query ? 'Try part of their name or email.' : 'Everyone is already assigned here.'}
+        />
+      ) : (
+        <ul className={cn('-mx-2 space-y-0.5 transition-opacity', loading && 'opacity-60')}>
+          {visible.map((r) => {
+            const status = statusFor?.(r)
+            const disabled = Boolean(status?.disabled)
+            return (
+              <li key={r.id}>
+                <button
+                  type="button"
+                  disabled={disabled || Boolean(pickingId)}
+                  onClick={() => pick(r)}
+                  className="w-full flex items-center gap-3 px-2 py-2.5 rounded-[var(--radius-md)] text-left transition-colors hover:bg-[var(--surface-muted)] disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                >
+                  <Avatar name={r.display_name} url={r.avatar_url} size="md" />
+                  <div className={cn('min-w-0 flex-1', disabled && 'opacity-60')}>
+                    <p className="text-sm font-semibold text-primary-token truncate">{r.display_name}</p>
+                    {r.email && <p className="text-xs text-muted-token truncate">{r.email}</p>}
+                  </div>
+                  {pickingId === r.id
+                    ? <Loader2 className="w-4 h-4 animate-spin text-[var(--color-primary)]" aria-label="Saving" />
+                    : status?.label && <Badge variant={status.variant ?? 'default'} className="text-[11px] max-w-[45%] truncate">{status.label}</Badge>}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </Dialog>
   )
 }
 
 // ---------------------------------------------------------------------
-// Manage Counsellis modal — for one counsellor
+// Assignment history for one counselli
 // ---------------------------------------------------------------------
-function ManageCounsellisModal({ counsellor, typeId, onClose, onChanged }) {
-  const toast = useToastStore()
-  const [rels, setRels] = useState([])
-  const [loading, setLoading] = useState(true)
+function HistoryDialog({ rel, onClose }) {
+  const [history, setHistory] = useState(null)
+  const [error, setError] = useState(null)
+  const menteeId = rel?.mentee_id
+
+  useEffect(() => {
+    if (!menteeId) return undefined
+    let cancelled = false
+    setHistory(null)
+    setError(null)
+    menteeAssignmentHistory(menteeId)
+      .then((rows) => { if (!cancelled) setHistory(rows) })
+      .catch((e) => { if (!cancelled) setError(e) })
+    return () => { cancelled = true }
+  }, [menteeId])
+
+  return (
+    <Dialog open={Boolean(rel)} onClose={onClose} title="Assignment history" description={rel?.mentee_name}>
+      {error ? (
+        <ErrorState compact error={error} />
+      ) : !history ? (
+        <SkeletonList rows={2} />
+      ) : history.length === 0 ? (
+        <EmptyState compact icon={History} title="No history yet" />
+      ) : (
+        <ol className="relative border-l-2 border-[var(--border-color)] ml-2 space-y-4">
+          {history.map((h) => (
+            <li key={h.id} className="pl-4 relative">
+              <span className={cn(
+                'absolute -left-[7px] top-1.5 w-3 h-3 rounded-full ring-4 ring-[var(--surface-elevated)]',
+                h.ended_at ? 'bg-[var(--border-strong)]' : 'bg-[var(--color-primary)]',
+              )} />
+              <p className="text-sm font-semibold text-primary-token">{h.mentor_name}</p>
+              <p className="text-xs text-muted-token">
+                {fmtDate(h.started_at)} – {h.ended_at ? fmtDate(h.ended_at) : 'now'}
+              </p>
+              {h.assigned_by_name && <p className="text-[11px] text-muted-token mt-0.5">Assigned by {h.assigned_by_name}</p>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </Dialog>
+  )
+}
+
+// ---------------------------------------------------------------------
+// Manage Counsellis — for one counsellor
+// ---------------------------------------------------------------------
+function ManageCounsellisDialog({ counsellor, typeId, onClose, onChanged }) {
+  const toast = useToast()
+  const [rels, setRels] = useState(null)
+  const [error, setError] = useState(null)
   const [showPicker, setShowPicker] = useState(false)
   const [historyFor, setHistoryFor] = useState(null)
-  const [history, setHistory] = useState([])
   const [busyId, setBusyId] = useState(null)
+  const mentorId = counsellor?.mentor_id
 
   const load = useCallback(async () => {
-    setLoading(true)
+    if (!mentorId) return
     try {
-      const rows = await mentorRelationships(counsellor.mentor_id, typeId)
-      setRels(rows)
+      setRels(await mentorRelationships(mentorId, typeId))
+      setError(null)
     } catch (e) {
-      toast.error('Could not load counsellis', e.message)
-    } finally {
-      setLoading(false)
+      setError(e)
     }
-  }, [counsellor.mentor_id, typeId, toast])
+  }, [mentorId, typeId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    setRels(null)
+    load()
+  }, [load])
 
-  const active = rels.filter((r) => r.status === 'active')
-  const past = rels.filter((r) => r.status !== 'active')
+  const active = useMemo(() => (rels ?? []).filter((r) => r.status === 'active'), [rels])
+  const past = useMemo(() => (rels ?? []).filter((r) => r.status !== 'active'), [rels])
+  const excludeIds = useMemo(() => [mentorId, ...active.map((r) => r.mentee_id)], [mentorId, active])
 
   const handleAssign = async (member) => {
-    setShowPicker(false)
-    if (member.current_mentor_id && member.current_mentor_id !== counsellor.mentor_id) {
-      const ok = await confirm({ title: `Transfer ${member.display_name}?`, message: `${member.display_name} is currently assigned to ${member.current_mentor_name}. Transfer to ${counsellor.mentor_name}?`, confirmLabel: 'Transfer' })
+    if (member.current_mentor_id && member.current_mentor_id !== mentorId) {
+      const ok = await confirm({
+        title: `Move ${member.display_name}?`,
+        message: `${member.display_name} is with ${member.current_mentor_name ?? 'another counsellor'} now. Move them to ${counsellor.mentor_name}?`,
+        confirmLabel: 'Move',
+      })
       if (!ok) return
     }
     try {
-      await assignMentee({ menteeId: member.id, mentorId: counsellor.mentor_id, typeId })
-      toast.success('Assigned', `${member.display_name} is now a counselli of ${counsellor.mentor_name}`)
+      await assignMentee({ menteeId: member.id, mentorId, typeId })
+      toast.success('Assigned', `${member.display_name} is now with ${counsellor.mentor_name}`)
+      setShowPicker(false)
       await load()
       onChanged?.()
     } catch (e) {
-      toast.error('Could not assign', e.message)
+      toast.error('Could not assign', friendlyError(e))
     }
   }
 
   const handleEnd = async (rel) => {
-    if (!(await confirm({ title: `Remove ${rel.mentee_name}?`, message: `${rel.mentee_name} will no longer be assigned to ${counsellor.mentor_name}.`, confirmLabel: 'Remove', danger: true }))) return
+    const ok = await confirm({
+      title: `Remove ${rel.mentee_name}?`,
+      message: `${rel.mentee_name} will no longer be assigned to ${counsellor.mentor_name}. Their history is kept.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    })
+    if (!ok) return
     setBusyId(rel.id)
     try {
       await endMentorship(rel.id)
@@ -138,116 +280,111 @@ function ManageCounsellisModal({ counsellor, typeId, onClose, onChanged }) {
       await load()
       onChanged?.()
     } catch (e) {
-      toast.error('Could not remove', e.message)
+      toast.error('Could not remove', friendlyError(e))
     } finally {
       setBusyId(null)
     }
   }
 
-  const openHistory = async (rel) => {
-    setHistoryFor(rel)
-    const rows = await menteeAssignmentHistory(rel.mentee_id)
-    setHistory(rows)
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
-      <div className="bg-[var(--surface)] rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-color)]">
-          <div className="flex items-center gap-3">
-            <Avatar name={counsellor.mentor_name} url={counsellor.mentor_avatar} size="sm" />
-            <div>
-              <h3 className="font-bold text-primary-token">{counsellor.mentor_name}</h3>
-              <p className="text-xs text-muted-token">{active.length} active counselli{active.length === 1 ? '' : 's'}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-muted-token hover:bg-[var(--surface-muted)]"><X className="w-4 h-4" /></button>
-        </div>
+    <>
+      <Dialog
+        open={Boolean(counsellor)}
+        onClose={onClose}
+        className="sm:max-w-lg"
+        title={counsellor && (
+          <span className="flex items-center gap-3">
+            <Avatar name={counsellor.mentor_name} url={counsellor.mentor_avatar} size="md" />
+            <span className="min-w-0">
+              <span className="block truncate">{counsellor.mentor_name}</span>
+              <span className="block text-caption font-normal tracking-normal">
+                {rels ? `${active.length} counselli${active.length === 1 ? '' : 's'}` : 'Loading…'}
+              </span>
+            </span>
+          </span>
+        )}
+      >
+        <Button icon={UserPlus} onClick={() => setShowPicker(true)} className="w-full mb-4">
+          Assign a counselli
+        </Button>
 
-        <div className="p-4 border-b border-[var(--border-color)]">
-          <Button size="sm" icon={UserPlus} onClick={() => setShowPicker(true)}>Assign Counselli</Button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {loading ? (
-            <div className="text-center text-sm text-muted-token py-8">Loading…</div>
-          ) : (
-            <>
-              <div>
-                <p className="text-xs font-bold text-muted-token uppercase tracking-wide mb-2">Current ({active.length})</p>
-                {active.length === 0 && <p className="text-sm text-muted-token">No counsellis assigned yet.</p>}
-                <div className="space-y-1.5">
+        {error && !rels ? (
+          <ErrorState compact error={error} onRetry={load} />
+        ) : !rels ? (
+          <SkeletonList rows={3} />
+        ) : (
+          <div className="space-y-5">
+            <section>
+              <p className="text-overline mb-2">Current · {active.length}</p>
+              {active.length === 0 ? (
+                <p className="text-caption py-3">No counsellis yet. Tap “Assign a counselli” to add one.</p>
+              ) : (
+                <ul className="space-y-1.5">
                   {active.map((r) => (
-                    <div key={r.id} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-[var(--surface-muted)]">
+                    <li key={r.id} className="flex items-center gap-3 p-2.5 rounded-[var(--radius-md)] bg-[var(--surface-muted)]">
                       <Avatar name={r.mentee_name} url={r.mentee_avatar} size="sm" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-primary-token truncate">{r.mentee_name}</p>
-                        <p className="text-[11px] text-muted-token">Since {format(new Date(r.started_at), 'd MMM yyyy')}</p>
+                        <p className="text-[11px] text-muted-token">Since {fmtDate(r.started_at)}</p>
                       </div>
-                      <button onClick={() => openHistory(r)} className="p-1.5 rounded-lg text-muted-token hover:bg-[var(--surface-sunken)]" title="History">
-                        <History className="w-3.5 h-3.5" />
+                      <button
+                        type="button"
+                        onClick={() => setHistoryFor(r)}
+                        className="w-9 h-9 flex items-center justify-center rounded-full text-muted-token hover:bg-[var(--surface-sunken)]"
+                        aria-label={`History for ${r.mentee_name}`}
+                      >
+                        <History className="w-4 h-4" />
                       </button>
-                      <Button size="xs" variant="danger" loading={busyId === r.id} onClick={() => handleEnd(r)}>Remove</Button>
-                    </div>
+                      <button
+                        type="button"
+                        onClick={() => handleEnd(r)}
+                        disabled={busyId === r.id}
+                        className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] disabled:opacity-50"
+                        aria-label={`Remove ${r.mentee_name}`}
+                      >
+                        {busyId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserMinus className="w-4 h-4" />}
+                      </button>
+                    </li>
                   ))}
-                </div>
-              </div>
-
-              {past.length > 0 && (
-                <div>
-                  <p className="text-xs font-bold text-muted-token uppercase tracking-wide mb-2">Past ({past.length})</p>
-                  <div className="space-y-1.5">
-                    {past.map((r) => (
-                      <div key={r.id} className="flex items-center gap-3 px-3 py-2 rounded-xl opacity-60">
-                        <Avatar name={r.mentee_name} url={r.mentee_avatar} size="sm" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-secondary-token truncate">{r.mentee_name}</p>
-                          <p className="text-[11px] text-muted-token">
-                            {format(new Date(r.started_at), 'd MMM yyyy')} – {r.ended_at ? format(new Date(r.ended_at), 'd MMM yyyy') : '—'}
-                          </p>
-                        </div>
-                        <Badge variant="default" className="text-[10px]">ended</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                </ul>
               )}
-            </>
-          )}
-        </div>
-      </div>
+            </section>
 
-      {showPicker && (
-        <MemberPicker
-          title={`Assign a counselli to ${counsellor.mentor_name}`}
-          excludeIds={active.map((r) => r.mentee_id)}
-          onPick={handleAssign}
-          onClose={() => setShowPicker(false)}
-        />
-      )}
-
-      {historyFor && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4" onClick={() => setHistoryFor(null)}>
-          <div className="bg-[var(--surface)] rounded-3xl shadow-2xl w-full max-w-sm max-h-[70vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-color)]">
-              <h3 className="font-bold text-primary-token">Assignment History — {historyFor.mentee_name}</h3>
-              <button onClick={() => setHistoryFor(null)} className="p-1.5 rounded-lg text-muted-token hover:bg-[var(--surface-muted)]"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {history.map((h) => (
-                <div key={h.id} className="px-3 py-2 rounded-xl bg-[var(--surface-muted)] text-sm">
-                  <p className="font-semibold text-primary-token">{h.mentor_name}</p>
-                  <p className="text-xs text-muted-token">
-                    {format(new Date(h.started_at), 'd MMM yyyy')} – {h.ended_at ? format(new Date(h.ended_at), 'd MMM yyyy') : 'current'}
-                  </p>
-                  {h.assigned_by_name && <p className="text-[11px] text-muted-token">Assigned by {h.assigned_by_name}</p>}
-                </div>
-              ))}
-            </div>
+            {past.length > 0 && (
+              <section>
+                <p className="text-overline mb-2">Past · {past.length}</p>
+                <ul className="space-y-1">
+                  {past.map((r) => (
+                    <li key={r.id} className="flex items-center gap-3 px-2.5 py-2 rounded-[var(--radius-md)]">
+                      <Avatar name={r.mentee_name} url={r.mentee_avatar} size="sm" className="opacity-60" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-secondary-token truncate">{r.mentee_name}</p>
+                        <p className="text-[11px] text-muted-token">{fmtDate(r.started_at)} – {fmtDate(r.ended_at)}</p>
+                      </div>
+                      <Badge className="text-[10px]">ended</Badge>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </Dialog>
+
+      <MemberPicker
+        open={Boolean(counsellor) && showPicker}
+        title="Assign a counselli"
+        description={counsellor ? `To ${counsellor.mentor_name}` : undefined}
+        excludeIds={excludeIds}
+        statusFor={(r) => (r.current_mentor_id
+          ? { label: `with ${r.current_mentor_name ?? 'someone'}`, variant: 'warning' }
+          : null)}
+        onPick={handleAssign}
+        onClose={() => setShowPicker(false)}
+      />
+
+      <HistoryDialog rel={historyFor} onClose={() => setHistoryFor(null)} />
+    </>
   )
 }
 
@@ -255,132 +392,134 @@ function ManageCounsellisModal({ counsellor, typeId, onClose, onChanged }) {
 // Main page
 // ---------------------------------------------------------------------
 export default function CounsellorManagement() {
-  const toast = useToastStore()
-  const { hasPermission } = useOrgStore()
-  const [counsellors, setCounsellors] = useState([])
-  const [loading, setLoading] = useState(true)
+  const toast = useToast()
+  // Selecting the boolean (not the function) re-renders when permissions load.
+  const canManage = useOrgStore((s) => s.permissions.includes('*') || s.permissions.includes('mentorship.manage'))
+  const [counsellors, setCounsellors] = useState(null)
+  const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [showMakePicker, setShowMakePicker] = useState(false)
   const [manageTarget, setManageTarget] = useState(null)
   const [typeId, setTypeId] = useState(null)
-  const [makingId, setMakingId] = useState(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
     try {
-      const { data: type } = await supabase.from('mentorship_types').select('id').eq('name', 'Counsellor').maybeSingle()
+      const type = await getCounsellorType()
       setTypeId(type?.id ?? null)
-      const rows = await adminMentorshipOverview(type?.id ?? null)
-      setCounsellors(rows)
+      setCounsellors(await adminMentorshipOverview(type?.id ?? null))
+      setError(null)
     } catch (e) {
-      toast.error('Could not load counsellors', e.message)
-    } finally {
-      setLoading(false)
+      setError(e)
     }
-  }, [toast])
+  }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { if (canManage) load() }, [canManage, load])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return counsellors
+    if (!counsellors || !q) return counsellors ?? []
     return counsellors.filter((c) => c.mentor_name?.toLowerCase().includes(q))
   }, [counsellors, search])
 
+  const counsellorIds = useMemo(() => new Set((counsellors ?? []).map((c) => c.mentor_id)), [counsellors])
+
   const handleMakeCounsellor = async (member) => {
-    setShowMakePicker(false)
-    setMakingId(member.id)
     try {
       const roleId = await ensureCounsellorRole()
       await addMemberRole(member.id, roleId)
-      toast.success('Counsellor created', `${member.display_name} can now access the Counsellor Dashboard`)
+      toast.success('Counsellor added', `${member.display_name} can now open the Counsellor Dashboard`)
+      setShowMakePicker(false)
       await load()
     } catch (e) {
-      toast.error('Could not make counsellor', e.message)
-    } finally {
-      setMakingId(null)
+      toast.error('Could not make counsellor', friendlyError(e))
     }
   }
 
-  if (!hasPermission('mentorship.manage')) {
-    return <div className="text-center py-12 text-muted-token text-sm">Admins only.</div>
+  if (!canManage) {
+    return (
+      <EmptyState icon={ShieldCheck} title="Admins only" description="Ask an admin if you need to manage counsellors." />
+    )
   }
+
+  const totalCounsellis = (counsellors ?? []).reduce((n, c) => n + (c.active_mentees ?? 0), 0)
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-title text-primary-token flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-saffron-500" /> Counsellor Management
-          </h2>
-          <p className="text-sm text-secondary-token mt-0.5">Assign counsellors and manage their counsellis.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-title text-primary-token">Counsellors</h1>
+          <p className="text-caption mt-0.5">
+            {counsellors
+              ? `${counsellors.length} counsellor${counsellors.length === 1 ? '' : 's'} · ${totalCounsellis} counselli${totalCounsellis === 1 ? '' : 's'}`
+              : 'Assign counsellors and manage their counsellis.'}
+          </p>
         </div>
-        <Button size="sm" icon={UserPlus} onClick={() => setShowMakePicker(true)}>Make Counsellor</Button>
+        <Button icon={UserPlus} onClick={() => setShowMakePicker(true)} className="flex-shrink-0">
+          <span className="hidden sm:inline">Make counsellor</span>
+          <span className="sm:hidden">Add</span>
+        </Button>
       </div>
 
-      <div className="relative">
-        <Search className="w-4 h-4 text-muted-token absolute left-3 top-1/2 -translate-y-1/2" />
-        <input
+      {(counsellors?.length ?? 0) > 4 && (
+        <AppInput
+          icon={Search}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search counsellors…"
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-saffron-300 bg-[var(--surface)]"
+          placeholder="Search counsellors"
+          aria-label="Search counsellors"
         />
-      </div>
+      )}
 
-      {loading ? (
-        <div className="text-center text-sm text-muted-token py-12">Loading…</div>
+      {error && !counsellors ? (
+        <ErrorState error={error} onRetry={load} />
+      ) : !counsellors ? (
+        <SkeletonList rows={3} />
       ) : filtered.length === 0 ? (
-        <Card><CardBody className="py-10 text-center text-muted-token">
-          <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          <p>No counsellors yet. Click "Make Counsellor" to assign one.</p>
-        </CardBody></Card>
+        <Card padded>
+          <EmptyState
+            icon={Users}
+            title={search ? 'No counsellor by that name' : 'No counsellors yet'}
+            description={search ? undefined : 'Make a member a counsellor, then assign counsellis to them.'}
+            action={!search && <Button icon={UserPlus} onClick={() => setShowMakePicker(true)}>Make counsellor</Button>}
+          />
+        </Card>
       ) : (
-        <div className="space-y-2">
+        <ul className="space-y-2">
           {filtered.map((c) => (
-            <Card key={c.mentor_id}>
-              <CardBody className="flex items-center gap-3">
+            <li key={c.mentor_id}>
+              <Card hover as="button" type="button" onClick={() => setManageTarget(c)} className="w-full text-left flex items-center gap-3 p-4">
                 <Avatar name={c.mentor_name} url={c.mentor_avatar} size="md" />
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-primary-token truncate">{c.mentor_name}</p>
                   <p className="text-xs text-muted-token">
-                    {c.active_mentees} counselli{c.active_mentees === 1 ? '' : 's'}
-                    {c.assigned_since && <> · since {format(new Date(c.assigned_since), 'd MMM yyyy')}</>}
+                    {c.assigned_since ? `Since ${fmtDate(c.assigned_since)}` : 'No counsellis yet'}
                   </p>
                 </div>
-                <Button size="sm" variant="secondary" icon={ArrowRightLeft} onClick={() => setManageTarget(c)}>
-                  Manage Counsellis
-                </Button>
-              </CardBody>
-            </Card>
+                <Badge variant={c.active_mentees ? 'primary' : 'default'}>
+                  {c.active_mentees ?? 0} counselli{c.active_mentees === 1 ? '' : 's'}
+                </Badge>
+                <ChevronRight className="w-4 h-4 text-muted-token flex-shrink-0" aria-hidden="true" />
+              </Card>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
-      {showMakePicker && (
-        <MemberPicker
-          title="Make a member a Counsellor"
-          onPick={handleMakeCounsellor}
-          onClose={() => setShowMakePicker(false)}
-        />
-      )}
+      <MemberPicker
+        open={showMakePicker}
+        title="Make a counsellor"
+        description="Pick a member. They keep their other roles."
+        statusFor={(r) => (counsellorIds.has(r.id) ? { label: 'already a counsellor', disabled: true } : null)}
+        onPick={handleMakeCounsellor}
+        onClose={() => setShowMakePicker(false)}
+      />
 
-      {manageTarget && (
-        <ManageCounsellisModal
-          counsellor={manageTarget}
-          typeId={typeId}
-          onClose={() => setManageTarget(null)}
-          onChanged={load}
-        />
-      )}
-
-      {makingId && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/20">
-          <div className="bg-[var(--surface)] rounded-2xl px-6 py-4 shadow-xl text-sm text-secondary-token flex items-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" /> Setting up counsellor access…
-          </div>
-        </div>
-      )}
+      <ManageCounsellisDialog
+        counsellor={manageTarget}
+        typeId={typeId}
+        onClose={() => setManageTarget(null)}
+        onChanged={load}
+      />
     </div>
   )
 }

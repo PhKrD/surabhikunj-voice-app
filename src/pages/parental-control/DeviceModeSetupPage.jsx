@@ -5,10 +5,25 @@
 // behave: as a parent's management console, or as the child's own
 // supervised device. See src/store/deviceModeStore.js for the full model.
 
-import { ShieldCheck, Smartphone, UserRound, Baby } from 'lucide-react'
+import { ShieldCheck, Smartphone, UserRound, Baby, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import Card, { CardBody } from '@/components/ui/Card'
+import Card from '@/components/ui/Card'
 import { useDeviceModeStore } from '@/store/deviceModeStore'
+
+function Option({ mode, icon: Icon, tone, title, body, onChoose }) {
+  return (
+    <Card hover as="button" type="button" onClick={() => onChoose(mode)} className="w-full text-left p-5 flex items-center gap-4">
+      <span className={`w-14 h-14 rounded-[var(--radius-lg)] flex items-center justify-center shrink-0 ${tone}`}>
+        <Icon className="w-7 h-7" aria-hidden="true" />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-heading text-primary-token">{title}</span>
+        <span className="block text-caption mt-1">{body}</span>
+      </span>
+      <ChevronRight className="w-5 h-5 text-muted-token shrink-0" aria-hidden="true" />
+    </Card>
+  )
+}
 
 export default function DeviceModeSetupPage() {
   const navigate = useNavigate()
@@ -27,49 +42,37 @@ export default function DeviceModeSetupPage() {
   return (
     <div className="max-w-lg mx-auto space-y-6 py-6">
       <div className="text-center space-y-2">
-        <div className="w-14 h-14 rounded-2xl bg-[var(--color-primary-50)] flex items-center justify-center mx-auto">
-          <ShieldCheck className="w-7 h-7 text-[var(--color-primary-600)]" />
+        <div className="w-16 h-16 rounded-[var(--radius-lg)] grad-brand flex items-center justify-center mx-auto shadow-[var(--shadow-2)]">
+          <ShieldCheck className="w-8 h-8 text-white" aria-hidden="true" />
         </div>
-        <h2 className="text-lg font-bold text-primary-token">How are you using Parental Control?</h2>
-        <p className="text-sm text-secondary-token">
-          This only configures THIS device — VOICE stays one app either way.
+        <h1 className="text-title text-primary-token pt-2">Whose phone is this?</h1>
+        <p className="text-caption max-w-sm mx-auto">
+          This only sets up THIS phone. VOICE stays one app either way.
         </p>
       </div>
 
       <div className="grid gap-3">
-        <Card hover onClick={() => choose('parent')}>
-          <CardBody className="py-5 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-tulasi-50 flex items-center justify-center shrink-0">
-              <UserRound className="w-5.5 h-5.5 text-tulasi-600" />
-            </div>
-            <div>
-              <p className="font-semibold text-primary-token">I am a Parent</p>
-              <p className="text-xs text-secondary-token mt-0.5">
-                Manage children, devices, rules and screen time from this device.
-              </p>
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card hover onClick={() => choose('child')}>
-          <CardBody className="py-5 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-saffron-50 flex items-center justify-center shrink-0">
-              <Baby className="w-5.5 h-5.5 text-saffron-600" />
-            </div>
-            <div>
-              <p className="font-semibold text-primary-token">This is my child's device</p>
-              <p className="text-xs text-secondary-token mt-0.5">
-                Set THIS device up to be supervised. It will ask for a pairing code from a
-                parent's device next, and will stop showing the regular VOICE login.
-              </p>
-            </div>
-          </CardBody>
-        </Card>
+        <Option
+          mode="parent"
+          onChoose={choose}
+          icon={UserRound}
+          tone="bg-[var(--color-primary-soft)] text-[var(--color-primary)]"
+          title="Mine — I’m a parent"
+          body="See your children, set limits and routines, lock their phone from here."
+        />
+        <Option
+          mode="child"
+          onChoose={choose}
+          icon={Baby}
+          tone="bg-[var(--color-accent-soft)] text-[var(--color-warning)]"
+          title="My child’s phone"
+          body="Next you’ll type a pairing code from your phone. After that this phone shows the child’s screen, not the VOICE login."
+        />
       </div>
 
       <p className="flex items-start gap-2 text-xs text-muted-token px-1">
-        <Smartphone className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-        You can change this later from Settings, which requires re-authenticating for security.
+        <Smartphone className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
+        You can change this later in Settings (it asks you to sign in again).
       </p>
     </div>
   )

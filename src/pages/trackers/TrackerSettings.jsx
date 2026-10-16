@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import Card, { CardBody, CardHeader } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { cn } from '@/lib/utils'
 import { calculateEntryScore } from '@/lib/trackerScoring'
 import { FALLBACK_TEMPLATE } from '@/lib/trackerWhatsapp'
@@ -786,7 +786,7 @@ function PreviewPanel({ fields, groups, rules, columns }) {
 export default function TrackerSettings() {
   const { trackerId } = useParams()
   const navigate = useNavigate()
-  const toast = useToastStore()
+  const toast = useToast()
   const [tab, setTab] = useState('fields')
   const [loading, setLoading] = useState(true)
   const [tracker, setTracker] = useState(null)

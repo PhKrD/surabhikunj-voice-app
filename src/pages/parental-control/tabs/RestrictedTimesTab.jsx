@@ -205,8 +205,8 @@ export default function RestrictedTimesTab({ childId }) {
                       onTouchStart={() => startPaint(d, h)}
                       className={cn(
                         'h-7 m-[1px] rounded-[3px] cursor-pointer transition-colors border',
-                        on ? 'bg-[var(--color-primary-500)] border-[var(--color-primary-600)]' : 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100',
-                        key === nowKey && 'ring-2 ring-saffron-400 ring-offset-1',
+                        on ? 'bg-[var(--color-primary-500)] border-[var(--color-primary-600)]' : 'bg-[var(--color-success-soft)] border-[color-mix(in_srgb,var(--color-success)_20%,transparent)] hover:brightness-95',
+                        key === nowKey && 'ring-2 ring-[var(--color-primary)] ring-offset-1',
                       )}
                     />
                   )
@@ -214,9 +214,9 @@ export default function RestrictedTimesTab({ childId }) {
               </div>
             ))}
             <div className="flex items-center gap-4 mt-3 text-xs text-muted-token">
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-50 border border-emerald-200" /> Allowed</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-[var(--color-success-soft)] border border-[color-mix(in_srgb,var(--color-success)_30%,transparent)]" /> Allowed</span>
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-[var(--color-primary-500)]" /> Restricted</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm ring-2 ring-saffron-400" /> Now</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm ring-2 ring-[var(--color-primary)]" /> Now</span>
             </div>
           </div>
         </CardBody>
@@ -234,7 +234,7 @@ export default function RestrictedTimesTab({ childId }) {
         ))}
         <button
           onClick={clearAll}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-color)] text-xs text-secondary-token hover:bg-red-50 hover:text-red-600"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border-color)] text-xs text-secondary-token hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
         >
           <Eraser className="w-3.5 h-3.5" /> Clear all
         </button>

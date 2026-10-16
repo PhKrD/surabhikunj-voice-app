@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { friendlyError } from '@/lib/friendlyError'
 import { APP_VERSION } from '@/lib/appVersion'
 import useConfigStore from '@/store/configStore'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { confirm } from '@/store/dialogStore'
 import Card, { CardHeader, CardBody, CardTitle } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -19,7 +19,7 @@ export default function PlatformSettingsTab() {
   const platform = useConfigStore((s) => s.platform) ?? {}
   const native = useConfigStore((s) => s.native)
   const reload = useConfigStore((s) => s.load)
-  const toast = useToastStore()
+  const toast = useToast()
   const [form, setForm] = useState({
     min_native_version_code: platform.min_native_version_code ?? 0,
     recommended_native_version_code: platform.recommended_native_version_code ?? 0,

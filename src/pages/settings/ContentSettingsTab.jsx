@@ -3,7 +3,7 @@ import { Megaphone, LifeBuoy, Link2, Plus, Trash2, Save } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { friendlyError } from '@/lib/friendlyError'
 import useOrgStore from '@/store/orgStore'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import Card, { CardHeader, CardBody, CardTitle } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { AppInput, AppSelect, AppTextarea } from '@/components/ui/Field'
@@ -17,7 +17,7 @@ const HTTPS = /^https:\/\/\S+$/i
  */
 export default function ContentSettingsTab() {
   const { org, settings, _load } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const initial = settings?.content ?? {}
   const [notice, setNotice] = useState({ enabled: false, tone: 'info', dismissible: true, ...initial.notice })
   const [support, setSupport] = useState({ ...initial.support })

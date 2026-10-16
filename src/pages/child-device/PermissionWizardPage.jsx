@@ -15,6 +15,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Check, ChevronRight, ShieldCheck, Loader2 } from 'lucide-react'
 import { SETUP_STEPS, readSetupStatus, isSetupComplete } from '../../lib/setupSteps.js'
 import { dpc } from '../../lib/dpcPlugin.js'
@@ -86,7 +87,7 @@ export default function PermissionWizardPage() {
 
   if (!status) {
     return (
-      <div className="min-h-screen bg-[#1A1030] flex items-center justify-center text-[#C7C2E0]">
+      <div className="min-h-svh grad-brand flex items-center justify-center text-white/80">
         <Loader2 className="animate-spin" />
       </div>
     )
@@ -95,17 +96,22 @@ export default function PermissionWizardPage() {
   if (done) {
     const complete = isSetupComplete(status)
     return (
-      <div className="min-h-screen bg-[#1A1030] text-white flex flex-col items-center justify-center px-8 gap-6 text-center">
-        <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center">
-          <ShieldCheck size={40} className="text-emerald-400" />
-        </div>
-        <h1 className="text-2xl font-bold">{complete ? "You're all set" : 'Almost there'}</h1>
-        <p className="text-[#C7C2E0] text-sm leading-relaxed max-w-xs">
+      <div className="min-h-svh grad-brand text-white flex flex-col items-center justify-center px-8 gap-6 text-center">
+        <motion.div
+          initial={{ scale: 0.6, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', damping: 14, stiffness: 220 }}
+          className="w-24 h-24 rounded-full bg-white/15 border border-white/25 flex items-center justify-center"
+        >
+          <ShieldCheck size={44} />
+        </motion.div>
+        <h1 className="text-2xl font-bold">{complete ? 'You’re all set' : 'Almost there'}</h1>
+        <p className="text-white/75 text-sm leading-relaxed max-w-xs">
           {complete
-            ? 'Protection is on. Your parent can now help manage screen time, and you can ask them for more time whenever you need it.'
-            : 'A few optional things are still off. You can turn them on any time from the home screen.'}
+            ? 'Protection is on. You can ask your parent for more time whenever you need it.'
+            : 'A few things are still off. The home screen will remind you, and you can turn them on any time.'}
         </p>
-        <button onClick={finish} className="w-full max-w-xs bg-white text-[#5636bd] font-bold rounded-2xl py-4">
+        <button type="button" onClick={finish} className="press w-full max-w-xs h-14 bg-white text-[var(--color-primary-700)] font-bold rounded-[var(--radius-lg)]">
           Continue
         </button>
       </div>
@@ -114,65 +120,81 @@ export default function PermissionWizardPage() {
 
   const Icon = step.icon
   const stepNumber = index + 1
+  const oem = step.key === 'battery' ? oemGuidance(manufacturer) : null
 
   return (
-    <div className="min-h-screen bg-[#1A1030] text-white flex flex-col px-7 pt-14 pb-8">
+    <div
+      className="min-h-svh grad-brand text-white flex flex-col px-6 pb-8 overflow-hidden"
+      style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 2.5rem)' }}
+    >
       {/* Progress */}
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold">Protection setup</p>
+        <p className="text-sm font-semibold text-white/85">Protection setup</p>
         <p className="text-sm font-bold tabular-nums" aria-live="polite">{percent}%</p>
       </div>
-      <div className="flex items-center gap-1.5 mb-10" aria-hidden>
+      <div className="flex items-center gap-1.5" aria-hidden>
         {steps.map((s, i) => (
           <div
             key={s.key}
-            className={`h-1.5 flex-1 rounded-full transition-colors ${
-              status[s.key] ? 'bg-emerald-400' : i === index ? 'bg-white' : 'bg-white/20'
+            className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
+              status[s.key] ? 'bg-emerald-300' : i === index ? 'bg-white' : 'bg-white/20'
             }`}
           />
         ))}
       </div>
 
-      <p className="text-xs font-semibold uppercase tracking-widest text-[#9B8FD1]">
-        Step {stepNumber} of {steps.length}
-        {!step.required && <span className="text-[#9B8FD1] normal-case tracking-normal"> · optional</span>}
-      </p>
-
-      <div className="flex-1 flex flex-col justify-center gap-6 -mt-8">
-        <div className="w-16 h-16 rounded-2xl bg-[#6845E0]/25 flex items-center justify-center">
-          <Icon size={30} className="text-[#C7C2E0]" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold leading-tight">{step.label}</h1>
-          <p className="text-[#C7C2E0] mt-3 leading-relaxed">{step.why}</p>
-          {step.key === 'battery' && oemGuidance(manufacturer) && (
-            <div className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 space-y-2">
-              <p className="text-sm font-semibold">Also on {oemGuidance(manufacturer).brand} phones:</p>
-              <ol className="list-decimal list-inside space-y-1 text-sm text-[#C7C2E0]">
-                {oemGuidance(manufacturer).steps.map((t) => <li key={t}>{t}</li>)}
-              </ol>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={step.key}
+          initial={{ x: 48, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: -48, opacity: 0 }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          className="flex-1 flex flex-col justify-center gap-6 py-8"
+        >
+          <div className="relative w-24 h-24">
+            <div className="absolute inset-0 rounded-[1.75rem] bg-white/10 rotate-6" aria-hidden />
+            <div className="relative w-24 h-24 rounded-[1.75rem] bg-white/15 border border-white/25 flex items-center justify-center">
+              <Icon size={40} />
             </div>
-          )}
-          {step.hint && (
-            <div className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4">
-              <p className="text-sm text-[#C7C2E0]">{step.hint}</p>
-            </div>
-          )}
-        </div>
-      </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/60">
+              Step {stepNumber} of {steps.length}{!step.required && ' · optional'}
+            </p>
+            <h1 className="text-[1.875rem] font-bold leading-tight mt-2">{step.label}</h1>
+            <p className="text-white/80 mt-3 leading-relaxed">{step.why}</p>
+            {oem && (
+              <div className="mt-4 rounded-[var(--radius-lg)] bg-white/10 border border-white/15 p-4 space-y-2">
+                <p className="text-sm font-semibold">Also on {oem.brand} phones:</p>
+                <ol className="list-decimal list-inside space-y-1 text-sm text-white/80">
+                  {oem.steps.map((t) => <li key={t}>{t}</li>)}
+                </ol>
+              </div>
+            )}
+            {step.hint && (
+              <div className="mt-4 rounded-[var(--radius-lg)] bg-white/10 border border-white/15 p-4">
+                <p className="text-sm text-white/80">{step.hint}</p>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </AnimatePresence>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         <button
+          type="button"
           onClick={handleAllow}
           disabled={working}
-          className="w-full bg-white text-[#5636bd] font-bold rounded-2xl py-4 flex items-center justify-center gap-2 disabled:opacity-60"
+          className="press w-full h-14 bg-white text-[var(--color-primary-700)] font-bold rounded-[var(--radius-lg)] flex items-center justify-center gap-2 shadow-[var(--shadow-3)] disabled:opacity-60"
         >
           {working ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
           {step.action}
         </button>
         <button
+          type="button"
           onClick={() => setCursor(index + 1)}
-          className="w-full text-[#9B8FD1] font-medium py-3 flex items-center justify-center gap-1"
+          className="w-full h-12 text-white/70 font-medium flex items-center justify-center gap-1"
         >
           {step.required ? 'I’ll do this later' : 'Skip'} <ChevronRight size={16} />
         </button>

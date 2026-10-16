@@ -3,7 +3,7 @@ import { ArrowLeft, MapPin, Phone, CalendarDays, Pencil, Save, X, BadgeCheck, Bo
 import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
@@ -58,7 +58,7 @@ export default function ResidentProfilePage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { profile: me } = useAuthStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const canEdit = isAdmin(me?.role)
 
   const [resident, setResident] = useState(null)

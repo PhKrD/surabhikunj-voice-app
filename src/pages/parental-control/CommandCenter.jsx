@@ -1,60 +1,106 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { WifiOff, Wifi, Lock, LockOpen, Smartphone, RefreshCw, Info, Gift, X, CloudOff } from 'lucide-react'
+import {
+  WifiOff, Lock, Gift, CloudOff, CheckCircle2, Loader2, ChevronDown, Info, Smartphone, X, Plus,
+} from 'lucide-react'
 import Badge from '@/components/ui/Badge'
+import Button from '@/components/ui/Button'
+import { Dialog } from '@/components/ui/Dialog'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/store/toastStore'
+import { friendlyError } from '@/lib/friendlyError'
 import {
   listRecentCommands, subscribeToDeviceCommands, grantExtraTime, revokeExtraTime,
   setParentLock, setInternetPause,
 } from '@/lib/parentalControlApi'
 import {
-  deriveCommandState,
-  isDeviceOnline,
-  isTerminalState,
-  COMMAND_STATE_META,
-  commandTypeLabel,
+  deriveCommandState, isDeviceOnline, isTerminalState, COMMAND_STATE_META, commandTypeLabel,
 } from '@/lib/commandStatus'
+import { controlStatus, controlStatusLabel } from '@/lib/desiredStateStatus'
 
-const EXTRA_TIME_PRESETS = [5, 10, 15, 30, 60]
+const EXTRA_TIME_PRESETS = [15, 30, 60, 120]
 
 function timeAgo(iso) {
   if (!iso) return ''
-  const diff = Date.now() - new Date(iso).getTime()
-  const s = Math.round(diff / 1000)
-  if (s < 60) return `${s}s ago`
+  const s = Math.round((Date.now() - new Date(iso).getTime()) / 1000)
+  if (s < 60) return 'just now'
   const m = Math.round(s / 60)
-  if (m < 60) return `${m}m ago`
+  if (m < 60) return `${m} min ago`
   const h = Math.round(m / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return `${h} h ago`
   return new Date(iso).toLocaleDateString()
+}
+
+function clock(date) {
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+function minutesLeft(until, now) {
+  return Math.max(0, Math.ceil((until.getTime() - now) / 60_000))
+}
+
+const STATUS_ICON = { applied: CheckCircle2, applying: Loader2, waiting: CloudOff, unknown: CloudOff }
+
+/** One of the three big controls. `on` = the parent's intent is active. */
+function ControlTile({ icon: Icon, onIcon: OnIcon = Icon, label, onLabel, on, tone, status, statusText, busy, onClick }) {
+  const StatusIcon = status ? STATUS_ICON[status] : null
+  const tones = {
+    danger: 'bg-[var(--color-danger-soft)] border-[color-mix(in_srgb,var(--color-danger)_35%,transparent)] text-[var(--color-danger)]',
+    warning: 'bg-[var(--color-warning-soft)] border-[color-mix(in_srgb,var(--color-warning)_35%,transparent)] text-[var(--color-warning)]',
+    success: 'bg-[var(--color-success-soft)] border-[color-mix(in_srgb,var(--color-success)_35%,transparent)] text-[var(--color-success)]',
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-pressed={on}
+      className={cn(
+        'press relative flex flex-col items-start gap-2 p-3.5 sm:p-4 rounded-[var(--radius-lg)] border text-left min-h-[7.5rem]',
+        'transition-colors disabled:opacity-60',
+        on ? tones[tone] : 'bg-[var(--surface)] border-[var(--border-color)] text-primary-token hover:border-[var(--border-strong)]',
+      )}
+    >
+      <span className={cn(
+        'w-10 h-10 rounded-full flex items-center justify-center',
+        on ? 'bg-[var(--surface)]/70' : 'bg-[var(--surface-muted)] text-secondary-token',
+      )}>
+        {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : on ? <OnIcon className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+      </span>
+      <span className="text-sm font-bold leading-tight">{on ? onLabel : label}</span>
+      {statusText && (
+        <span className={cn('flex items-start gap-1 text-[11px] leading-tight font-medium', on ? 'opacity-90' : 'text-muted-token')}>
+          {StatusIcon && <StatusIcon className={cn('w-3.5 h-3.5 flex-shrink-0', status === 'applying' && 'animate-spin')} aria-hidden="true" />}
+          {statusText}
+        </span>
+      )}
+    </button>
+  )
 }
 
 /**
  * Command center: the parent's immediate controls over a child.
  *
  * Lock, internet pause and extra time are DESIRED STATE on the child
- * (pc_children, migration 72), not fire-and-forget commands — so they are
- * deliberately modelled here as toggles reflecting the current intent, and
- * they work whether or not a device is online this second. An offline
- * device applies them when it reconnects; the UI says so rather than
- * showing a scary "timed out".
+ * (pc_children, migration 72), not fire-and-forget commands — they work
+ * whether or not a device is online this second. Each tile shows what the
+ * PHONE has confirmed (desiredStateStatus.js), not just what was tapped,
+ * so "Locked" is never claimed before the phone actually is.
  *
  * They apply to ALL of the child's devices because that is what the
- * underlying state is scoped to; the device list below is status, not a
- * target picker.
+ * underlying state is scoped to.
  */
 export default function CommandCenter({ devices, childId, child, onChildUpdated, onRefreshDevices }) {
   const toast = useToast()
   const activeDevices = useMemo(() => devices.filter((d) => d.is_active), [devices])
 
-  const [sending, setSending] = useState(false)
+  const [busy, setBusy] = useState(null)
   const [customMin, setCustomMin] = useState('')
   const [commands, setCommands] = useState([])
   const [nowTick, setNowTick] = useState(() => Date.now())
   const [showExtraTime, setShowExtraTime] = useState(false)
-  // Flipped false if the database turns out to predate migration 72, in
-  // which case these controls are command-only and DO depend on the device
-  // being reachable — the offline note below must not claim otherwise.
+  const [showHistory, setShowHistory] = useState(false)
+  // Flipped false if the database predates migration 72; the controls are
+  // then command-only and DO depend on the device being reachable.
   const [durable, setDurable] = useState(true)
 
   const deviceIds = useMemo(() => activeDevices.map((d) => d.id), [activeDevices])
@@ -69,7 +115,9 @@ export default function CommandCenter({ devices, childId, child, onChildUpdated,
   const bonusUntil = child?.bonus_expires_at ? new Date(child.bonus_expires_at) : null
   const bonusActive = bonusUntil != null && bonusUntil > new Date(nowTick)
 
-  // A clock so timed-out states surface even without a DB event.
+  const lockStatus = controlStatus('lock', { parent_lock_active: locked }, activeDevices, nowTick)
+  const pauseStatus = controlStatus('pause', { internet_pause_active: paused }, activeDevices, nowTick)
+
   useEffect(() => {
     const id = setInterval(() => setNowTick(Date.now()), 5000)
     return () => clearInterval(id)
@@ -78,188 +126,221 @@ export default function CommandCenter({ devices, childId, child, onChildUpdated,
   const loadCommands = useCallback(async () => {
     if (deviceIds.length === 0) return
     try {
-      setCommands(await listRecentCommands(deviceIds, { limit: 15 }))
-    } catch (error) {
-      toast.error('Could not load command history', error.message)
+      setCommands(await listRecentCommands(deviceIds, { limit: 10 }))
+    } catch {
+      // History is secondary; the controls above still work without it.
     }
-  }, [deviceIds, toast])
+  }, [deviceIds])
 
   useEffect(() => {
     const id = setTimeout(() => loadCommands(), 0)
     return () => clearTimeout(id)
   }, [loadCommands])
 
-  // Merge an inserted/updated command row into local state (dedup by id).
   const mergeCommand = useCallback((row) => {
     if (!row?.id) return
-    setCommands((prev) => [row, ...prev.filter((c) => c.id !== row.id)].slice(0, 15))
+    setCommands((prev) => [row, ...prev.filter((c) => c.id !== row.id)].slice(0, 10))
   }, [])
 
-  // Live updates from Realtime.
   useEffect(() => {
     if (deviceIds.length === 0) return undefined
     return subscribeToDeviceCommands(deviceIds, mergeCommand)
   }, [deviceIds, mergeCommand])
 
   /** Applies one desired-state change and reports honestly what will happen. */
-  const apply = async (fn, { label, queuedNote }) => {
-    setSending(true)
+  const apply = async (key, fn, { label, offlineNote }) => {
+    setBusy(key)
     try {
       const result = await fn()
       if (result?.child) onChildUpdated?.(result.child)
       if (result?.durable === false) {
-        // Migration 72 hasn't been applied, so there is no durable intent
-        // behind this — don't promise it survives going offline.
         setDurable(false)
-        toast.info(label, 'Sent to the device. Run migration 72 so this also survives the device being offline.')
+        toast.info(label, 'Sent to the phone. Run migration 72 so this also survives the phone being offline.')
       } else if (anyOnline) {
-        toast.success(label, 'Applying now — tracking status below.')
+        toast.success(label)
       } else {
-        toast.info(`${label} — queued`, queuedNote)
+        toast.info(`${label} — saved`, offlineNote)
       }
       loadCommands()
       onRefreshDevices?.()
+      return true
     } catch (error) {
-      toast.error(`Could not ${label.toLowerCase()}`, error.message)
+      toast.error(`Couldn’t ${label.toLowerCase()}`, friendlyError(error))
+      return false
     } finally {
-      setSending(false)
+      setBusy(null)
     }
   }
 
+  const offlineNote = 'The phone is offline. It applies this the moment it’s back online.'
+
   const toggleLock = () =>
-    apply(() => setParentLock(childId, !locked), {
-      label: locked ? 'Unlocked' : 'Locked',
-      queuedNote: "The device is offline. It will apply this the moment it's back online.",
-    })
+    apply('lock', () => setParentLock(childId, !locked), { label: locked ? 'Unlocked' : 'Locked', offlineNote })
 
   const togglePause = () =>
-    apply(() => setInternetPause(childId, !paused), {
-      label: paused ? 'Internet resumed' : 'Internet paused',
-      queuedNote: "The device is offline. It will apply this the moment it's back online.",
-    })
+    apply('pause', () => setInternetPause(childId, !paused), { label: paused ? 'Internet resumed' : 'Internet paused', offlineNote })
 
   const giveExtraTime = async (minutes) => {
-    setShowExtraTime(false)
-    await apply(() => grantExtraTime(childId, minutes), {
-      label: `${minutes} extra minutes granted`,
-      queuedNote: 'The device is offline. It will pick this up when it reconnects.',
+    const ok = await apply('bonus', () => grantExtraTime(childId, minutes), {
+      label: `${minutes >= 60 && minutes % 60 === 0 ? `${minutes / 60} h` : `${minutes} min`} extra time given`,
+      offlineNote,
     })
+    if (ok) { setShowExtraTime(false); setCustomMin('') }
   }
 
   const endExtraTime = async () => {
-    setShowExtraTime(false)
-    await apply(() => revokeExtraTime(childId), {
-      label: 'Extra time ended',
-      queuedNote: 'The device is offline. It will pick this up when it reconnects.',
-    })
+    const ok = await apply('bonus', () => revokeExtraTime(childId), { label: 'Extra time ended', offlineNote })
+    if (ok) setShowExtraTime(false)
   }
 
   if (activeDevices.length === 0) {
     return (
-      <div className="rounded-3xl border border-[var(--border-color)] bg-[var(--surface)] p-5 text-center text-sm text-muted-token">
-        No active devices. Add a device from the Devices tab to send commands.
+      <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] p-5 text-center">
+        <Smartphone className="w-6 h-6 mx-auto text-muted-token mb-2" />
+        <p className="text-sm font-semibold text-primary-token">No phone linked yet</p>
+        <p className="text-caption mt-1">Pair your child’s phone from Protection to lock it, pause the internet or give extra time.</p>
       </div>
     )
   }
 
+  const custom = Math.round(Number(customMin))
+  const customValid = custom > 0 && custom <= 24 * 60
+
   return (
-    <div className="space-y-4">
-      {/* Device status — informational. Lock/pause apply to every device. */}
-      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-        {activeDevices.map((d) => {
-          const online = isDeviceOnline(d, nowTick)
-          return (
-            <span
-              key={d.id}
-              className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border bg-[var(--surface)] text-secondary-token border-[var(--border-color)]"
-            >
-              <span className={cn('w-1.5 h-1.5 rounded-full', online ? 'bg-tulasi-400' : 'bg-[var(--surface-sunken)]')} />
-              {d.device_name || 'Unnamed'}
-              <span className="font-normal text-muted-token">{online ? 'online' : 'offline'}</span>
-            </span>
-          )
-        })}
-      </div>
-
-      {/* State toggles */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          disabled={sending}
-          onClick={togglePause}
-          title={paused ? 'Let this child back online' : 'Keep every app that needs a connection off screen'}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-            paused
-              ? 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'
-              : 'bg-[var(--surface)] border-[var(--border-color)] text-secondary-token hover:border-red-200 hover:text-red-600',
-          )}
-        >
-          {paused ? <Wifi className="w-4.5 h-4.5" /> : <WifiOff className="w-4.5 h-4.5" />}
-          {paused ? 'Resume internet' : 'Pause internet'}
-        </button>
-
-        <button
-          disabled={sending}
+    <section className="space-y-3" aria-label="Quick controls">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <ControlTile
+          icon={Lock}
+          onIcon={Lock}
+          label="Lock now"
+          onLabel="Locked"
+          on={locked}
+          tone="danger"
+          busy={busy === 'lock'}
+          status={durable ? lockStatus.status : null}
+          statusText={locked || lockStatus.status !== 'applied'
+            ? controlStatusLabel('lock', locked, lockStatus.status)
+            : 'Calls stay available'}
           onClick={toggleLock}
-          title={locked ? 'Release your lock' : 'Keep every app off-screen (calls + VOICE stay available)'}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
-            locked
-              ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100'
-              : 'bg-[var(--surface)] border-[var(--border-color)] text-secondary-token hover:border-slate-400',
-          )}
-        >
-          {locked ? <LockOpen className="w-4.5 h-4.5" /> : <Lock className="w-4.5 h-4.5" />}
-          {locked ? 'Unlock' : 'Lock now'}
-        </button>
-
-        <button
-          disabled={sending}
-          onClick={() => setShowExtraTime((v) => !v)}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2.5 rounded-2xl border text-sm font-semibold disabled:opacity-50',
-            bonusActive
-              ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
-              : showExtraTime
-                ? 'bg-[var(--color-primary-500)] text-white border-[var(--color-primary-500)]'
-                : 'bg-[var(--surface)] border-[var(--border-color)] text-secondary-token hover:border-[var(--color-primary-200)] hover:text-[var(--color-primary-600)]',
-          )}
-          title="Pause every limit, routine and restriction for a while"
-        >
-          <Gift className="w-4.5 h-4.5" />
-          {bonusActive ? `Extra time until ${bonusUntil.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Give extra time'}
-        </button>
-
-        <button
-          onClick={() => { loadCommands(); onRefreshDevices?.() }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[var(--surface)] border border-[var(--border-color)] text-sm font-medium text-muted-token hover:text-secondary-token"
-          title="Refresh status"
-        >
-          <RefreshCw className="w-4.5 h-4.5" />
-        </button>
+        />
+        <ControlTile
+          icon={WifiOff}
+          label="Pause internet"
+          onLabel="Internet paused"
+          on={paused}
+          tone="warning"
+          busy={busy === 'pause'}
+          status={durable ? pauseStatus.status : null}
+          statusText={paused || pauseStatus.status !== 'applied'
+            ? controlStatusLabel('pause', paused, pauseStatus.status)
+            : 'Offline apps still work'}
+          onClick={togglePause}
+        />
+        <ControlTile
+          icon={Gift}
+          label="Extra time"
+          onLabel={bonusActive ? `${minutesLeft(bonusUntil, nowTick)} min left` : 'Extra time'}
+          on={bonusActive}
+          tone="success"
+          busy={busy === 'bonus'}
+          statusText={bonusActive ? `Until ${clock(bonusUntil)} · tap to change` : 'Pauses limits for a while'}
+          onClick={() => setShowExtraTime(true)}
+        />
       </div>
 
-      {showExtraTime && (
-        <div className="rounded-3xl border border-[var(--color-primary-200)] bg-[var(--color-primary-50)]/60 p-4 flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-[var(--color-primary-800)] mr-1">Extra time:</span>
-          {EXTRA_TIME_PRESETS.map((m) => (
-            <button
-              key={m}
-              disabled={sending}
-              onClick={() => giveExtraTime(m)}
-              className="px-4 py-2 rounded-xl bg-[var(--surface)] border border-[var(--color-primary-200)] text-sm font-medium text-[var(--color-primary-700)] hover:bg-[var(--color-primary-100)] disabled:opacity-50"
-            >
-              +{m >= 60 ? `${m / 60}h` : `${m}m`}
-            </button>
-          ))}
-          <form
-            className="flex items-center gap-1.5"
-            onSubmit={(e) => {
-              e.preventDefault()
-              const n = Math.round(Number(customMin))
-              if (n > 0 && n <= 24 * 60) { giveExtraTime(n); setCustomMin('') }
-            }}
+      {locked && (
+        <p className="flex items-start gap-2 text-caption px-1">
+          <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-muted-token" aria-hidden="true" />
+          Tap <span className="font-semibold text-secondary-token">Locked</span> again to unlock. Unlock can’t remove a PIN or pattern your child set on the phone itself — that’s an Android rule.
+        </p>
+      )}
+
+      {!anyOnline && (
+        <p className="flex items-start gap-2 text-sm rounded-[var(--radius-md)] px-3.5 py-3 bg-[var(--color-warning-soft)] text-[var(--color-warning)]">
+          <CloudOff className="w-4 h-4 flex-shrink-0 mt-0.5" aria-hidden="true" />
+          {durable
+            ? <span>{activeDevices.length === 1 ? 'The phone is' : 'The phones are'} offline. Anything you change here is saved and applied automatically when {activeDevices.length === 1 ? 'it reconnects' : 'they reconnect'}.</span>
+            : <span>The phone is offline, and this database still needs migration 72 — until then these controls only reach a phone that is online.</span>}
+        </p>
+      )}
+
+      {activeDevices.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          {activeDevices.map((d) => {
+            const online = isDeviceOnline(d, nowTick)
+            return (
+              <span key={d.id} className="flex-shrink-0 inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-xs font-medium bg-[var(--surface-muted)] text-secondary-token">
+                <span className={cn('w-1.5 h-1.5 rounded-full', online ? 'bg-[var(--color-success)]' : 'bg-[var(--border-strong)]')} />
+                {d.device_name || 'Phone'}
+                <span className="text-muted-token">{online ? 'online' : 'offline'}</span>
+              </span>
+            )
+          })}
+        </div>
+      )}
+
+      {commands.length > 0 && (
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--surface)]">
+          <button
+            type="button"
+            onClick={() => setShowHistory((v) => !v)}
+            aria-expanded={showHistory}
+            className="w-full flex items-center justify-between gap-2 px-4 h-11 text-sm font-semibold text-secondary-token"
           >
+            Recent actions
+            <ChevronDown className={cn('w-4 h-4 transition-transform', showHistory && 'rotate-180')} />
+          </button>
+          {showHistory && (
+            <ul className="divide-y divide-[var(--border-color)] border-t border-[var(--border-color)]">
+              {commands.map((cmd) => {
+                const state = deriveCommandState(cmd, nowTick)
+                const meta = COMMAND_STATE_META[state] ?? COMMAND_STATE_META.unknown
+                const pending = !isTerminalState(state)
+                // An expired command only means the fast path missed; the
+                // desired state above is still on record and converging.
+                const queued = state === 'timed_out'
+                return (
+                  <li key={cmd.id} className="px-4 py-2.5 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-primary-token truncate">
+                        {commandTypeLabel(cmd.command_type)}
+                        {activeDevices.length > 1 && <span className="text-muted-token"> · {deviceById[cmd.device_id]?.device_name || 'phone'}</span>}
+                      </p>
+                      <p className="text-xs text-muted-token truncate">
+                        {timeAgo(cmd.created_at)}
+                        {state === 'failed' && cmd.error_message ? ` · ${cmd.error_message}` : ''}
+                      </p>
+                    </div>
+                    <Badge variant={queued ? 'default' : meta.tone} dot={pending}>{queued ? 'Saved' : meta.label}</Badge>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <Dialog
+        open={showExtraTime}
+        onClose={() => setShowExtraTime(false)}
+        title="Give extra time"
+        description={bonusActive
+          ? `Extra time runs until ${clock(bonusUntil)}. Adding more extends it.`
+          : 'Daily limits, restricted hours and routines pause until it runs out. Your own Lock still wins.'}
+      >
+        <div className="grid grid-cols-2 gap-2">
+          {EXTRA_TIME_PRESETS.map((m) => (
+            <Button key={m} variant="secondary" size="lg" icon={Plus} disabled={busy === 'bonus'} onClick={() => giveExtraTime(m)}>
+              {m >= 60 ? `${m / 60} hour${m > 60 ? 's' : ''}` : `${m} min`}
+            </Button>
+          ))}
+        </div>
+        <form
+          className="flex items-end gap-2 mt-3"
+          onSubmit={(e) => { e.preventDefault(); if (customValid) giveExtraTime(custom) }}
+        >
+          <label className="flex-1">
+            <span className="block text-sm font-semibold text-primary-token mb-1.5">Other amount (minutes)</span>
             <input
               type="number"
               inputMode="numeric"
@@ -267,97 +348,17 @@ export default function CommandCenter({ devices, childId, child, onChildUpdated,
               max={1440}
               value={customMin}
               onChange={(e) => setCustomMin(e.target.value)}
-              placeholder="min"
-              aria-label="Custom extra minutes"
-              className="w-20 px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--color-primary-200)] text-sm"
+              placeholder="e.g. 45"
             />
-            <button
-              type="submit"
-              disabled={sending || !(Number(customMin) > 0)}
-              className="px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--color-primary-200)] text-sm font-medium text-[var(--color-primary-700)] hover:bg-[var(--color-primary-100)] disabled:opacity-50"
-            >
-              Add
-            </button>
-          </form>
-          <button
-            disabled={sending}
-            onClick={endExtraTime}
-            className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-          >
-            <X className="w-4 h-4" /> End extra time now
-          </button>
-        </div>
-      )}
-
-      {/* Honest offline behaviour: these are durable intents, not lost taps. */}
-      {!anyOnline && (
-        <p className="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
-          <CloudOff className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          {durable ? (
-            <span>
-              {activeDevices.length === 1 ? 'This device is' : 'These devices are'} offline right now. Lock,
-              internet pause and extra time are saved as instructions and applied automatically the moment
-              {activeDevices.length === 1 ? ' it reconnects' : ' they reconnect'} — you don&apos;t need to tap again.
-            </span>
-          ) : (
-            <span>
-              {activeDevices.length === 1 ? 'This device is' : 'These devices are'} offline right now, and this
-              database still needs migration 72 — until it is applied these controls only reach a device that is
-              online, so this may not take effect.
-            </span>
-          )}
-        </p>
-      )}
-
-      {/* Real Android constraint, surfaced here rather than only in a doc no
-          parent will read: "Lock now" keeps apps off-screen via the
-          Accessibility soft-lock (no reset needed) and locks the screen once.
-          Dismissing an EXISTING PIN/pattern/password from here needs a
-          Device-Owner-only API. See PLATFORM_LIMITATIONS.md. */}
-      <p className="flex items-start gap-2 text-sm text-muted-token">
-        <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-        Lock and internet pause stay in force until you switch them off here. Pausing the internet keeps every
-        app that needs a connection off screen (offline apps and calls still work); if the device also has the optional
-        VPN permission, background traffic stops too. Unlock can&apos;t remove a PIN/pattern the child set on the phone
-        itself — that&apos;s an Android restriction, not a bug here.
-      </p>
-
-      {/* Live command status feed */}
-      {commands.length > 0 && (
-        <div className="rounded-3xl border border-[var(--border-color)] bg-[var(--surface)] divide-y divide-[var(--border-color)]">
-          <p className="px-5 pt-4 pb-2 text-xs font-bold uppercase tracking-wide text-muted-token">
-            Recent commands
-          </p>
-          {commands.map((cmd) => {
-            const state = deriveCommandState(cmd, nowTick)
-            const meta = COMMAND_STATE_META[state] ?? COMMAND_STATE_META.unknown
-            const dev = deviceById[cmd.device_id]
-            const pending = !isTerminalState(state)
-            // A command that expired only means the fast path missed; the
-            // desired state above is still on record and still converging.
-            const queued = state === 'timed_out'
-            return (
-              <div key={cmd.id} className="px-5 py-3 flex items-center gap-3">
-                <Smartphone className="w-4.5 h-4.5 text-muted-token flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-primary-token truncate">
-                    {commandTypeLabel(cmd.command_type)}
-                    <span className="text-muted-token font-normal"> · {dev?.device_name || 'device'}</span>
-                  </p>
-                  <p className="text-xs text-muted-token truncate">
-                    {timeAgo(cmd.created_at)}
-                    {state === 'failed' && cmd.error_message ? ` · ${cmd.error_message}` : ''}
-                    {queued ? ' · saved, applies when the device is back' : ''}
-                  </p>
-                </div>
-                <Badge variant={queued ? 'default' : meta.tone} dot={pending}>
-                  {queued ? 'Queued' : meta.label}
-                </Badge>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
+          </label>
+          <Button type="submit" disabled={!customValid} loading={busy === 'bonus'}>Give</Button>
+        </form>
+        {bonusActive && (
+          <Button variant="danger-soft" icon={X} className="w-full mt-4" disabled={busy === 'bonus'} onClick={endExtraTime}>
+            End extra time now
+          </Button>
+        )}
+      </Dialog>
+    </section>
   )
 }

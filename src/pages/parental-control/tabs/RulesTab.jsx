@@ -309,8 +309,8 @@ export default function RulesTab({ childId }) {
               <Card key={app.package_name}>
                 <CardBody className="py-3">
                   <div className="flex items-center gap-3">
-                    <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0', app.status === 'block' ? 'bg-red-50' : app.status === 'time_limit' ? 'bg-amber-50' : 'bg-[var(--surface-muted)]')}>
-                      <meta.icon className={cn('w-4 h-4', app.status === 'block' ? 'text-red-600' : app.status === 'time_limit' ? 'text-amber-600' : 'text-secondary-token')} />
+                    <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0', app.status === 'block' ? 'bg-[var(--color-danger-soft)]' : app.status === 'time_limit' ? 'bg-[var(--color-warning-soft)]' : 'bg-[var(--surface-muted)]')}>
+                      <meta.icon className={cn('w-4 h-4', app.status === 'block' ? 'text-[var(--color-danger)]' : app.status === 'time_limit' ? 'text-[var(--color-warning)]' : 'text-secondary-token')} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-primary-token truncate">
@@ -320,7 +320,7 @@ export default function RulesTab({ childId }) {
                       <p className="text-xs text-muted-token truncate">
                         {app.usedMs > 0 ? `${formatMinutes(usedMin)} today` : 'Not used today'}
                         {app.limitMin !== null && (
-                          <span className={overLimit ? 'text-red-600 font-medium' : ''}> · limit {formatMinutes(app.limitMin)}{overLimit ? ' — reached' : ''}</span>
+                          <span className={overLimit ? 'text-[var(--color-danger)] font-medium' : ''}> · limit {formatMinutes(app.limitMin)}{overLimit ? ' — reached' : ''}</span>
                         )}
                       </p>
                     </div>
@@ -350,7 +350,7 @@ export default function RulesTab({ childId }) {
                           className={cn(
                             'flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50',
                             active
-                              ? opt.key === 'block' ? 'border-red-500 bg-red-50 text-red-700' : opt.key === 'time_limit' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                              ? opt.key === 'block' ? 'border-[var(--color-danger)] bg-[var(--color-danger-soft)] text-[var(--color-danger)]' : opt.key === 'time_limit' ? 'border-[var(--color-warning)] bg-[var(--color-warning-soft)] text-[var(--color-warning)]' : 'border-[var(--color-success)] bg-[var(--color-success-soft)] text-[var(--color-success)]'
                               : 'border-[var(--border-color)] text-secondary-token hover:bg-[var(--surface-muted)]',
                           )}
                         >
@@ -363,7 +363,7 @@ export default function RulesTab({ childId }) {
                   {app.limitMin !== null && (
                     <div className="w-full bg-[var(--surface-sunken)] rounded-full h-1.5 mt-2">
                       <div
-                        className={cn('h-1.5 rounded-full transition-all', overLimit ? 'bg-red-500' : 'bg-amber-500')}
+                        className={cn('h-1.5 rounded-full transition-all', overLimit ? 'bg-[var(--color-danger)]' : 'bg-[var(--color-warning)]')}
                         style={{ width: `${app.limitMin > 0 ? Math.min(100, (usedMin / app.limitMin) * 100) : 100}%` }}
                       />
                     </div>

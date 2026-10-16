@@ -20,6 +20,8 @@
  */
 
 import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { Check, Link2, Loader2, Smartphone, ShieldCheck, KeyRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase.js'
 import { saveDeviceCreds } from '../../lib/deviceStore.js'
@@ -43,7 +45,7 @@ export default function EnrollmentPage() {
     setLoading(true)
 
     try {
-      const trimmed = code.trim().toUpperCase()
+      const trimmed = cleanCode(code)
 
       const { data, error: fnErr } = await supabase.functions.invoke('pc-redeem-pairing-code', {
         body: { pairing_code: trimmed },
@@ -111,66 +113,116 @@ export default function EnrollmentPage() {
 
   if (linked) {
     return (
-      <div className="min-h-screen bg-[#1A1030] text-white flex flex-col items-center justify-center px-8 text-center gap-5">
-        <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center text-4xl" aria-hidden>✓</div>
-        <h1 className="text-2xl font-bold">You&apos;re now linked with {linked.parent}</h1>
-        <p className="text-[#C7C2E0] text-sm max-w-xs">Next: a few quick permissions so protection can switch on.</p>
+      <div className="min-h-svh grad-brand text-white flex flex-col items-center justify-center px-8 text-center gap-5">
+        <motion.div
+          initial={{ scale: 0.6, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', damping: 14, stiffness: 220 }}
+          className="w-24 h-24 rounded-full bg-white/15 border border-white/25 flex items-center justify-center"
+        >
+          <Check size={48} strokeWidth={2.5} />
+        </motion.div>
+        <h1 className="text-2xl font-bold">Linked with {linked.parent}</h1>
+        <p className="text-white/75 text-sm max-w-xs">Next: a few quick permissions so protection can switch on.</p>
       </div>
     )
   }
 
+  const chars = code.padEnd(CODE_LENGTH, ' ').slice(0, CODE_LENGTH).split('')
+  const ready = code.length === CODE_LENGTH
+
   return (
-    <div className="min-h-screen bg-[#1A1030] flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8 flex flex-col gap-6">
-        {/* Logo / title */}
-        <div className="text-center">
-          <div className="w-16 h-16 bg-[#6845E0] rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#6845E0]/30">
-            <span className="text-white text-2xl font-bold">V</span>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">VOICE</h1>
-          <p className="text-sm text-gray-500 mt-1">Enter the pairing code from a parent's device</p>
+    <div className="min-h-svh app-bg flex flex-col">
+      <header
+        className="grad-brand text-white px-7 pb-16 rounded-b-[2.5rem] text-center"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)' }}
+      >
+        <div className="w-16 h-16 rounded-[var(--radius-lg)] bg-white/15 border border-white/25 flex items-center justify-center mx-auto mb-4">
+          <Link2 size={30} />
         </div>
+        <h1 className="text-[1.75rem] leading-tight font-bold">Link this phone</h1>
+        <p className="text-sm text-white/75 mt-2 max-w-xs mx-auto">Type the 6-letter code shown on your parent’s phone.</p>
+      </header>
 
-        {revoked && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-            This device was removed by a parent. All restrictions have been lifted. Ask a parent for a new pairing code to reconnect.
-          </div>
-        )}
+      <main className="flex-1 px-6 -mt-10 pb-8 flex flex-col gap-4 w-full max-w-md mx-auto">
+        <form onSubmit={handleEnroll} className="bg-[var(--surface)] border border-[var(--border-color)] rounded-[var(--radius-xl)] shadow-[var(--shadow-3)] p-6 flex flex-col gap-5">
+          {revoked && (
+            <p className="rounded-[var(--radius-md)] px-4 py-3 text-sm bg-[var(--color-warning-soft)] text-[var(--color-warning)]">
+              This phone was removed by a parent, so all limits are off. Ask a parent for a new code to link it again.
+            </p>
+          )}
 
-        {/* Form */}
-        <form onSubmit={handleEnroll} className="flex flex-col gap-4">
-          <input
-            type="text"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="e.g. AB12CD"
-            maxLength={8}
-            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-center text-2xl font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-[#6845E0]"
-            disabled={loading}
-            autoComplete="off"
-            autoCapitalize="characters"
-          />
+          {/* One real input (keyboard, paste, autofill) under six display boxes. */}
+          <label className="relative block" htmlFor="pair-code">
+            <span className="sr-only">Pairing code</span>
+            <div className="grid grid-cols-6 gap-2" aria-hidden="true">
+              {chars.map((c, i) => (
+                <span
+                  key={i}
+                  className={`h-14 rounded-[var(--radius-md)] border-2 flex items-center justify-center text-2xl font-bold font-mono transition-colors ${
+                    i === code.length && !loading
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]'
+                      : c.trim()
+                        ? 'border-[var(--border-strong)] bg-[var(--surface)] text-primary-token'
+                        : 'border-[var(--border-color)] bg-[var(--surface-muted)]'
+                  }`}
+                >
+                  {c.trim()}
+                </span>
+              ))}
+            </div>
+            <input
+              id="pair-code"
+              type="text"
+              value={code}
+              onChange={(e) => { setError(null); setCode(cleanCode(e.target.value)) }}
+              maxLength={CODE_LENGTH + 4}
+              className="!absolute inset-0 !opacity-0 !h-full !w-full cursor-text"
+              disabled={loading}
+              autoComplete="one-time-code"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              autoFocus
+            />
+          </label>
 
           {error && (
-            <p className="text-sm text-red-600 text-center">{error}</p>
+            <p role="alert" className="text-sm text-[var(--color-danger)] text-center -mt-1">{error}</p>
           )}
 
           <button
             type="submit"
-            disabled={loading || code.trim().length < 4}
-            className="w-full bg-[#6845E0] active:bg-[#5636bd] disabled:bg-[#bcabff] text-white font-semibold rounded-2xl py-3.5 transition-colors"
+            disabled={loading || !ready}
+            className="press w-full h-14 rounded-[var(--radius-lg)] bg-[var(--color-primary)] text-[var(--color-on-primary)] font-bold text-base flex items-center justify-center gap-2 shadow-[var(--shadow-2)] disabled:opacity-50 disabled:shadow-none"
           >
-            {loading ? 'Connecting…' : 'Pair this device'}
+            {loading ? <><Loader2 size={20} className="animate-spin" /> Linking…</> : 'Link this phone'}
           </button>
         </form>
 
-        <p className="text-xs text-gray-400 text-center">
-          Your parent gets the code in VOICE: Family → child → Protection → Add a device. Codes last 10 minutes and work once.
-        </p>
-      </div>
+        <ol className="space-y-3 px-1">
+          {[
+            ['On your parent’s phone, open VOICE → Family.', Smartphone],
+            ['Choose your name → Protection → Add a phone.', ShieldCheck],
+            ['Type the code here. It works once and lasts 10 minutes.', KeyRound],
+          ].map(([text, Icon], i) => (
+            <li key={i} className="flex items-start gap-3 text-sm text-secondary-token">
+              <span className="w-8 h-8 rounded-full bg-[var(--color-primary-soft)] text-[var(--color-primary)] flex items-center justify-center flex-shrink-0">
+                <Icon size={16} />
+              </span>
+              <span className="pt-1.5">{text}</span>
+            </li>
+          ))}
+        </ol>
+      </main>
     </div>
   )
 }
+
+const CODE_LENGTH = 6
+// Same alphabet as pc-generate-pairing-code (no O/0/I/1), so a mistyped
+// "0" for "O" can't silently produce a code that will never match.
+const cleanCode = (v) => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH)
 
 /**
  * supabase.functions.invoke() hides the server's message behind "non-2xx

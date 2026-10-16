@@ -150,9 +150,9 @@ export default function ChildrenOverview({ onAddChild, reloadKey = 0 }) {
       </p>
 
       {needsAttention.length > 0 && (
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 flex items-start gap-3">
-          <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-800 leading-relaxed">
+        <div className="rounded-3xl border border-[color-mix(in_srgb,var(--color-warning)_30%,transparent)] bg-[var(--color-warning-soft)] px-5 py-4 flex items-start gap-3">
+          <ShieldAlert className="w-5 h-5 text-[var(--color-warning)] shrink-0 mt-0.5" />
+          <p className="text-sm text-[var(--color-warning)] leading-relaxed">
             <span className="font-semibold">
               {needsAttention.map((c) => c.display_name).join(', ')}
             </span>{' '}
@@ -193,7 +193,7 @@ export default function ChildrenOverview({ onAddChild, reloadKey = 0 }) {
                     <div className="relative">
                       <Avatar name={child.display_name} size="lg" />
                       {d.onlineDevices > 0 && (
-                        <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-tulasi-500 border-2 border-[var(--surface-elevated)]" />
+                        <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-[var(--color-success)] border-2 border-[var(--surface-elevated)]" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -212,7 +212,7 @@ export default function ChildrenOverview({ onAddChild, reloadKey = 0 }) {
                   <div>
                     <div className="flex items-baseline justify-between mb-2">
                       <span className="text-sm text-secondary-token">Screen time today</span>
-                      <span className={`text-lg font-bold tabular-nums ${over ? 'text-red-600' : 'text-primary-token'}`}>
+                      <span className={`text-lg font-bold tabular-nums ${over ? 'text-[var(--color-danger)]' : 'text-primary-token'}`}>
                         {formatDuration(d.totalMs)}
                         {d.limitMin != null && (
                           <span className="text-sm font-medium text-muted-token"> / {formatDuration(d.limitMin * 60000)}</span>
@@ -221,7 +221,7 @@ export default function ChildrenOverview({ onAddChild, reloadKey = 0 }) {
                     </div>
                     <div className="h-2.5 w-full rounded-full bg-[var(--surface-muted)] overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${over ? 'bg-red-500' : 'bg-[var(--color-primary-500)]'}`}
+                        className={`h-full rounded-full transition-all duration-500 ${over ? 'bg-[var(--color-danger)]' : 'bg-[var(--color-primary-500)]'}`}
                         style={{ width: `${pct ?? Math.min(100, usedMin / 3)}%` }}
                       />
                     </div>

@@ -6,7 +6,7 @@ import useAuthStore from '@/store/authStore'
 import useOrgStore from '@/store/orgStore'
 import Card, { CardBody, CardHeader } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 
 const inputBase = 'w-full px-3 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-sm text-primary-token placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-saffron-300 transition'
 
@@ -46,7 +46,7 @@ export default function TrackerBuilder() {
   const navigate = useNavigate()
   const { profile } = useAuthStore()
   const { org } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')

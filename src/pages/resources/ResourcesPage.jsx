@@ -1,18 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
-import { UtensilsCrossed, ChevronLeft, ChevronRight, Plus, Trash2, X, Star } from 'lucide-react'
+import { UtensilsCrossed, ChevronLeft, ChevronRight, Plus, Trash2, Star } from 'lucide-react'
 import { format, addDays, subDays } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import useOrgStore from '@/store/orgStore'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
+import { Dialog } from '@/components/ui/Dialog'
 import Can from '@/components/Can'
 import { useTerm } from '@/hooks/usePermission'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { confirm } from '@/store/dialogStore'
 
 // ── Plan edit modal ───────────────────────────────────────────────────────────
 function PlanModal({ type, slot, plan, dateStr, orgId, onClose, onSaved }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [items, setItems]       = useState((plan?.resource_plan_items ?? []).map((i) => ({ ...i })))
   const [notes, setNotes]       = useState(plan?.notes ?? '')
   const [isSpecial, setIsSpecial] = useState(plan?.is_special ?? false)
@@ -74,19 +75,24 @@ function PlanModal({ type, slot, plan, dateStr, orgId, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-[var(--surface)] rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-[var(--border-color)]">
-          <div>
-            <p className="font-bold text-primary-token">{type.name} — {slot}</p>
-            <p className="text-sm text-secondary-token">{format(new Date(dateStr), 'EEE, dd MMM yyyy')}</p>
-          </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-[var(--surface-muted)]">
-            <X className="w-5 h-5 text-secondary-token" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-4">
+    <Dialog
+      open
+      onClose={onClose}
+      title={`${type.name} — ${slot}`}
+      description={format(new Date(dateStr), 'EEE, dd MMM yyyy')}
+      footer={
+        <>
+          {plan?.id && (
+            <Button variant="danger-soft" icon={Trash2} onClick={deletePlan} disabled={saving} className="w-full sm:w-auto sm:mr-auto">
+              Delete
+            </Button>
+          )}
+          <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">Cancel</Button>
+          <Button onClick={save} loading={saving} className="w-full sm:w-auto">Save plan</Button>
+        </>
+      }
+    >
+        <div className="space-y-4">
           {/* Special toggle */}
           <label className="flex items-center gap-3 cursor-pointer">
             <div
@@ -146,19 +152,7 @@ function PlanModal({ type, slot, plan, dateStr, orgId, onClose, onSaved }) {
             />
           </div>
         </div>
-
-        <div className="flex items-center gap-2 p-5 border-t border-[var(--border-color)]">
-          {plan?.id && (
-            <button onClick={deletePlan} disabled={saving} className="p-2 text-red-400 hover:bg-red-50 rounded-xl">
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-          <div className="flex-1" />
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} loading={saving}>Save Plan</Button>
-        </div>
-      </div>
-    </div>
+    </Dialog>
   )
 }
 

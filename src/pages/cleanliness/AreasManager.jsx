@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { MapPin, Plus, X, Pencil, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { confirm } from '@/store/dialogStore'
@@ -12,7 +12,7 @@ const INPUT_CLASS = 'w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--bor
 const emptyForm = { name: '', location: '', description: '' }
 
 export default function AreasManager({ orgId, canManage }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [areas, setAreas] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)

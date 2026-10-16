@@ -10,6 +10,7 @@
 import { supabase } from '@/lib/supabase'
 import { aggregatePeriod, calculateEntryScore, hasValue } from '@/lib/trackerScoring'
 import { buildSheetModel } from '@/lib/trackerSheet'
+import { withoutDeviceAccounts } from '@/lib/utils'
 import { format, eachDayOfInterval } from 'date-fns'
 
 function toISO(d) { return format(d, 'yyyy-MM-dd') }
@@ -37,9 +38,9 @@ export async function mentorRelationships(mentorId, typeId = null) {
 }
 
 export async function adminMenteeSearch(query = '', typeId = null) {
-  const { data, error } = await supabase.rpc('admin_mentee_search', { p_query: query, p_type_id: typeId })
+  const { data, error } = await supabase.rpc('admin_mentee_search', { p_query: query.trim(), p_type_id: typeId })
   if (error) throw error
-  return data ?? []
+  return withoutDeviceAccounts(data)
 }
 
 export async function assignMentee({ menteeId, mentorId, typeId = null, notes = null }) {

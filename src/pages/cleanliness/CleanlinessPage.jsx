@@ -10,7 +10,7 @@ import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
-import { cn, formatTime } from '@/lib/utils'
+import { cn, formatTime, withoutDeviceAccounts } from '@/lib/utils'
 import AreasManager from './AreasManager'
 import { confirm } from '@/store/dialogStore'
 
@@ -477,7 +477,7 @@ export default function CleanlinessPage() {
         if (allRes.error) throw allRes.error
         if (membersRes.error) throw membersRes.error
         setAll(allRes.data ?? [])
-        setMembers(membersRes.data ?? [])
+        setMembers(withoutDeviceAccounts(membersRes.data))
       }
     } catch (e) {
       toastError('Could not load cleaning duties', e.message)

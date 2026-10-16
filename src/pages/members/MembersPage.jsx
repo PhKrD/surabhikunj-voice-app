@@ -3,20 +3,20 @@ import { motion } from 'framer-motion'
 import { Search, Mail, ShieldCheck, Clock, UserCog, Check, X, Save, UserPlus, Phone } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
 import useOrgStore from '@/store/orgStore'
-import { cn } from '@/lib/utils'
+import { cn, withoutDeviceAccounts } from '@/lib/utils'
 
 const SELECT_COLS = 'id, spiritual_name, legal_name, email, avatar_url, role, is_approved'
 
 export default function MembersPage() {
   const { profile } = useAuthStore()
   const { org, hasPermission } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const orgId = org?.id ?? profile?.org_id
   const isAdmin = hasPermission('members.manage')
 
@@ -50,7 +50,7 @@ export default function MembersPage() {
       // included — filtering profiles by org_id would hide them entirely.
       const { data, error } = await supabase.rpc('org_members')
       if (error) throw error
-      const rows = (data ?? []).map((r) => ({
+      const rows = withoutDeviceAccounts(data).map((r) => ({
         ...r,
         spiritual_name: r.spiritual_name ?? r.display_name,
         is_approved:    r.status === 'active',

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { CheckCircle2, AlertCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import Card, { CardBody, CardHeader } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import { formatDate } from '@/lib/utils'
@@ -27,7 +27,7 @@ function sortStatuses(entries) {
 }
 
 export default function BroadcastDelivery({ orgId, memberById, categoryByKey }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [notifs, setNotifs] = useState([])
   const [deliveries, setDeliveries] = useState([])
   const [loading, setLoading] = useState(true)

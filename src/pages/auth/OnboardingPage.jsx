@@ -2,63 +2,84 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Building2, KeyRound, ArrowRight, ArrowLeft, Loader2,
-  Clock, Copy, Check, LogOut, Users,
+  Building2, KeyRound, ArrowRight, ArrowLeft, Clock, Copy, Check, LogOut, Users, Smartphone,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
 import useOrgStore from '@/store/orgStore'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import Button from '@/components/ui/Button'
-import { cn } from '@/lib/utils'
+import { AppInput } from '@/components/ui/Field'
+import { LoadingState } from '@/components/ui/States'
+import { friendlyError } from '@/lib/friendlyError'
+import { isDeviceAccount } from '@/lib/utils'
+import { useDeviceModeStore } from '@/store/deviceModeStore'
+import AuthLayout from './AuthLayout'
 
-const INPUT =
-  'w-full px-4 py-3.5 rounded-2xl border border-[var(--border-color)] bg-[var(--surface-muted)]/60 text-sm text-primary-token placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-saffron-400/60 focus:border-saffron-300 focus:bg-[var(--surface)] transition-all'
+const slide = {
+  initial: { opacity: 0, x: 24 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -24 },
+  transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] },
+}
+
+function BackLink({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="-ml-2 inline-flex items-center gap-1.5 h-10 px-2 rounded-full text-sm font-medium text-secondary-token hover:text-primary-token"
+    >
+      <ArrowLeft className="w-4 h-4" /> Back
+    </button>
+  )
+}
 
 // ─── Choice cards ─────────────────────────────────────────────────────────────
 function ChoiceCard({ icon: Icon, title, description, onClick }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="w-full text-left p-5 rounded-2xl border border-[var(--border-color)] bg-[var(--surface)] hover:border-saffron-300 hover:shadow-[0_12px_32px_-16px_rgba(249,115,22,0.35)] transition-all group"
+      className="press group w-full text-left p-4 rounded-[var(--radius-lg)] border border-[var(--border-color)] bg-[var(--surface)] shadow-[var(--shadow-1)] hover:shadow-[var(--shadow-2)] hover:border-[var(--border-strong)] transition-shadow flex items-center gap-4"
     >
-      <div className="flex items-start gap-4">
-        <div className="w-11 h-11 rounded-2xl grad-saffron flex items-center justify-center flex-shrink-0">
-          <Icon className="w-5 h-5 text-white" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-bold text-primary-token">{title}</p>
-          <p className="text-sm text-muted-token mt-0.5">{description}</p>
-        </div>
-        <ArrowRight className="w-5 h-5 text-muted-token group-hover:text-saffron-500 group-hover:translate-x-0.5 transition-all flex-shrink-0 mt-3" />
-      </div>
+      <span className="w-12 h-12 rounded-[var(--radius-md)] bg-[var(--color-primary-soft)] text-[var(--color-primary)] flex items-center justify-center flex-shrink-0">
+        <Icon className="w-6 h-6" aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-primary-token">{title}</span>
+        <span className="block text-caption mt-0.5">{description}</span>
+      </span>
+      <ArrowRight className="w-5 h-5 text-muted-token group-hover:translate-x-0.5 transition-transform flex-shrink-0" aria-hidden="true" />
     </button>
   )
 }
 
 // ─── Create an organization ───────────────────────────────────────────────────
 function CreateOrgForm({ onBack, onDone }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [error, setError] = useState('')
 
   const submit = async (e) => {
     e.preventDefault()
     if (name.trim().length < 3) {
-      toast.error('Name too short', 'Use at least 3 characters.')
+      setError('Use at least 3 characters.')
       return
     }
+    setError('')
     setLoading(true)
     try {
-      const { data, error } = await supabase.rpc('create_organization', { p_name: name.trim() })
-      if (error) throw error
+      const { data, error: rpcError } = await supabase.rpc('create_organization', { p_name: name.trim() })
+      if (rpcError) throw rpcError
       const row = Array.isArray(data) ? data[0] : data
       if (!row?.org_id) throw new Error('Organization was not created')
       setResult(row)
     } catch (err) {
-      toast.error('Could not create organization', err.message)
+      toast.error('Could not create organization', friendlyError(err))
     } finally {
       setLoading(false)
     }
@@ -77,84 +98,61 @@ function CreateOrgForm({ onBack, onDone }) {
   if (result) {
     return (
       <div className="space-y-5 text-center">
-        <div className="w-14 h-14 rounded-3xl grad-tulasi flex items-center justify-center mx-auto">
-          <Check className="w-7 h-7 text-white" />
+        <div className="w-16 h-16 rounded-full bg-[var(--color-success-soft)] flex items-center justify-center mx-auto">
+          <Check className="w-8 h-8 text-[var(--color-success)]" />
         </div>
         <div>
-          <h2 className="text-xl font-extrabold text-primary-token">You're all set</h2>
-          <p className="text-sm text-muted-token mt-1">
-            You are the owner of <span className="font-semibold text-secondary-token">{name.trim()}</span>.
+          <h2 className="text-title text-primary-token">You’re all set</h2>
+          <p className="text-caption mt-1">
+            You own <span className="font-semibold text-secondary-token">{name.trim()}</span>.
           </p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-saffron-50 border border-saffron-100">
-          <p className="text-xs font-medium text-muted-token mb-1.5">
-            Share this join code with your members
-          </p>
+        <div className="p-4 rounded-[var(--radius-lg)] bg-[var(--color-primary-soft)]">
+          <p className="text-overline mb-2">Join code for your members</p>
           <div className="flex items-center justify-center gap-2">
-            <code className="text-2xl font-extrabold tracking-[0.2em] text-saffron-700">
+            <code className="text-[1.75rem] font-bold tracking-[0.2em] text-[var(--color-primary-strong)]">
               {result.join_code}
             </code>
             <button
+              type="button"
               onClick={copyCode}
-              className="p-2 rounded-xl text-saffron-600 hover:bg-saffron-100 transition-colors"
-              title="Copy code"
+              className="w-10 h-10 flex items-center justify-center rounded-full text-[var(--color-primary)] hover:bg-[var(--surface)]"
+              aria-label="Copy code"
             >
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
             </button>
           </div>
-          <p className="text-[11px] text-muted-token mt-2">
-            You can find this again in Settings → Organization.
-          </p>
+          <p className="text-xs text-muted-token mt-2">You can find it again in Settings → Organization.</p>
         </div>
 
-        <Button className="w-full" size="lg" onClick={onDone}>
-          Go to Dashboard
-        </Button>
+        <Button className="w-full" size="lg" onClick={onDone}>Go to dashboard</Button>
       </div>
     )
   }
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex items-center gap-1.5 text-sm text-muted-token hover:text-secondary-token transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" /> Back
-      </button>
-
-      <div>
-        <h2 className="text-xl font-extrabold text-primary-token">Create your organization</h2>
-        <p className="text-sm text-muted-token mt-1">
-          You'll become its owner with full control over members, roles and modules.
-        </p>
-      </div>
-
-      <div className="relative group">
-        <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token group-focus-within:text-saffron-500 transition-colors" />
-        <input
-          type="text"
-          placeholder="Organization name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          autoFocus
-          required
-          className={`${INPUT} pl-11`}
-        />
-      </div>
-
-      <Button type="submit" loading={loading} size="lg" className="w-full">
-        Create organization
-      </Button>
+      <BackLink onClick={onBack} />
+      <AppInput
+        label="Organization name"
+        icon={Building2}
+        placeholder="e.g. Surabhi Kunj"
+        value={name}
+        onChange={(e) => { setName(e.target.value); setError('') }}
+        error={error}
+        hint="You’ll be its owner, with full control over members, roles and modules."
+        autoFocus
+        required
+      />
+      <Button type="submit" loading={loading} size="lg" className="w-full">Create organization</Button>
     </form>
   )
 }
 
 // ─── Join with a code ─────────────────────────────────────────────────────────
 function JoinOrgForm({ onBack, onDone, onPending }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [peek, setPeek] = useState(null)
@@ -175,10 +173,7 @@ function JoinOrgForm({ onBack, onDone, onPending }) {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!clean) {
-      toast.error('Enter a join code')
-      return
-    }
+    if (!clean) return
     setLoading(true)
     try {
       const { data, error } = await supabase.rpc('join_organization_by_code', { p_code: clean })
@@ -193,7 +188,7 @@ function JoinOrgForm({ onBack, onDone, onPending }) {
         onPending(row.org_name)
       }
     } catch (err) {
-      toast.error('Could not join', err.message)
+      toast.error('Could not join', friendlyError(err, 'That code didn’t work. Check it with your admin.'))
     } finally {
       setLoading(false)
     }
@@ -201,36 +196,21 @@ function JoinOrgForm({ onBack, onDone, onPending }) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <button
-        type="button"
-        onClick={onBack}
-        className="flex items-center gap-1.5 text-sm text-muted-token hover:text-secondary-token transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" /> Back
-      </button>
-
-      <div>
-        <h2 className="text-xl font-extrabold text-primary-token">Join an organization</h2>
-        <p className="text-sm text-muted-token mt-1">
-          Enter the 7-character join code from your organization's admin.
-        </p>
-      </div>
-
-      <div className="relative group">
-        <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-token group-focus-within:text-saffron-500 transition-colors" />
-        <input
-          type="text"
-          placeholder="ABC2XYZ"
-          value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
-          maxLength={9}
-          autoFocus
-          autoCapitalize="characters"
-          autoCorrect="off"
-          spellCheck={false}
-          className={`${INPUT} pl-11 tracking-[0.25em] font-semibold uppercase`}
-        />
-      </div>
+      <BackLink onClick={onBack} />
+      <AppInput
+        label="Join code"
+        icon={KeyRound}
+        placeholder="ABC2XYZ"
+        value={code}
+        onChange={(e) => setCode(e.target.value.toUpperCase())}
+        maxLength={9}
+        autoFocus
+        autoCapitalize="characters"
+        autoCorrect="off"
+        spellCheck={false}
+        hint="7 characters, from your organization’s admin."
+        className="tracking-[0.25em] font-semibold uppercase"
+      />
 
       <AnimatePresence>
         {peek && (
@@ -238,20 +218,18 @@ function JoinOrgForm({ onBack, onDone, onPending }) {
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-tulasi-50 border border-tulasi-100"
+            className="flex items-center gap-2.5 px-4 py-3 rounded-[var(--radius-md)] bg-[var(--color-success-soft)]"
           >
-            <Users className="w-4 h-4 text-tulasi-600 flex-shrink-0" />
+            <Users className="w-4 h-4 text-[var(--color-success)] flex-shrink-0" />
             <p className="text-sm text-secondary-token">
-              Joining <span className="font-semibold">{peek.org_name}</span>
+              Joining <span className="font-semibold text-primary-token">{peek.org_name}</span>
               <span className="text-muted-token"> · {peek.member_count} members</span>
             </p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <Button type="submit" loading={loading} size="lg" className="w-full" disabled={!clean}>
-        Join organization
-      </Button>
+      <Button type="submit" loading={loading} size="lg" className="w-full" disabled={!clean}>Join organization</Button>
     </form>
   )
 }
@@ -260,22 +238,24 @@ function JoinOrgForm({ onBack, onDone, onPending }) {
 function PendingState({ orgName, onRecheck, checking }) {
   return (
     <div className="space-y-5 text-center">
-      <div className="w-14 h-14 rounded-3xl bg-amber-100 flex items-center justify-center mx-auto">
-        <Clock className="w-7 h-7 text-amber-600" />
+      <div className="w-16 h-16 rounded-full bg-[var(--color-warning-soft)] flex items-center justify-center mx-auto">
+        <Clock className="w-8 h-8 text-[var(--color-warning)]" />
       </div>
-      <div>
-        <h2 className="text-xl font-extrabold text-primary-token">Waiting for approval</h2>
-        <p className="text-sm text-muted-token mt-1">
-          Your request to join{' '}
-          <span className="font-semibold text-secondary-token">{orgName}</span> has been sent.
-          An admin needs to approve it before you can continue.
-        </p>
-      </div>
-      <Button variant="secondary" className="w-full" onClick={onRecheck} loading={checking}>
-        Check again
-      </Button>
+      <p className="text-body text-secondary-token">
+        Your request to join <span className="font-semibold text-primary-token">{orgName}</span> was sent.
+        An admin needs to approve it before you can continue.
+      </p>
+      <Button variant="secondary" size="lg" className="w-full" onClick={onRecheck} loading={checking}>Check again</Button>
     </div>
   )
+}
+
+const TITLES = {
+  choose: (name) => ({ title: `Welcome${name ? `, ${name}` : ''}`, subtitle: 'You’re signed in. Now join your community, or start a new one.' }),
+  create: () => ({ title: 'Create your organization', subtitle: 'Set it up, then share the join code with your members.' }),
+  join: () => ({ title: 'Join your organization', subtitle: 'Enter the code your admin gave you.' }),
+  pending: () => ({ title: 'Waiting for approval', subtitle: null }),
+  device: () => ({ title: 'This is a supervised phone', subtitle: null }),
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -284,10 +264,14 @@ export default function OnboardingPage() {
   const { profile, signOut } = useAuthStore()
   const { refresh } = useOrgStore()
 
-  const [view, setView]         = useState('choose') // choose | create | join | pending
+  // A parental-control device account is never a member of anything; it
+  // reaching this screen means Device Mode was reset on the phone. Joining
+  // an org here is what put "device-…" into the member list before.
+  const deviceAccount = isDeviceAccount(profile)
+  const [view, setView]         = useState(deviceAccount ? 'device' : 'choose') // choose | create | join | pending | device
   const [pendingOrg, setPending] = useState(null)
   const [checking, setChecking] = useState(false)
-  const [booting, setBooting]   = useState(true)
+  const [booting, setBooting]   = useState(!deviceAccount)
 
   // On mount:
   //   1. Run ensure_active_org() — if the user already has an active
@@ -296,6 +280,7 @@ export default function OnboardingPage() {
   //      find the org and navigate home without showing this form at all.
   //   2. Otherwise check for pending memberships so we can show the wait screen.
   useEffect(() => {
+    if (deviceAccount) return undefined
     let cancelled = false
     ;(async () => {
       try {
@@ -339,59 +324,47 @@ export default function OnboardingPage() {
     }
   }, [refresh, navigate])
 
-  if (booting) {
-    return (
-      <div className="min-h-svh flex items-center justify-center app-bg">
-        <Loader2 className="w-7 h-7 text-saffron-500 animate-spin" />
-      </div>
-    )
-  }
+  if (booting) return <LoadingState fullScreen label="Getting things ready…" />
+
+  const { title, subtitle } = TITLES[view](profile?.display_name)
 
   return (
-    <div className="relative min-h-svh flex items-center justify-center p-4 overflow-hidden app-bg">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 -left-32 w-[28rem] h-[28rem] rounded-full grad-saffron opacity-25 blur-3xl animate-float-slow" />
-        <div className="absolute -bottom-32 right-0 w-[26rem] h-[26rem] rounded-full grad-blue opacity-20 blur-3xl animate-float-slow" style={{ animationDelay: '1.6s' }} />
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-md"
-      >
-        <div className="bg-white/75 backdrop-blur-2xl rounded-[2rem] shadow-[0_24px_70px_-20px_rgba(15,23,42,0.30)] border border-white/60 p-7 sm:p-8">
+    <AuthLayout
+      title={title}
+      subtitle={subtitle}
+      footer={
+        <div className="flex items-center justify-between gap-3 pt-5 border-t border-[var(--border-color)]">
+          <p className="text-xs text-muted-token truncate">{profile?.email}</p>
+          <button
+            type="button"
+            onClick={async () => { await signOut(); navigate('/login', { replace: true }) }}
+            className="inline-flex items-center gap-1.5 h-9 px-2 rounded-full text-xs font-semibold text-secondary-token hover:text-[var(--color-danger)] flex-shrink-0"
+          >
+            <LogOut className="w-3.5 h-3.5" /> Sign out
+          </button>
+        </div>
+      }
+    >
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div key={view} {...slide}>
           {view === 'choose' && (
-            <div className="space-y-5">
-              <div>
-                <h1 className="text-2xl font-extrabold text-primary-token">
-                  Welcome{profile?.display_name ? `, ${profile.display_name}` : ''}
-                </h1>
-                <p className="text-sm text-muted-token mt-1">
-                  You're signed in but not part of an organization yet.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <ChoiceCard
-                  icon={KeyRound}
-                  title="I have a join code"
-                  description="Join an organization that already exists."
-                  onClick={() => setView('join')}
-                />
-                <ChoiceCard
-                  icon={Building2}
-                  title="Create a new organization"
-                  description="Set one up from scratch and invite your members."
-                  onClick={() => setView('create')}
-                />
-              </div>
+            <div className="space-y-3">
+              <ChoiceCard
+                icon={KeyRound}
+                title="I have a join code"
+                description="Join a community that already uses VOICE."
+                onClick={() => setView('join')}
+              />
+              <ChoiceCard
+                icon={Building2}
+                title="Create a new organization"
+                description="Set one up from scratch and invite your members."
+                onClick={() => setView('create')}
+              />
             </div>
           )}
 
-          {view === 'create' && (
-            <CreateOrgForm onBack={() => setView('choose')} onDone={finish} />
-          )}
+          {view === 'create' && <CreateOrgForm onBack={() => setView('choose')} onDone={finish} />}
 
           {view === 'join' && (
             <JoinOrgForm
@@ -401,24 +374,27 @@ export default function OnboardingPage() {
             />
           )}
 
-          {view === 'pending' && (
-            <PendingState orgName={pendingOrg} onRecheck={recheck} checking={checking} />
-          )}
+          {view === 'pending' && <PendingState orgName={pendingOrg} onRecheck={recheck} checking={checking} />}
 
-          <div className="mt-6 pt-5 border-t border-[var(--border-color)] flex items-center justify-between">
-            <p className="text-xs text-muted-token truncate">{profile?.email}</p>
-            <button
-              onClick={async () => { await signOut(); navigate('/login', { replace: true }) }}
-              className={cn(
-                'flex items-center gap-1.5 text-xs font-medium text-muted-token',
-                'hover:text-red-500 transition-colors flex-shrink-0'
-              )}
-            >
-              <LogOut className="w-3.5 h-3.5" /> Sign out
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    </div>
+          {view === 'device' && (
+            <div className="space-y-4 text-center">
+              <div className="w-16 h-16 rounded-full bg-[var(--color-primary-soft)] flex items-center justify-center mx-auto">
+                <Smartphone className="w-8 h-8 text-[var(--color-primary)]" />
+              </div>
+              <p className="text-body text-secondary-token">
+                This phone is linked to a child in Parental Control, so it can’t join an organization.
+              </p>
+              <Button
+                size="lg"
+                className="w-full"
+                onClick={() => { useDeviceModeStore.getState().setMode('child'); navigate('/child/home', { replace: true }) }}
+              >
+                Go to the child’s screen
+              </Button>
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </AuthLayout>
   )
 }

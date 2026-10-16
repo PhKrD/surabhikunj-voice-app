@@ -8,7 +8,7 @@ import {
 import Avatar from '@/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 import useToastStore from '@/store/toastStore'
-import { getChild, listDevices, listChildren, getAttentionCounts } from '@/lib/parentalControlApi'
+import { getChild, listDevices, listChildren, getAttentionCounts, subscribeToChildState } from '@/lib/parentalControlApi'
 import { protectionHealth, PROTECTION_STATUS_META, onlineStatus } from '@/lib/protectionHealth'
 import { friendlyError } from '@/lib/friendlyError'
 import CommandCenter from './CommandCenter'
@@ -148,15 +148,17 @@ export default function ChildDetailPage() {
   const [activeTab, setActiveTab] = useState('summary')
   const navRef = useRef(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ quiet = false } = {}) => {
     try {
       const [childData, deviceList] = await Promise.all([getChild(childId), listDevices(childId)])
       setChild(childData)
       setDevices(deviceList)
       getAttentionCounts(childId).then(setCounts).catch(() => {})
-      listChildren().then(setSiblings).catch(() => {})
+      if (!quiet) listChildren().then(setSiblings).catch(() => {})
     } catch (error) {
-      toastError('Could not load this child', friendlyError(error))
+      // A background refresh failing (phone briefly offline) must not
+      // throw a toast at the parent every 30 seconds.
+      if (!quiet) toastError('Could not load this child', friendlyError(error))
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -167,6 +169,34 @@ export default function ChildDetailPage() {
     const id = setTimeout(() => { setLoading(true); load() }, 0)
     return () => clearTimeout(id)
   }, [load])
+
+  // Live: device reports arrive over Realtime (the phone PATCHes its row the
+  // moment what it enforces changes), so "Locked on the phone" shows up
+  // without the parent refreshing. A slow poll + refresh-on-return covers
+  // the child row on databases without migration 76, and dropped sockets.
+  useEffect(() => {
+    const unsubscribe = subscribeToChildState(childId, {
+      onDevice: (row, eventType) => {
+        if (eventType === 'DELETE' || !row) { load({ quiet: true }); return }
+        setDevices((prev) => {
+          const i = prev.findIndex((d) => d.id === row.id)
+          if (i === -1) return [...prev, row]
+          const next = prev.slice()
+          next[i] = { ...prev[i], ...row }
+          return next
+        })
+      },
+      onChild: (row) => setChild((prev) => (prev ? { ...prev, ...row } : row)),
+    })
+    const tick = () => { if (document.visibilityState === 'visible') load({ quiet: true }) }
+    const id = setInterval(tick, 30_000)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      unsubscribe()
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', tick)
+    }
+  }, [childId, load])
 
   // A different child starts on their overview.
   useEffect(() => {
@@ -318,7 +348,7 @@ export default function ChildDetailPage() {
       </nav>
 
       {section.key === 'today' && (
-        <CommandCenter devices={devices} childId={childId} child={child} onChildUpdated={setChild} onRefreshDevices={load} />
+        <CommandCenter devices={devices} childId={childId} child={child} onChildUpdated={setChild} onRefreshDevices={() => load({ quiet: true })} />
       )}
 
       {ActiveComponent && (
@@ -326,8 +356,15 @@ export default function ChildDetailPage() {
           key={activeTab}
           childId={childId}
           child={child}
+          devices={devices}
           onNavigateTab={setActiveTab}
-          onChildUpdated={(c) => { setChild(c); getAttentionCounts(childId).then(setCounts).catch(() => {}) }}
+          onChildUpdated={(c) => {
+            // Called with the updated child row, or with nothing just to
+            // refresh the badges — never wipe the child on an empty call.
+            if (c?.id) setChild(c)
+            else load({ quiet: true })
+            getAttentionCounts(childId).then(setCounts).catch(() => {})
+          }}
         />
       )}
     </div>

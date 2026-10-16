@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Megaphone, Send, Clock, CheckCircle2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import useOrgStore from '@/store/orgStore'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import Card, { CardBody } from '@/components/ui/Card'
-import { cn } from '@/lib/utils'
+import { cn, withoutDeviceAccounts } from '@/lib/utils'
 import BroadcastCompose from './BroadcastCompose'
 import BroadcastScheduled from './BroadcastScheduled'
 import BroadcastDelivery from './BroadcastDelivery'
@@ -17,7 +17,7 @@ const TABS = [
 
 export default function BroadcastPage() {
   const { org, hasPermission } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const orgId = org?.id
   const canBroadcast = hasPermission('announcements.manage') || hasPermission('members.manage')
 
@@ -31,7 +31,7 @@ export default function BroadcastPage() {
     try {
       const { data, error } = await supabase.rpc('org_members')
       if (error) throw error
-      setMembers(data ?? [])
+      setMembers(withoutDeviceAccounts(data))
     } catch (err) {
       toast.error('Could not load devotees', err.message)
     } finally {

@@ -37,14 +37,14 @@ export default function SetupChecklistCard() {
   const missingRequired = outstanding.filter((s) => s.required).length
 
   return (
-    <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
+    <div className="rounded-[var(--radius-lg)] bg-[var(--color-warning-soft)] p-4">
       <div className="flex items-start gap-3 mb-3">
-        <ShieldAlert size={20} className="text-amber-600 shrink-0 mt-0.5" />
+        <ShieldAlert size={20} className="text-[var(--color-warning)] shrink-0 mt-0.5" />
         <div>
-          <p className="font-semibold text-amber-900">
+          <p className="font-semibold text-primary-token">
             {missingRequired > 0 ? 'Setup is not finished' : 'A couple of optional things'}
           </p>
-          <p className="text-xs text-amber-700 mt-0.5">
+          <p className="text-xs text-secondary-token mt-0.5">
             {missingRequired > 0
               ? 'Some protection is off until these are turned on. Android needs each one tapped by hand on this device.'
               : 'These make VOICE work better, but nothing is broken without them.'}
@@ -57,17 +57,17 @@ export default function SetupChecklistCard() {
           <button
             key={key}
             onClick={() => navigate('/child/setup')}
-            className="flex items-center gap-3 bg-white rounded-2xl px-3.5 py-3 text-left active:bg-amber-100/60 transition-colors"
+            className="press flex items-center gap-3 bg-[var(--surface)] rounded-[var(--radius-md)] px-3.5 h-12 text-left"
           >
-            <Icon size={18} className="text-amber-600 shrink-0" />
-            <span className="flex-1 min-w-0 text-sm font-medium text-gray-800">
-              {label} {!required && <span className="text-gray-400 font-normal">(optional)</span>}
+            <Icon size={18} className="text-[var(--color-warning)] shrink-0" />
+            <span className="flex-1 min-w-0 text-sm font-medium text-primary-token">
+              {label} {!required && <span className="text-muted-token font-normal">(optional)</span>}
             </span>
-            <ChevronRight size={16} className="text-amber-400 shrink-0" />
+            <ChevronRight size={16} className="text-muted-token shrink-0" />
           </button>
         ))}
         {outstanding.length > 3 && (
-          <button onClick={() => navigate('/child/setup')} className="text-xs font-semibold text-amber-800 py-1">
+          <button onClick={() => navigate('/child/setup')} className="text-xs font-semibold text-[var(--color-warning)] py-1">
             + {outstanding.length - 3} more
           </button>
         )}

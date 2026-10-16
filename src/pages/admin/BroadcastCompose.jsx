@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Send, Clock, Users, Building2, CheckCircle2, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Avatar from '@/components/ui/Avatar'
@@ -36,7 +36,7 @@ function devoteeWord(n) {
 }
 
 export default function BroadcastCompose({ orgId, members, membersLoading, categories }) {
-  const toast = useToastStore()
+  const toast = useToast()
 
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')

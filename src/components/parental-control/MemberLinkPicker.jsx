@@ -17,6 +17,7 @@
 import { useState, useEffect } from 'react'
 import { UserRound } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { withoutDeviceAccounts } from '@/lib/utils'
 
 export default function MemberLinkPicker({ value, onChange }) {
   const [members, setMembers] = useState([])
@@ -27,7 +28,7 @@ export default function MemberLinkPicker({ value, onChange }) {
     supabase.rpc('org_members').then(({ data, error }) => {
       if (!alive) return
       if (!error) {
-        setMembers((data ?? []).filter((m) => m.status === 'active'))
+        setMembers(withoutDeviceAccounts(data).filter((m) => m.status === 'active'))
       }
       setLoading(false)
     })

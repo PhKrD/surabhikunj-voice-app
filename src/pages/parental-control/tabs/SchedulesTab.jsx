@@ -75,7 +75,7 @@ function AppPicker({ apps, selected, onChange }) {
             return (
               <span key={pkg} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--color-primary-50)] text-[var(--color-primary-700)] text-xs">
                 {app?.app_name || pkg}
-                <button type="button" onClick={() => toggle(pkg)} className="hover:text-red-600"><X className="w-3 h-3" /></button>
+                <button type="button" onClick={() => toggle(pkg)} className="hover:text-[var(--color-danger)]"><X className="w-3 h-3" /></button>
               </span>
             )
           })}
@@ -337,7 +337,7 @@ export default function SchedulesTab({ childId }) {
                       <button onClick={() => openForm(sched)} className="p-1.5 rounded-lg text-muted-token hover:text-[var(--color-primary-600)] hover:bg-[var(--color-primary-50)]">
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button onClick={() => remove(sched.id)} className="p-1.5 rounded-lg text-muted-token hover:text-red-600 hover:bg-red-50">
+                      <button onClick={() => remove(sched.id)} className="p-1.5 rounded-lg text-muted-token hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>

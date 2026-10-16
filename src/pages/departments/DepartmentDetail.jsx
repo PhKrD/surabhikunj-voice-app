@@ -1,15 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Building2, Users, X, Trash2, Plus,
+  Building2, Users, Trash2, Plus,
   UtensilsCrossed, BookOpen, Sparkles, Heart, Home, Flower2, Sun,
   Music, Leaf, Wrench, Shield, Calendar, Bell, Star, Flame,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import Card, { CardBody } from '@/components/ui/Card'
 import Avatar from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
-import useToastStore from '@/store/toastStore'
+import { Dialog } from '@/components/ui/Dialog'
+import { useToast } from '@/store/toastStore'
 import { confirm } from '@/store/dialogStore'
+import { withoutDeviceAccounts } from '@/lib/utils'
 
 const DEPT_ICON_MAP = {
   Building2, Users, UtensilsCrossed, BookOpen, Sparkles, Heart, Home,
@@ -21,7 +22,7 @@ function memberLabel(m) {
 }
 
 export default function DepartmentDetail({ department, orgId, canManage, onClose, onChanged }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [orgMembers, setOrgMembers] = useState([])
   const [members, setMembers] = useState([])
   const [loadingMembers, setLoadingMembers] = useState(true)
@@ -36,7 +37,7 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
     if (!orgId) return
     const { data, error } = await supabase.rpc('org_members')
     if (!error && data) {
-      setOrgMembers(data)
+      setOrgMembers(withoutDeviceAccounts(data))
       return
     }
 
@@ -140,39 +141,26 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
   const LI = department.icon && DEPT_ICON_MAP[department.icon]
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
-      onClick={onClose}
+    <Dialog
+      open
+      onClose={onClose}
+      className="sm:max-w-lg"
+      description={department.description}
+      title={
+        <span className="flex items-center gap-3">
+          <span
+            className="w-11 h-11 rounded-[var(--radius-md)] flex items-center justify-center flex-shrink-0 text-lg"
+            style={{ backgroundColor: department.color ? department.color + '20' : '#f9731620' }}
+          >
+            {LI
+              ? <LI className="w-5 h-5" style={{ color: department.color ?? '#f97316' }} />
+              : <span>{department.icon ?? '🏛️'}</span>}
+          </span>
+          <span className="truncate">{department.name}</span>
+        </span>
+      }
     >
-      <div
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Card>
-          <CardBody className="py-5 space-y-5">
-            <div className="flex items-start gap-3">
-              <div
-                className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
-                style={{ backgroundColor: department.color ? department.color + '20' : '#f9731620' }}
-              >
-                {LI
-                  ? <LI className="w-5 h-5" style={{ color: department.color ?? '#f97316' }} />
-                  : <span>{department.icon ?? '🏛️'}</span>}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-primary-token truncate">{department.name}</p>
-                {department.description && (
-                  <p className="text-xs text-secondary-token mt-0.5">{department.description}</p>
-                )}
-              </div>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg text-muted-token hover:text-secondary-token hover:bg-[var(--surface-muted)] flex-shrink-0"
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+          <div className="space-y-5">
 
             <div className="space-y-2">
               <p className="text-xs font-semibold text-secondary-token uppercase tracking-wide">Leadership</p>
@@ -306,9 +294,7 @@ export default function DepartmentDetail({ department, orgId, canManage, onClose
                 </div>
               )}
             </div>
-          </CardBody>
-        </Card>
-      </div>
-    </div>
+          </div>
+    </Dialog>
   )
 }

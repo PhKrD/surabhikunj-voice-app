@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Clock, Users, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -42,7 +42,7 @@ function groupRows(rows) {
 }
 
 export default function BroadcastScheduled({ orgId, memberById, categoryByKey }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [groups, setGroups] = useState([])
   const [loading, setLoading] = useState(true)
   const [cancellingKey, setCancellingKey] = useState(null)

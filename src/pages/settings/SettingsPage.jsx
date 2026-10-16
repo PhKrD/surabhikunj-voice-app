@@ -15,14 +15,14 @@ import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
 import Can from '@/components/Can'
 import { supabase } from '@/lib/supabase'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import { cn } from '@/lib/utils'
 
 // ─── Org Settings Tab ────────────────────────────────────────────────────────
 
 function OrgSettingsTab() {
   const { org, settings, _load } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const [branding, setBranding] = useState(settings?.branding ?? {})
   const [terminology, setTerminology] = useState(settings?.terminology ?? {})
   const [saving, setSaving] = useState(false)
@@ -138,7 +138,7 @@ function OrgSettingsTab() {
 // ─── Join code ───────────────────────────────────────────────────────────────
 
 function JoinCodeCard({ code }) {
-  const toast = useToastStore()
+  const toast = useToast()
   const [copied, setCopied] = useState(false)
 
   if (!code) return null
@@ -182,7 +182,7 @@ function JoinCodeCard({ code }) {
 
 function ModulesTab() {
   const { org, _load } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const [modules, setModules] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState({})
@@ -353,7 +353,7 @@ const ALL_PERMISSIONS = [
 
 function RolesTab() {
   const { org } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const [roles, setRoles]           = useState([])
   const [permissions, setPerms]     = useState({})  // role_id → Set<perm_key>
   const [loading, setLoading]       = useState(true)

@@ -12,7 +12,7 @@ import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
 import useOrgStore from '@/store/orgStore'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import DepartmentDetail from './DepartmentDetail'
 import { confirm } from '@/store/dialogStore'
 
@@ -34,7 +34,7 @@ const defaultForm = {
 export default function DepartmentsPage() {
   const { profile } = useAuthStore()
   const { org, hasPermission } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const orgId = org?.id ?? profile?.org_id
   const [departments, setDepartments] = useState([])
   const [loading, setLoading] = useState(true)

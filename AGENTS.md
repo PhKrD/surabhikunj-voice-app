@@ -45,6 +45,23 @@ See DEPLOYMENT.md for what needs an APK vs an OTA vs a settings change.
   `confirm()` from `store/dialogStore`, States: EmptyState/ErrorState/
   LoadingState/Skeleton, DynamicIcon). Use `friendlyError()` for any error
   shown to a user. No `window.confirm`.
+- **Modals = `<Dialog>`** (`components/ui/Dialog.jsx`), never a hand-built
+  `fixed inset-0` div. The main scroll container (`.scroll-container`) has
+  `transform: translateZ(0)`, so a `fixed` element inside it is positioned
+  relative to the content pane (sidebar not dimmed, sheet off-centre).
+  Dialog portals to `document.body`, stacks (Escape/back close only the top
+  one), keeps `onClose` in a ref (an inline `onClose` used to steal focus
+  from inputs on every render) and leaves focus on an `autoFocus` child.
+- **Toasts in hook deps**: use `useToast()` (stable actions), never
+  `const toast = useToastStore()` — the whole-store object changes on every
+  toast, so `useCallback(..., [toast])` loaders refetched in a loop.
+- **No default `[]`/`{}` props in hook deps** (`function X({ ids = [] })` +
+  `useCallback(..., [ids])`): a new array every render re-runs the effect
+  every render. This was the Counsellor picker "Searching…" flicker.
+- **Device accounts** (`device-…@voice.kids.internal`, pairing creates one
+  per unlinked child phone) are not people: filter member lists with
+  `withoutDeviceAccounts()` (`lib/utils.js`); migration 75 also hides them
+  in `org_members()` and blocks them from joining an org.
 - **Icons by name** (nav, categories): `getIcon()`/`<DynamicIcon>` from the
   registry in `src/lib/icons.js` — never `import * as Icons from 'lucide-react'`
   (pulls 625 kB). Add new names to the registry.
@@ -58,7 +75,9 @@ This repo does not store a DB password or Supabase access token locally —
 do not attempt to run DDL via the JS client (service-role key only grants
 PostgREST access, not raw SQL execution). Live status (probed October 2026):
 everything through 74 is applied except the optional 50 (it overwrites
-configured Sadhana marks — do not run it casually).
+configured Sadhana marks — do not run it casually). 75 (hide device
+accounts) and 76 (pc_children realtime) were written October 16 2026 and
+must be pasted in by hand; the app degrades gracefully without them.
 
 ## Parental Control module (`pc_*` schema)
 See:
@@ -269,6 +288,18 @@ Rules when touching this:
 - `applyDesiredState()` checks `childRow.has(...)` so a pre-72 database
   keeps the old command behaviour; `setDesiredState()` catches the missing
   column (42703/PGRST204) and falls back to command-only.
+- "Did the phone apply it?" = `src/lib/desiredStateStatus.js` (unit-tested):
+  intent (child row) vs. the phone's report (`lock_reason === 'parent_lock'`,
+  `manual_internet_pause`) → applied / applying / waiting (offline) /
+  unknown. CommandCenter tiles show this; never claim "Locked" from the
+  tap alone. `ChildDetailPage` keeps devices live via
+  `subscribeToChildState()` (Realtime on `pc_devices`; `pc_children` needs
+  migration 76) plus a 30 s visible-tab refresh.
+- Child requests: the child's RequestPage sends `metadata.package_name`
+  (picked from the child's blocked / time-limited apps) or
+  `metadata.domain` (`normalizeHost()`), so the parent's Approve applies
+  the change itself (`resolveChildRequest`). Free-typed app names can't be
+  applied and RequestsTab says so.
 
 ## Recent Parental Control Updates (Migration 71+)
 - **Parent PIN protection**: `SettingsGuard.kt` + `PinGateActivity.kt` prevent

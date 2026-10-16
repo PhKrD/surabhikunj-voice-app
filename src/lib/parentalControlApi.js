@@ -1145,6 +1145,32 @@ export function subscribeToDeviceCommands(deviceIds, onChange) {
   return () => supabase.removeChannel(channel)
 }
 
+/**
+ * Live device reports + the child's desired state. The phone PATCHes
+ * pc_devices (enforcement_state, last_seen_at) whenever what it enforces
+ * changes, so this is how the parent sees "Locked on the phone" a second or
+ * two after tapping Lock — without it the page only changed on a manual
+ * refresh. pc_children changes need migration 76 (publication); until then
+ * the caller's periodic refresh covers them.
+ */
+export function subscribeToChildState(childId, { onDevice, onChild }) {
+  if (!childId) return () => {}
+  const channel = supabase
+    .channel(`pc-child-state-${childId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'pc_devices', filter: `child_id=eq.${childId}` },
+      (payload) => onDevice?.(payload.new?.id ? payload.new : null, payload.eventType),
+    )
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'pc_children', filter: `id=eq.${childId}` },
+      (payload) => payload.new?.id && onChild?.(payload.new),
+    )
+    .subscribe()
+  return () => supabase.removeChannel(channel)
+}
+
 /** Move a device to a different child of the same parent. */
 export async function reassignDevice(deviceId, newChildId) {
   const { error } = await supabase

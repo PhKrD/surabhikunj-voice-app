@@ -3,7 +3,7 @@ import { ListChecks, Plus, ChevronLeft, ChevronRight, CheckCircle2, MinusCircle,
 import { format, parseISO } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import useOrgStore from '@/store/orgStore'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -26,7 +26,7 @@ const QUICK_STATUSES = ['done', 'partial', 'missed', 'excused']
 export default function TasksPage() {
   const { profile } = useAuthStore()
   const { org } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const orgId = org?.id ?? profile?.org_id
   const label = useTerm('tasks', 'Tasks')
 

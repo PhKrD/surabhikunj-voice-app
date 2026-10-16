@@ -4,12 +4,13 @@ import { GitBranch, Crown, Shield, Star, Users, Plus, X, Pencil, Trash2 } from '
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
 import useOrgStore from '@/store/orgStore'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import Card, { CardBody } from '@/components/ui/Card'
 import Avatar from '@/components/ui/Avatar'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
 import { confirm } from '@/store/dialogStore'
+import { withoutDeviceAccounts } from '@/lib/utils'
 
 const levelConfig = {
   vmc: { label: 'VMC', icon: Crown, color: 'bg-saffron-500 text-white', order: 0 },
@@ -37,7 +38,7 @@ const memberLabel = (m) => m.display_name || m.spiritual_name || m.legal_name ||
 export default function HierarchyPage() {
   const { profile } = useAuthStore()
   const { org, hasPermission } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const orgId = org?.id ?? profile?.org_id
   const [positions, setPositions] = useState([])
   const [members, setMembers] = useState([])
@@ -82,7 +83,7 @@ export default function HierarchyPage() {
 
     const { data, error } = await supabase.rpc('org_members')
     if (!error && data) {
-      setMembers(data)
+      setMembers(withoutDeviceAccounts(data))
       return
     }
 

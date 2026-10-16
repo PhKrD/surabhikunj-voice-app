@@ -25,6 +25,28 @@ export async function createRequest({ type, metadata, reason }) {
   return data
 }
 
+/**
+ * Apps the parent has blocked or time-limited for this child — what the
+ * child can pick from when asking for an app. Picking one sends the exact
+ * package_name, so the parent's "Approve" can apply the change itself
+ * (resolveChildRequest) instead of the parent having to guess from text.
+ */
+export async function listRestrictedApps() {
+  const creds = loadDeviceCreds()
+  if (!creds?.childId) return []
+  const { data, error } = await supabase
+    .from('pc_app_rules')
+    .select('package_name, app_name, action')
+    .eq('child_id', creds.childId)
+    .in('action', ['block', 'time_limit'])
+  if (error) throw error
+  const seen = new Set()
+  return (data ?? [])
+    .filter((r) => r.package_name && !seen.has(r.package_name) && seen.add(r.package_name))
+    .map((r) => ({ packageName: r.package_name, appName: r.app_name || r.package_name, action: r.action }))
+    .sort((a, b) => a.appName.localeCompare(b.appName))
+}
+
 export async function listMyRequests() {
   const creds = loadDeviceCreds()
   if (!creds?.childId) return []

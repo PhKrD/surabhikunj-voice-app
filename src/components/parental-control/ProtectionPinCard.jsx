@@ -81,8 +81,8 @@ export default function ProtectionPinCard({ child, onUpdated }) {
     <Card>
       <CardBody className="py-4 space-y-3">
         <div className="flex items-start gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${hasPin ? 'bg-emerald-100' : 'bg-amber-100'}`}>
-            {hasPin ? <ShieldCheck className="w-5 h-5 text-emerald-600" /> : <ShieldAlert className="w-5 h-5 text-amber-600" />}
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${hasPin ? 'bg-[var(--color-success-soft)]' : 'bg-[var(--color-warning-soft)]'}`}>
+            {hasPin ? <ShieldCheck className="w-5 h-5 text-[var(--color-success)]" /> : <ShieldAlert className="w-5 h-5 text-[var(--color-warning)]" />}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-primary-token">Protection PIN</p>

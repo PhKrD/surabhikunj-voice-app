@@ -19,9 +19,9 @@ const ACTION_META = {
 }
 
 const ACTION_SELECT_CLASS = {
-  block: 'bg-red-50 border-red-200 text-red-700',
-  alert: 'bg-amber-50 border-amber-200 text-amber-700',
-  allow: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+  block: 'bg-[var(--color-danger-soft)] border-[color-mix(in_srgb,var(--color-danger)_30%,transparent)] text-[var(--color-danger)]',
+  alert: 'bg-[var(--color-warning-soft)] border-[color-mix(in_srgb,var(--color-warning)_30%,transparent)] text-[var(--color-warning)]',
+  allow: 'bg-[var(--color-success-soft)] border-[color-mix(in_srgb,var(--color-success)_30%,transparent)] text-[var(--color-success)]',
 }
 
 function CategoryRow({ category, action, onChange }) {
@@ -102,7 +102,7 @@ function SettingsModal({ settings, onClose, onSave }) {
                 <p className="text-sm font-medium text-primary-token">{row.title}</p>
                 <p className="text-xs text-muted-token mt-0.5">{row.hint}</p>
                 {row.requiresVpn && form[row.key] && !form.use_vpn && (
-                  <p className="text-xs text-amber-700 mt-1 font-medium">
+                  <p className="text-xs text-[var(--color-warning)] mt-1 font-medium">
                     Turn on &quot;Also filter with a VPN&quot; below for this to take effect.
                   </p>
                 )}
@@ -248,9 +248,9 @@ export default function WebsiteRulesTab({ childId }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 flex items-start gap-3">
-        <AlertTriangle className="w-4.5 h-4.5 text-amber-600 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-800 leading-relaxed">
+      <div className="rounded-2xl border border-[color-mix(in_srgb,var(--color-warning)_30%,transparent)] bg-[var(--color-warning-soft)] p-3.5 flex items-start gap-3">
+        <AlertTriangle className="w-4.5 h-4.5 text-[var(--color-warning)] flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-[var(--color-warning)] leading-relaxed">
           <span className="font-semibold">Best-effort, not guaranteed.</span> Blocking works in the
           child&apos;s browser — VOICE reads the address bar and closes the page. No VPN required, and
           incognito doesn&apos;t bypass it. Limits: it only covers the browsers VOICE recognises (Chrome,
@@ -342,7 +342,7 @@ export default function WebsiteRulesTab({ childId }) {
                     <option value="allow">Allow (whitelist — overrides category blocks)</option>
                   </select>
                 </label>
-                {formError && <p className="text-sm text-red-600">{formError}</p>}
+                {formError && <p className="text-sm text-[var(--color-danger)]">{formError}</p>}
                 <div className="flex justify-end gap-2 pt-1">
                   <Button variant="secondary" size="sm" onClick={() => { setForm({ domain: '', action: 'block' }); setShowForm(false) }}>
                     Cancel
@@ -379,7 +379,7 @@ export default function WebsiteRulesTab({ childId }) {
                     <Badge variant={meta.variant}>{meta.label}</Badge>
                     <button
                       onClick={() => handleDelete(rule.id)}
-                      className="p-2 rounded-lg text-muted-token hover:text-red-600 hover:bg-red-50"
+                      className="p-2 rounded-lg text-muted-token hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

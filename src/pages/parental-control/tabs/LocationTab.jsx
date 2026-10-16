@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, X, MapPin, Navigation } from 'lucide-react'
+import { Plus, Trash2, X, MapPin, Navigation, Crosshair } from 'lucide-react'
 import Card, { CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import useOrgStore from '@/store/orgStore'
 import { useToast } from '@/store/toastStore'
+import { confirm } from '@/store/dialogStore'
+import { friendlyError } from '@/lib/friendlyError'
+import { cn } from '@/lib/utils'
+import { parseCoordinates } from '@/lib/geo'
 import {
   getLatestLocation,
   listRecentLocations,
@@ -13,6 +17,7 @@ import {
 } from '@/lib/parentalControlApi'
 
 const defaultForm = { name: '', latitude: '', longitude: '', radiusMeters: 200 }
+const RADIUS_PRESETS = [100, 200, 500, 1000]
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
   const r = 6_371_000
@@ -42,7 +47,7 @@ function MapEmbed({ latitude, longitude, zoomDelta = 0.01, height = 220 }) {
   )
 }
 
-export default function LocationTab({ childId }) {
+export default function LocationTab({ childId, child }) {
   const { org } = useOrgStore()
   const toast = useToast()
 
@@ -67,7 +72,7 @@ export default function LocationTab({ childId }) {
       setHistory(recent)
       setGeofences(gfs)
     } catch (error) {
-      toast.error('Could not load location data', error.message)
+      toast.error('Could not load location data', friendlyError(error))
     } finally {
       setLoading(false)
     }
@@ -94,11 +99,25 @@ export default function LocationTab({ childId }) {
     })
   }
 
+  const useChildLocation = () => {
+    if (!latest) return
+    setForm((f) => ({ ...f, latitude: latest.latitude.toFixed(6), longitude: latest.longitude.toFixed(6) }))
+  }
+
+  // Pasting "18.52, 73.85" or a maps link into either box fills both.
+  const onCoordinatePaste = (e) => {
+    const parsed = parseCoordinates(e.clipboardData?.getData('text'))
+    if (!parsed) return
+    e.preventDefault()
+    setForm((f) => ({ ...f, latitude: String(parsed.lat), longitude: String(parsed.lng) }))
+  }
+
   const handleCreate = async () => {
     const lat = Number(form.latitude)
     const lng = Number(form.longitude)
-    if (!form.name.trim() || Number.isNaN(lat) || Number.isNaN(lng)) {
-      setFormError('Name, latitude and longitude are required.')
+    if (!form.name.trim()) { setFormError('Give this place a name, like Home or School.'); return }
+    if (form.latitude === '' || form.longitude === '' || Number.isNaN(lat) || Number.isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      setFormError('Choose where it is: use a location button below, or paste coordinates or a Google Maps link.')
       return
     }
     setFormError('')
@@ -106,7 +125,7 @@ export default function LocationTab({ childId }) {
     try {
       await createGeofence({
         childId,
-        orgId: org?.id,
+        orgId: child?.org_id ?? org?.id,
         name: form.name.trim(),
         latitude: lat,
         longitude: lng,
@@ -115,22 +134,23 @@ export default function LocationTab({ childId }) {
       resetForm()
       setShowForm(false)
       await load()
-      toast.success('Geofence created')
+      toast.success('Place saved', 'Arrive / leave alerts start within about 30 minutes.')
     } catch (error) {
-      setFormError(error.message)
-      toast.error('Could not create geofence', error.message)
+      setFormError(friendlyError(error))
     } finally {
       setSaving(false)
     }
   }
 
   const handleDeleteGeofence = async (gf) => {
+    const ok = await confirm({ title: `Remove ${gf.name}?`, message: 'You will stop getting arrive / leave alerts for this place.', confirmLabel: 'Remove', danger: true })
+    if (!ok) return
     try {
       await deleteGeofence(gf.id)
       await load()
-      toast.success('Geofence removed')
+      toast.success('Place removed')
     } catch (error) {
-      toast.error('Could not remove geofence', error.message)
+      toast.error('Could not remove this place', friendlyError(error))
     }
   }
 
@@ -166,7 +186,7 @@ export default function LocationTab({ childId }) {
                 {geofences.length > 0 && (() => {
                   const inside = geofences.filter((gf) => haversineMeters(latest.latitude, latest.longitude, gf.latitude, gf.longitude) <= gf.radius_meters)
                   return (
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${inside.length ? 'bg-emerald-50 text-emerald-700' : 'bg-[var(--surface-muted)] text-secondary-token'}`}>
+                    <span className={cn('text-xs font-medium px-2.5 py-1 rounded-full', inside.length ? 'bg-[var(--color-success-soft)] text-[var(--color-success)]' : 'bg-[var(--surface-muted)] text-secondary-token')}>
                       {inside.length ? `At ${inside.map((g) => g.name).join(', ')}` : 'Not at a saved place'}
                     </span>
                   )
@@ -195,7 +215,7 @@ export default function LocationTab({ childId }) {
             setShowForm((v) => !v)
           }}
         >
-          {showForm ? 'Close' : 'Add zone'}
+          {showForm ? 'Close' : 'Add place'}
         </Button>
       </div>
 
@@ -211,12 +231,14 @@ export default function LocationTab({ childId }) {
                 className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
               />
             </label>
-            <div className="grid sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="text-xs text-secondary-token">Latitude</span>
                 <input
                   value={form.latitude}
                   onChange={(e) => setForm((f) => ({ ...f, latitude: e.target.value }))}
+                  onPaste={onCoordinatePaste}
+                  inputMode="decimal"
                   placeholder="18.5204"
                   className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
@@ -226,29 +248,46 @@ export default function LocationTab({ childId }) {
                 <input
                   value={form.longitude}
                   onChange={(e) => setForm((f) => ({ ...f, longitude: e.target.value }))}
+                  onPaste={onCoordinatePaste}
+                  inputMode="decimal"
                   placeholder="73.8567"
                   className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
                 />
               </label>
-              <label className="block">
-                <span className="text-xs text-secondary-token">Radius (m)</span>
-                <input
-                  type="number"
-                  min={50}
-                  value={form.radiusMeters}
-                  onChange={(e) => setForm((f) => ({ ...f, radiusMeters: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2.5 rounded-xl border border-[var(--border-color)] text-sm"
-                />
-              </label>
             </div>
-            <button
-              type="button"
-              onClick={useMyLocation}
-              className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-primary-600)]"
-            >
-              <Navigation className="w-3.5 h-3.5" /> Use my current location
-            </button>
-            {formError && <p className="text-sm text-red-600">{formError}</p>}
+            <div>
+              <span className="text-xs text-secondary-token">Size</span>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {RADIUS_PRESETS.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, radiusMeters: r }))}
+                    aria-pressed={Number(form.radiusMeters) === r}
+                    className={cn(
+                      'h-9 px-3.5 rounded-full text-sm font-medium border',
+                      Number(form.radiusMeters) === r
+                        ? 'bg-[var(--color-primary-soft)] border-[var(--color-primary)] text-[var(--color-primary-strong)]'
+                        : 'border-[var(--border-color)] text-secondary-token',
+                    )}
+                  >
+                    {r >= 1000 ? `${r / 1000} km` : `${r} m`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {latest && (
+                <Button type="button" size="sm" variant="soft" icon={Crosshair} onClick={useChildLocation}>
+                  Where {child?.display_name ?? 'my child'} is now
+                </Button>
+              )}
+              <Button type="button" size="sm" variant="secondary" icon={Navigation} onClick={useMyLocation}>
+                Where I am now
+              </Button>
+            </div>
+            <p className="text-xs text-muted-token">Tip: paste coordinates or a Google Maps link into Latitude to fill both boxes.</p>
+            {formError && <p role="alert" className="text-sm text-[var(--color-danger)]">{formError}</p>}
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="secondary" size="sm" onClick={() => { resetForm(); setShowForm(false) }}>
                 Cancel
@@ -276,7 +315,8 @@ export default function LocationTab({ childId }) {
               </div>
               <button
                 onClick={() => handleDeleteGeofence(gf)}
-                className="p-2 rounded-lg text-muted-token hover:text-red-600 hover:bg-red-50"
+                aria-label={`Remove ${gf.name}`}
+                className="w-10 h-10 flex items-center justify-center rounded-full text-muted-token hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]"
               >
                 <Trash2 className="w-4 h-4" />
               </button>

@@ -34,8 +34,8 @@ const LIMIT_ACTIONS = [
 ]
 
 const BAR_COLORS = [
-  'bg-[var(--color-primary-500)]', 'bg-saffron-500', 'bg-tulasi-500',
-  'bg-lotus-500', 'bg-blue-500', 'bg-emerald-500',
+  'bg-[var(--color-primary-500)]', 'bg-[var(--color-primary)]', 'bg-[var(--color-success)]',
+  'bg-lotus-500', 'bg-[var(--color-info)]', 'bg-[var(--color-success)]',
 ]
 
 /** Minutes input that also accepts "h:mm" and shows a friendly label. */
@@ -182,7 +182,7 @@ export default function UsageTab({ childId }) {
           </div>
           <button
             onClick={refresh}
-            className="p-2 rounded-xl text-muted-token hover:text-saffron-500 hover:bg-saffron-50 transition-colors"
+            className="p-2 rounded-xl text-muted-token hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition-colors"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -191,14 +191,14 @@ export default function UsageTab({ childId }) {
         {todayLimitMin !== null && (
           <div className="px-5 pb-4">
             <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className={overLimit ? 'text-red-600 font-semibold' : 'text-secondary-token'}>
+              <span className={overLimit ? 'text-[var(--color-danger)] font-semibold' : 'text-secondary-token'}>
                 {overLimit ? "Today's limit reached" : `${progress}% of today's limit · ${formatMinutes(todayLimitMin - Math.round(totalMs / 60_000))} left`}
               </span>
               <span className="text-muted-token">{DAYS[todayDow]} limit: {formatMinutes(todayLimitMin)}</span>
             </div>
             <div className="h-2 w-full bg-[var(--surface-muted)] rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full ${overLimit ? 'bg-red-500' : 'bg-saffron-500'}`}
+                className={`h-full rounded-full ${overLimit ? 'bg-[var(--color-danger)]' : 'bg-[var(--color-primary)]'}`}
                 style={{ width: `${todayLimitMin === 0 ? 100 : progress}%` }}
               />
             </div>
@@ -359,7 +359,7 @@ export default function UsageTab({ childId }) {
             <button
               onClick={save}
               disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-saffron-500 text-white text-sm font-medium hover:bg-saffron-600 disabled:opacity-60"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-strong)] disabled:opacity-60"
             >
               <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save limits'}
             </button>

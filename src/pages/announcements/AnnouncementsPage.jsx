@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Megaphone, Plus, Trash2, X, Send } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import useAuthStore from '@/store/authStore'
-import useToastStore from '@/store/toastStore'
+import { useToast } from '@/store/toastStore'
 import Card, { CardHeader, CardBody } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import Button from '@/components/ui/Button'
@@ -17,7 +17,7 @@ const inputCls =
 export default function AnnouncementsPage() {
   const { profile } = useAuthStore()
   const { org, hasPermission } = useOrgStore()
-  const toast = useToastStore()
+  const toast = useToast()
   const orgId = org?.id ?? profile?.org_id
   const canPost = hasPermission('announcements.create')
 

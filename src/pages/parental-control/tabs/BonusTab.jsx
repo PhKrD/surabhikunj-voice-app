@@ -74,7 +74,7 @@ export default function BonusTab({ childId }) {
                 <button
                   disabled={resolvingId === req.id}
                   onClick={() => handleResolve(req, false)}
-                  className="p-2 rounded-lg text-muted-token hover:text-red-600 hover:bg-red-50"
+                  className="p-2 rounded-lg text-muted-token hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]"
                 >
                   <XIcon className="w-4 h-4" />
                 </button>

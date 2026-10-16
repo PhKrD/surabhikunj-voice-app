@@ -43,7 +43,7 @@ export default function AuditLogTab({ childId }) {
         </div>
         <button
           onClick={refresh}
-          className="p-2 rounded-xl text-muted-token hover:text-saffron-500 hover:bg-saffron-50 transition-colors"
+          className="p-2 rounded-xl text-muted-token hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition-colors"
           title="Refresh"
         >
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />

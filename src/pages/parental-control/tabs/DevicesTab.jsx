@@ -221,7 +221,7 @@ export default function DevicesTab({ childId, onChildUpdated }) {
                       <p className="text-sm text-secondary-token mb-2">{syncMeta.description}</p>
                       {checklist.map((row) => {
                         const RowIcon = row.ok === null ? HelpCircle : row.ok ? CheckCircle2 : XCircle
-                        const color = row.ok === null ? 'text-muted-token' : row.ok ? 'text-green-600' : 'text-red-600'
+                        const color = row.ok === null ? 'text-muted-token' : row.ok ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'
                         return (
                           <div key={row.key} className="flex items-start gap-2 text-sm">
                             <RowIcon className={`w-4 h-4 mt-0.5 shrink-0 ${color}`} />
@@ -284,7 +284,7 @@ export default function DevicesTab({ childId, onChildUpdated }) {
                 )}
                 <button
                   onClick={() => handleRemove(device)}
-                  className="p-2.5 rounded-xl text-muted-token hover:text-red-600 hover:bg-red-50"
+                  className="p-2.5 rounded-xl text-muted-token hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]"
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>

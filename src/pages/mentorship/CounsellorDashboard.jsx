@@ -229,7 +229,7 @@ export default function CounsellorDashboard() {
 
       {stats.attention > 0 && (
         <Card className="!border-red-100">
-          <CardBody className="space-y-2">
+          <CardBody className="py-4 space-y-2">
             <p className="text-sm font-bold text-red-600 flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> Needs Attention</p>
             {mentees.filter((m) => m.needsAttention).map((m) => (
               <button
@@ -292,7 +292,7 @@ export default function CounsellorDashboard() {
           >
           <Card>
             <CardBody
-              className="flex items-center gap-3 cursor-pointer active:scale-[0.99] transition-transform"
+              className="py-4 flex items-center gap-3 cursor-pointer active:scale-[0.99] transition-transform"
               onClick={() => { tap(); navigate(`counselli/${m.id}`) }}
             >
               <Avatar name={m.name} url={m.avatar_url} size="md" />

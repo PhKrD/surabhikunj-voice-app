@@ -75,9 +75,9 @@ function MentorshipHome() {
     <div className="space-y-6 max-w-3xl mx-auto">
       <h1 className="text-title text-primary-token">{pageLabel}</h1>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {hasPermission('mentorship.view_own') && (
-          <Link to="dashboard" className="flex-1 min-w-[220px] flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-br from-saffron-500 to-orange-500 text-white shadow-sm hover:brightness-105 transition">
+          <Link to="dashboard" className="min-h-16 flex items-center gap-3 px-4 py-3 rounded-2xl bg-gradient-to-br from-saffron-500 to-orange-500 text-white shadow-sm hover:brightness-105 transition">
             <LayoutDashboard className="w-5 h-5" />
             <div className="flex-1">
               <p className="text-sm font-bold">Counsellor Dashboard</p>
@@ -87,7 +87,7 @@ function MentorshipHome() {
           </Link>
         )}
         <Can permission="mentorship.manage">
-          <Link to="manage" className="flex-1 min-w-[220px] flex items-center gap-3 px-4 py-3 rounded-2xl bg-[var(--surface)] border border-[var(--border-color)] hover:border-saffron-300 transition">
+          <Link to="manage" className="min-h-16 flex items-center gap-3 px-4 py-3 rounded-2xl bg-[var(--surface)] border border-[var(--border-color)] shadow-[var(--shadow-1)] hover:border-saffron-300 transition">
             <ShieldCheck className="w-5 h-5 text-saffron-500" />
             <div className="flex-1">
               <p className="text-sm font-bold text-primary-token">Counsellor Management</p>
@@ -112,7 +112,7 @@ function MentorshipHome() {
           <div className="grid gap-3 sm:grid-cols-2">
             {mentees.map((m) => (
               <Card key={m.id}>
-                <CardBody className="flex items-center gap-3">
+                <CardBody className="py-4 flex items-center gap-3">
                   <Avatar name={m.spiritual_name} url={m.avatar_url} size="sm" />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-primary-token truncate">{m.spiritual_name}</p>
@@ -128,7 +128,7 @@ function MentorshipHome() {
           <h2 className="text-base font-bold text-secondary-token">Your {mentorLabel}</h2>
           {mentor ? (
             <Card>
-              <CardBody className="flex items-center gap-4">
+              <CardBody className="py-4 flex items-center gap-4">
                 <Avatar name={mentor.spiritual_name} url={mentor.avatar_url} size="md" />
                 <div>
                   <p className="font-semibold text-primary-token">{mentor.spiritual_name}</p>

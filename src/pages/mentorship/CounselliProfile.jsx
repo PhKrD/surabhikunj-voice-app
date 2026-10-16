@@ -219,7 +219,7 @@ function TrendsTab({ mentee, tracker, fields, groups, rules, calculatedColumns }
 
   return (
     <Card>
-      <CardBody className="space-y-3">
+      <CardBody className="py-4 space-y-3">
         <p className="text-sm font-bold text-primary-token">Sadhana — Last 8 Weeks</p>
         <div className="flex items-end gap-2 h-40">
           {weeks.map((w) => (
